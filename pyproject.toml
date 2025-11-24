@@ -1,5 +1,5 @@
 [project]
-name = "acs-matcher"                   # what people will `uv add`
+name = "acs-matcher"
 version = "0.1.0"
 description = "Match participant-level CSVs to ACS tracts and transfer a new feature."
 readme = "README.md"
@@ -9,17 +9,18 @@ authors = [
   { name = "Atharva Beesen", email = "atharva.beesen@gmail.com" }
 ]
 
-# non-stdlib dependencies your code imports
 dependencies = [
   "numpy>=1.24",
   "pandas>=2.0"
 ]
 
 [project.urls]
-Homepage = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/acs_matcher"
-Repository = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/acs_matcher"
+Homepage = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"
+Repository = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build]
+packages = ["acs_matcher"]
