@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-  { name = "Your Name", email = "you@example.com" }
+  { name = "Atharva Beesen", email = "atharva.beesen@gmail.com" }
 ]
 
 # non-stdlib dependencies your code imports
@@ -16,9 +16,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourname/acs_matcher"
-Repository = "https://github.com/yourname/acs_matcher"
+Homepage = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/acs_matcher"
+Repository = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/acs_matcher"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
