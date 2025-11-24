@@ -1,4 +1,5 @@
-[![Unit tests](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/unittests.yml/badge.svg)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/unittests.yml)
+[![Unit tests](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/unittests.yml/badge.svg?branch=main)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/unittests.yml)
+
 # acs-matcher
 
 Match participant-level CSVs to ACS tracts and copy over a `new_feature` column.
@@ -25,5 +26,6 @@ This will create two files next to your participant CSV:
 
 - `Participant_Dataset_matched.csv`
 - `Participant_Dataset_unmatched.csv`
+
 
 
