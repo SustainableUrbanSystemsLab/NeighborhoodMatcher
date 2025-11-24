@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
 
-# -------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------------------
 # IMPORT TOOL
-# -------------------------------------------------------------
+# First run: pip install git+https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher.git
+# -------------------------------------------------------------------------------------------------------------
 from acs_matcher import match_participants_to_new_feature
 
 np.random.seed(42)
