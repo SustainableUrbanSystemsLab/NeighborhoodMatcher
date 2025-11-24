@@ -2,10 +2,10 @@
 
 Match participant-level CSVs to ACS tracts and copy over a `new_feature` column.
 
-## Installation (with uv)
+## Installation (with pip)
 
 ```bash
-uv add acs-matcher
+pip install git+https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher.git
 ```
 
 ## Usage
@@ -24,3 +24,4 @@ This will create two files next to your participant CSV:
 
 - `Participant_Dataset_matched.csv`
 - `Participant_Dataset_unmatched.csv`
+
