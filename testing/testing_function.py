@@ -28,7 +28,7 @@ acs["new_feature"] = (
     0.25*acs["feature_3"]
 )
 
-acs_path = "acs_sim_fixed.csv"
+acs_path = "acs_sim.csv"
 acs.to_csv(acs_path, index=False)
 
 # -------------------------------------------------------------
@@ -46,7 +46,7 @@ participants.loc[N_MATCH:, "feature_1"] = np.random.uniform(5, 10, N_UNMATCH)
 participants.loc[N_MATCH:, "feature_2"] = np.random.uniform(200000, 300000, N_UNMATCH)
 participants.loc[N_MATCH:, "feature_3"] = np.random.uniform(5, 10, N_UNMATCH)
 
-participant_path = "participants_sim_fixed.csv"
+participant_path = "participants_sim.csv"
 participants.to_csv(participant_path, index=False)
 
 # -------------------------------------------------------------
