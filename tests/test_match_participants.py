@@ -4,7 +4,7 @@ import numpy as np
 import os
 import tempfile
 import shutil
-from acs_matcher import match_participants_to_new_feature
+from acs_matcher import match_participants
 
 class TestMatchParticipants(unittest.TestCase):
     def setUp(self):
@@ -52,7 +52,7 @@ class TestMatchParticipants(unittest.TestCase):
         shutil.rmtree(self.test_dir)
 
     def test_matching_logic(self):
-        matched_path, unmatched_path = match_participants_to_new_feature(
+        matched_path, unmatched_path = match_participants(
             acs_csv_path=self.acs_path,
             participant_csv_path=self.participant_path,
             rtol=0.005

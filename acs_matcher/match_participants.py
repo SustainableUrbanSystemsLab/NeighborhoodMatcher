@@ -39,13 +39,13 @@ def _to_numeric_series(s: pd.Series) -> pd.Series:
     return s.map(parse_cell)
 
 
-def match_participants_to_new_feature(
+def match_participants(
     acs_csv_path: str,
     participant_csv_path: str,
     rtol: float = 0.005,
 ):
     """
-    Match participant-level rows to ACS tracts and copy over `new_feature`.
+    Match participant-level rows to ACS tracts and copy over `new_feature`. It essentially matches participants to a new feature.
 
     Parameters
     ----------
