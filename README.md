@@ -1,4 +1,4 @@
-[![Tests (Python)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/unittests.yml/badge.svg?branch=main)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/unittests.yml)
+[![Tests (Python)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml)
 [![Tests (R)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/r-tests.yml/badge.svg?branch=main)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/r-tests.yml)
 
 # acs-matcher
@@ -75,3 +75,4 @@ match_participants(
 ```
 
 This writes `*_matched.csv` and `*_unmatched.csv` next to your participant file and returns their paths.
+
