@@ -1,3 +1,9 @@
-/acs_matcher/__pycache__
-/tests/__pycache__
+/python/acs_matcher/__pycache__
+/python/tests/__pycache__
 .venv/
+/python/.venv/
+/r/.Rhistory
+/r/.RData
+/r/.Ruserdata
+/r/.Rproj.user
+/r/.venv/
