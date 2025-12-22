@@ -3,7 +3,7 @@ with_temp_dir <- function(code) {
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   old <- setwd(dir)
   on.exit(setwd(old), add = TRUE)
-  force(code)
+  eval.parent(substitute(code))
 }
 
 test_that("matches participants and writes outputs", {
