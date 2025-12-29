@@ -7,3 +7,5 @@
 /r/.Ruserdata
 /r/.Rproj.user
 /r/.venv/
+/acs_matcher/__pycache__
+/tests/__pycache__
