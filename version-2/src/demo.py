@@ -1,3 +1,5 @@
+# NOTE: Human written
+
 import csv
 import numpy as np
 
