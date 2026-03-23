@@ -4,6 +4,9 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
+import seaborn as sns # Wrapper for matplotlib.pyplot
+import squarify # Wrapper for seaborns for tree plots
+
 def load_results(filepath):
     with open(filepath, "r") as f:
         reader = csv.reader(f)
@@ -21,8 +24,8 @@ def load_results(filepath):
 
     return noise_levels, column_counts, np.array(match_rates)
 
-def plot_heatmap(noise_levels, column_counts, match_rates, output_path="data/heatmap.png"):
-    fig, ax = plt.subplots(figsize=(12, 5))
+def plot_heatmap_even(noise_levels, column_counts, match_rates, output_path="data/heatmap_even.png"):
+    fig, ax = plt.subplots(figsize=(20, 8))
 
     im = ax.imshow(match_rates, cmap="RdYlGn", vmin=0, vmax=1, aspect="auto")
 
@@ -33,14 +36,43 @@ def plot_heatmap(noise_levels, column_counts, match_rates, output_path="data/hea
 
     ax.set_xlabel("Noise Level")
     ax.set_ylabel("Number of Columns")
-    ax.set_title("Match Rate by Column Count and Noise Level")
+    ax.set_title("Match Rate by Column Count and Noise Level (Even Spacing)")
 
     # Add text annotations in each cell
     for i in range(len(column_counts)):
         for j in range(len(noise_levels)):
             val = match_rates[i, j]
             color = "white" if val < 0.5 else "black"
-            ax.text(j, i, f"{val:.2f}", ha="center", va="center", color=color, fontsize=7)
+            ax.text(j, i, f"{val:.2f}", ha="center", va="center", color=color, fontsize=5)
+
+    plt.colorbar(im, ax=ax, label="Match Rate")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150)
+    print(f"Even heatmap saved to {output_path}")
+
+def plot_heatmap(noise_levels, column_counts, match_rates, output_path="data/heatmap.png"):
+    fig, ax = plt.subplots(figsize=(14, 6))
+
+    # Build edge arrays for pcolormesh (needs N+1 edges for N cells)
+    noise_arr = np.array(noise_levels)
+    col_arr = np.array(column_counts)
+
+    # Create bin edges halfway between each value
+    noise_edges = np.concatenate([[noise_arr[0] - (noise_arr[1] - noise_arr[0]) / 2],
+        (noise_arr[:-1] + noise_arr[1:]) / 2,
+        [noise_arr[-1] + (noise_arr[-1] - noise_arr[-2]) / 2]])
+
+    col_edges = np.concatenate([[col_arr[0] - 0.5],
+        (col_arr[:-1] + col_arr[1:]) / 2,
+        [col_arr[-1] + 0.5]])
+
+    im = ax.pcolormesh(noise_edges, col_edges, match_rates, cmap="RdYlGn", vmin=0, vmax=1)
+
+    ax.set_xlabel("Noise Level")
+    ax.set_ylabel("Number of Columns")
+    ax.set_title("Match Rate by Column Count and Noise Level")
+    ax.set_yticks(column_counts)
+    ax.invert_yaxis()
 
     plt.colorbar(im, ax=ax, label="Match Rate")
     plt.tight_layout()
@@ -66,5 +98,6 @@ def plot_line_chart(noise_levels, column_counts, match_rates, output_path="data/
 
 if __name__ == "__main__":
     noise_levels, column_counts, match_rates = load_results("data/experiment_results.csv")
+    plot_heatmap_even(noise_levels, column_counts, match_rates)
     plot_heatmap(noise_levels, column_counts, match_rates)
     plot_line_chart(noise_levels, column_counts, match_rates)

@@ -94,8 +94,8 @@ def dump_heatmap_csv(filepath, results, column_counts, noise_levels):
             writer.writerow(row)
 
 if __name__ == "__main__":
-    column_counts = [2, 4, 6, 8, 10, 12]
-    noise_levels = [0, 0.005, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.12, 0.15, 0.18, 0.2]
+    column_counts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    noise_levels = [0, 0.0025, 0.005, 0.0075, 0.01, 0.0125, 0.015, 0.0175, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05, 0.055, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.14, 0.16, 0.18, 0.2, 0.225, 0.25, 0.3, 0.35, 0.4]
 
     results = experiment_coordinator(
         target_file="data/acs-test/dataseta.csv",

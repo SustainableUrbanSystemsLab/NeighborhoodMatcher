@@ -9,3 +9,6 @@
 /r/.venv/
 /acs_matcher/__pycache__
 /tests/__pycache__
+
+# Local Netlify folder
+.netlify
