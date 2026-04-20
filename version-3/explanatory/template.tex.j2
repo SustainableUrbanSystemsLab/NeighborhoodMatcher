@@ -1,0 +1,349 @@
+\documentclass[11pt, letterpaper]{article}
+
+\usepackage[margin=1in, bottom=1.2in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{amsmath}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{parskip}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{fancyhdr}
+\usepackage{mdframed}
+
+\definecolor{matchgreen}{RGB}{180, 230, 185}
+\definecolor{accentblue}{RGB}{68, 114, 196}
+\definecolor{lightgray}{RGB}{245, 245, 245}
+\definecolor{rulegray}{RGB}{180, 180, 180}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\small\textcolor{accentblue}{\textbf{Probabilistic Dataset Merge}} --- Signal Reference}
+\fancyhead[R]{\small << scenario_title >>}
+\fancyfoot[C]{\small\thepage}
+
+\captionsetup{font=small, labelfont=bf}
+
+\begin{document}
+
+%% ============================================================
+%% TITLE
+%% ============================================================
+\begin{center}
+  {\LARGE\bfseries\textcolor{accentblue}{Probabilistic Dataset Merge}}\\[6pt]
+  {\large\bfseries << scenario_title >>}\\[4pt]
+  {\normalsize\itshape << scenario_subtitle >>}\\[8pt]
+  \textcolor{rulegray}{\rule{0.6\textwidth}{0.8pt}}
+\end{center}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.8pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=8pt, innerbottommargin=8pt]
+  \small\textbf{What this scenario demonstrates.} << description >>
+\end{mdframed}
+
+\vspace{8pt}
+
+%% ============================================================
+%% TARGET ROW
+%% ============================================================
+\section*{The Target Record}
+
+This is the record we are trying to match. The system will search the supplemental
+dataset for the row closest to these values.
+
+\vspace{4pt}
+
+<% if target_table_rows %>
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{l <% for c in columns %>r<% if not loop.last %> <% endif %><% endfor %>}
+    \toprule
+    \textbf{Record} & <% for c in columns %>\textbf{<< c.display >>}<% if not loop.last %> & <% endif %><% endfor %> \\
+    \midrule
+<% for row in target_table_rows %>
+    \textbf{<< row.label >>} & << row.cells >> \\
+<% endfor %>
+    \bottomrule
+  \end{tabular}
+  \caption{Target row values (raw, unstandardized). The match is performed for \textbf{Target A}.}
+\end{table}
+<% else %>
+\begin{table}[h]
+  \centering
+  \small
+  \begin{tabular}{<% for c in columns %>r<% if not loop.last %> <% endif %><% endfor %>}
+    \toprule
+    <% for c in columns %>\textbf{<< c.display >>}<% if not loop.last %> & <% endif %><% endfor %> \\
+    \midrule
+    << target_row_cells >> \\
+    \bottomrule
+  \end{tabular}
+  \caption{Target row values (raw, unstandardized).}
+\end{table}
+<% endif %>
+
+<% if rounding_note %>
+\vspace{2pt}
+{\small\textit{\textbf{Note:} << rounding_note >>}}
+\vspace{4pt}
+<% endif %>
+
+%% ============================================================
+%% ALL CANDIDATES
+%% ============================================================
+\section*{All Candidate Matches}
+
+The table below shows all 20 supplemental rows, sorted from closest to farthest.
+Distances are computed in standardized space (see Section~3).
+The \colorbox{matchgreen}{highlighted row} is the best match --- the one the system selects.
+
+\vspace{4pt}
+
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{r <% for c in columns %>r <% endfor %>r}
+  \toprule
+  \textbf{Rank} & <% for c in columns %>\textbf{<< c.display >>} & <% endfor %>\textbf{Distance} \\
+  \midrule
+<% for row in supp_table %>
+<% if row.is_best %>  \rowcolor{matchgreen}<% endif %>
+  << row.rank >> & << row.cells >> & << row.dist_fmt >> \\
+<% endfor %>
+  \bottomrule
+\end{tabular}%
+}
+
+\vspace{4pt}
+{\footnotesize
+  \textit{Note: ``Distance'' is the standardized Euclidean distance between the target and each
+  candidate row. A distance of 0.0000 means a perfect, identical match.}}
+
+%% ============================================================
+%% WORKED EXAMPLE
+%% ============================================================
+\section*{How Distance Is Calculated: A Worked Example}
+
+We use the \textbf{rank~2} candidate below to illustrate the calculation step by step.
+(The rank~1 match has distance~0 and is trivial; rank~2 shows the full arithmetic.)
+
+\vspace{6pt}
+
+\textbf{Step 1 --- Put every feature on the same scale (standardization).}
+
+Raw values are measured in different units (counts, years, percentages).
+Before computing distance we convert each to a \emph{standardized score}: how many
+standard deviations above or below the combined average that value sits.
+
+\[
+  z = \frac{\text{raw value} - \text{combined average}}{\text{combined spread}}
+\]
+
+\vspace{4pt}
+
+{\small
+\begin{tabular}{l r r r r}
+  \toprule
+  \textbf{Feature} &
+  \textbf{Target (raw)} &
+  \textbf{Candidate (raw)} &
+  \textbf{Combined Avg.} &
+  \textbf{Combined Spread} \\
+  \midrule
+<% for row in example_rows %>
+  << row.display >> & << row.target_raw >> & << row.cand_raw >> & << row.mean >> & << row.std >> \\
+<% endfor %>
+  \bottomrule
+\end{tabular}
+}
+
+\vspace{6pt}
+
+Applying the formula above to each feature gives these standardized scores:
+
+\vspace{4pt}
+
+{\small
+\begin{tabular}{l r r}
+  \toprule
+  \textbf{Feature} &
+  \textbf{Target (std.)} &
+  \textbf{Candidate (std.)} \\
+  \midrule
+<% for row in example_rows %>
+  << row.display >> & << row.z_target >> & << row.z_cand >> \\
+<% endfor %>
+  \bottomrule
+\end{tabular}
+}
+
+\vspace{8pt}
+
+\textbf{Step 2 --- Compute the squared difference for each feature, then sum and take the square root.}
+
+\[
+  d \;=\; \sqrt{\,\sum_{i}\,\bigl(z_{\text{target},i} - z_{\text{cand},i}\bigr)^2\,}
+\]
+
+\vspace{4pt}
+
+{\small
+\begin{tabular}{l r r r}
+  \toprule
+  \textbf{Feature} & \textbf{Target (std.)} & \textbf{Cand. (std.)} & \textbf{Squared difference} \\
+  \midrule
+<% for row in example_rows %>
+  << row.display >> & << row.z_target >> & << row.z_cand >> & << row.sq_diff >> \\
+<% endfor %>
+  \midrule
+  \textit{Sum} & & & \textit{<< example_sq_sum >>} \\
+  \bottomrule
+\end{tabular}
+}
+
+\vspace{6pt}
+
+\[
+  d \;=\; \sqrt{<< example_sq_sum >>} \;=\; \mathbf{<< example_distance >>}
+\]
+
+%% ============================================================
+%% HISTOGRAM
+%% ============================================================
+\section*{Distance Distribution}
+
+The chart below shows the distance from the target to each of the 20 candidate rows,
+sorted closest to farthest. The \textbf{highlighted bar} is the selected match.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.92\textwidth]{<< histogram_path >>}
+  \caption{Distances from target to all 20 supplemental candidates, sorted ascending.
+           The selected match is highlighted.}
+\end{figure}
+
+%% ============================================================
+%% SIGNAL ANALYSIS
+%% ============================================================
+\section*{Signal Analysis}
+
+Each signal below is reported in the output file for every matched row.
+This section explains what each signal means and why it has the value it does
+for this particular match.
+
+\vspace{6pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{euc\_distance} \hfill \texttt{<< signals.euc_distance >>}\\[4pt]
+  \small << signal_explanations.euc_distance >>
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{per\_feature\_contribution (best match)}\\[4pt]
+  \small << signal_explanations.per_feature_contribution >>
+
+  \vspace{4pt}
+  {\small
+  \begin{tabular}{l r}
+    \toprule
+    \textbf{Feature} & \textbf{Share of distance} \\
+    \midrule
+<% for row in contrib_rows %>
+    << row.display >> & << row.pct >> \\
+<% endfor %>
+    \bottomrule
+  \end{tabular}
+  }
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{nndr} \hfill \texttt{<< signals.nndr >>}\\[4pt]
+  \small << signal_explanations.nndr >>
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{near\_miss\_count} \hfill \texttt{<< signals.near_miss_count >>}\\[4pt]
+  \small << signal_explanations.near_miss_count >>
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{mnn\_confirmed} \hfill \texttt{<< signals.mnn_confirmed >>}\\[4pt]
+  \small << signal_explanations.mnn_confirmed >>
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{repeats} \hfill \texttt{<< signals.repeats >>}\\[4pt]
+  \small << signal_explanations.repeats >>
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{smd (per feature)} \hfill
+  \texttt{[<% for v in signals.smd_fmt %><< v >><% if not loop.last %>,\; <% endif %><% endfor %>]}\\[4pt]
+  \small << signal_explanations.smd >>
+\end{mdframed}
+
+\vspace{4pt}
+
+\begin{mdframed}[backgroundcolor=lightgray, linecolor=rulegray, linewidth=0.6pt,
+                 innerleftmargin=10pt, innerrightmargin=10pt,
+                 innertopmargin=6pt, innerbottommargin=6pt, nobreak=true]
+  \textbf{flags} \hfill
+<% if signals.flags %>
+  \texttt{<< signals.flags >>}\\[4pt]
+<% else %>
+  \texttt{(none)}\\[4pt]
+<% endif %>
+  \small << signal_explanations.flags >>
+\end{mdframed}
+
+%% ============================================================
+%% FOOTER
+%% ============================================================
+\vfill
+
+\textcolor{rulegray}{\rule{\textwidth}{0.4pt}}
+
+\vspace{4pt}
+
+{\footnotesize
+  \textbf{Data note:} Values in this example are adapted from U.S. Census Bureau
+  American Community Survey (ACS) public data. Column names have been replaced
+  with illustrative labels for demonstration purposes.
+  This document is intended for researcher education and internal system validation.
+}
+
+\end{document}

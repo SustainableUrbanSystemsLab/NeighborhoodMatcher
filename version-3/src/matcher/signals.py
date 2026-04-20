@@ -139,15 +139,17 @@ def dataset_smd(std_rows_1, matched_indices, std_rows_2):
 # NNDR threshold is intentionally absent — it is run-configurable and
 # passed explicitly so the flag reflects the same threshold used during matching.
 _FLAG_RULES = {
-    "nndr":     {"message": "ambiguous match — NNDR {nndr:.2f} (>= {threshold:.2f})"},
-    "near_miss":{"message": "{n} near-miss row(s) within distance ratio threshold"},
-    "repeat":   {"message": "{n} exact-distance tie(s)"},
-    "smd_poor": {"threshold": 0.25, "message": "poor feature balance — {features} (|SMD| > 0.25)"},
-    "smd_warn": {"threshold": 0.10, "message": "feature imbalance — {features} (|SMD| > 0.10)"},
+    "nndr":      {"message": "ambiguous match — NNDR {nndr:.2f} (>= {threshold:.2f})"},
+    "near_miss": {"message": "{n} near-miss row(s) within distance ratio threshold"},
+    "repeat":    {"message": "{n} exact-distance tie(s)"},
+    "mnn":       {"message": "MNN not confirmed — supplemental row is closer to a different target; this record may have no valid match"},
+    "smd_poor":  {"threshold": 0.25, "message": "poor feature balance — {features} (|SMD| > 0.25)"},
+    "smd_warn":  {"threshold": 0.10, "message": "feature imbalance — {features} (|SMD| > 0.10)"},
 }
 
 
-def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature, feature_names):
+def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature, feature_names,
+                mnn_confirmed=True):
     """
     Assembles a plain-English flag string for one matched row.
 
@@ -157,6 +159,7 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
     repeat_count    : int      — exact-distance ties from brute_find_best_match.
     smd_per_feature : 1-D array — per-feature SMD values from dataset_smd.
     feature_names   : sequence of str — feature names, same order as smd_per_feature.
+    mnn_confirmed   : bool     — False triggers an MNN flag (default True = no flag).
 
     Returns: str. Empty string if no flags raised; " | "-joined messages otherwise.
     """
@@ -170,6 +173,9 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
 
     if repeat_count > 1:
         flags.append(_FLAG_RULES["repeat"]["message"].format(n=repeat_count))
+
+    if not mnn_confirmed:
+        flags.append(_FLAG_RULES["mnn"]["message"])
 
     smd   = np.asarray(smd_per_feature)
     names = list(feature_names)
