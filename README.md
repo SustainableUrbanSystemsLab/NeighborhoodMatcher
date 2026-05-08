@@ -1,99 +1,25 @@
-[![Python Tests](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml)
-[![R tests](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/r-tests.yml/badge.svg?branch=main)](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/r-tests.yml)
+# NeighborhoodMatcher
 
-# acs-matcher
+Tooling developed by the Sustainable Urban Systems Lab for matching
+participant-level data to neighborhood-scale records (American Community Survey
+census tracts and similar). The repository captures three iterations of the
+matcher and a browser frontend.
 
-Match participant-level CSVs to ACS tracts and copy over a `new_feature` column.
+## Repository layout
 
-## Project layout
+| Folder | What it is | Authorship |
+|--------|------------|------------|
+| [`version-1/`](version-1/) | Original Python (`acs_matcher`) and R packages. Match participant CSVs to ACS tracts and copy over a `new_feature` column. Tolerance-based matching. | Predates the current author (Tristin Shestag). Kept for reference; install paths in [`version-1/README.md`](version-1/README.md). |
+| [`version-2/`](version-2/) | Modular Python tool that finds the closest supplemental row for each target row using standardized Euclidean distance. Adds an analysis suite, sample data, and design notes. | Tristin Shestag — spring 2026. |
+| [`version-3/`](version-3/) | Current backend. Same matching core as v2 plus a battery of match-quality signals (NNDR, MNN, dataset SMD, per-row feature contribution, plain-English flags), an explanatory-PDF pipeline, and a Pyodide-loadable `web_api` for the frontend. See [`version-3/docs/`](version-3/docs/). | Tristin Shestag — spring 2026. |
+| [`apps/dataset-merge/`](apps/dataset-merge/) | React + Vite webapp that runs `version-3` in the browser via Pyodide. Upload two CSVs, link columns, view per-row diagnostics. | Tristin Shestag — spring 2026. |
 
-- `python/acs_matcher/`: Python package (uv/pyproject in `python/`).
-- `python/tests/`: Python tests.
-- `r/`: R package (DESCRIPTION, NAMESPACE, R/, tests/).
+Each version is self-contained in its folder; later versions do not import code
+from earlier ones. The progression is iterative — v2 generalizes the v1 idea,
+v3 adds the quality-signals layer on top of v2's matching logic.
 
-## Installation (Python):
+## Where to start
 
-With `uv`:
-
-```bash
-uv pip install "git+https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher.git#subdirectory=python"
-```
-
-wITH `pip`:
-
-```
-pip install "git+https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher.git#subdirectory=python"
-```
-
-## Usage (Python):
-
-```python
-from acs_matcher import match_participants
-
-match_participants(
-    acs_csv_path="ACS_Dataset.csv",
-    participant_csv_path="Participant_Dataset.csv",
-    rtol=0.005,  # default; 0.5%
-)
-```
-
-This will create two files next to your participant CSV:
-
-- `Participant_Dataset_matched.csv` (adds `new_feature`, `tract_alias`)
-- `Participant_Dataset_unmatched.csv` (original participant columns only)
-
-## Development (Python):
-
-```bash
-# from repo root
-cd python
-
-# create a local .venv and install deps + the package in editable mode
-uv sync
-
-# run the test suite
-uv run python -m unittest discover tests
-```
-
-## Installation (R)
-
-Recommended (install directly from GitHub):
-
-```bash
-install.packages("remotes", repos = "https://cloud.r-project.org")
-remotes::install_github("SustainableUrbanSystemsLab/NeighborhoodMatcher", subdir = "r")
-```
-
-## Usage (R):
-
-```r
-library(acsMatcher)
-
-match_participants(
-  acs_csv_path = "ACS_Dataset.csv",
-  participant_csv_path = "Participant_Dataset.csv",
-  rtol = 0.005
-)
-
-```
-
-This will create two files next to your participant CSV:
-
-- `Participant_Dataset_matched.csv` (adds `new_feature`, `tract_alias`)
-- `Participant_Dataset_unmatched.csv` (original participant columns only)
-
-## Development / Local install (R, Windows example)
-From the repo root:
-```
-# set a user-writable library (single path) for this session
-set R_LIBS_USER=%USERPROFILE%\R\libs
-
-# install R deps and build/install the package locally (verbose output)
-"C:\Program Files\R\R-4.5.2\bin\x64\Rscript.exe" -e "lib <- file.path(Sys.getenv('USERPROFILE'), 'R', 'libs'); dir.create(lib, showWarnings = FALSE, recursive = TRUE); .libPaths(lib); install.packages(c('digest','testthat','remotes'), lib=lib, repos='https://cloud.r-project.org'); remotes::install_local('r', lib=lib)"
-
-# run the R tests (uses the same library path)
-"C:\Program Files\R\R-4.5.2\bin\x64\Rscript.exe" -e "lib <- file.path(Sys.getenv('USERPROFILE'), 'R', 'libs'); .libPaths(lib); testthat::test_dir('r/tests/testthat')"
-```
-
-
-
+- **Researchers picking up the project:** read [`version-3/docs/README.md`](version-3/docs/README.md).
+- **Running the webapp locally:** [`apps/dataset-merge/`](apps/dataset-merge/).
+- **Looking at the older R / tolerance-matching code:** [`version-1/README.md`](version-1/README.md).
