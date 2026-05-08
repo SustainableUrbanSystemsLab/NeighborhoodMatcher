@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # Rounding Discrepancy scenario.
 #
 # The target values are rounded to coarser precision than the supplemental:

@@ -1,4 +1,3 @@
-# NOTE: Human authorized
 import os
 
 from .io import load_csv, clean_val, dump_csv

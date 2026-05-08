@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # Generates one PDF per scenario.
 # Run from version-3/ with the project venv active:
 #   python explanatory/build.py [scenario_label ...]

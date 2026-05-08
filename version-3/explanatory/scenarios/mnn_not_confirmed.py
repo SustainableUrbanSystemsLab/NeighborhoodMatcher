@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # MNN Not Confirmed scenario.
 #
 # Mutual Nearest Neighbor (MNN) confirmation runs the match in reverse:

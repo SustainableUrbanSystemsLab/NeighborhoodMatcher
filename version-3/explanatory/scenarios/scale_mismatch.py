@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # Scale Mismatch scenario.
 #
 # The target reports dragon_sightings in thousands (2.469) while every

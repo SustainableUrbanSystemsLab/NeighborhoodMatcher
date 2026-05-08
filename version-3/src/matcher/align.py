@@ -1,6 +1,3 @@
-# NOTE: Human authorized
-
-
 def find_common_headers(headers1, headers2, exclude=None):
     """
     Finds columns present in both header lists.
