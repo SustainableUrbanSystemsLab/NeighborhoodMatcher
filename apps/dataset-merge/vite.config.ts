@@ -10,4 +10,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Pyodide inside the matcher worker uses dynamic imports, which Rollup
+  // cannot emit as IIFE (Vite's default). Force ES modules for workers.
+  worker: {
+    format: "es",
+  },
 });

@@ -19,7 +19,7 @@ export function parseCSVFile(file: File): Promise<ParsedDataset> {
           row.some((cell) => cell.trim() !== "")
         );
 
-        resolve({ headers, rows, fileName: file.name });
+        resolve({ headers, rows, fileName: file.name, file });
       },
       error(err) {
         reject(err);

@@ -2,6 +2,7 @@ export interface ParsedDataset {
   headers: string[];
   rows: string[][];
   fileName: string;
+  file: File;
 }
 
 export interface ColumnLink {
@@ -11,34 +12,47 @@ export interface ColumnLink {
   excluded: boolean;
 }
 
-export interface MatchResult {
-  targetRowIndex: number;
-  matchedSupplementalIndex: number;
-  euclideanDistance: number;
-  repeatCount: number;
-  nearRepeatCount: number;
-  near1PctCount: number;
-  near5PctCount: number;
-  matchQuality: number;
-  matchFlag: MatchFlag;
-  flagReasons: string[];
-  mergedRow: string[];
-}
-
-export interface MatchOutput {
-  headers: string[];
-  results: MatchResult[];
-  mergedRows: string[][];
-}
-
 export interface PIIWarning {
   columnName: string;
   datasetLabel: "target" | "supplemental";
   reason: string;
 }
 
-export type MatchFlag = "OK" | "Warning" | "Extreme Warning";
+export interface PerTargetDetail {
+  target_idx: number;
+  match_idx: number;
+  best_distance: number;
+  second_distance: number;
+  nndr: number;
+  near_miss: number;
+  mnn_confirmed: boolean;
+  repeats: number;
+  contributions: number[];
+  flags: string;
+  hist_counts: number[];
+  hist_edges: number[];
+  top_k_distances: number[];
+}
 
-export type ProgressCallback = (current: number, total: number) => void;
+export interface MatchSummary {
+  total: number;
+  flagged: number;
+  mnn_confirmed: number;
+  mean_nndr: number;
+  mean_best_distance: number;
+  threshold: number;
+}
+
+export interface MatchOutput {
+  feature_names: string[];
+  smd: number[];
+  threshold: number;
+  linked_headers: string[];
+  linked_rows: string[][];
+  detail_headers: string[];
+  detail_rows: string[][];
+  per_target: PerTargetDetail[];
+  summary: MatchSummary;
+}
 
 export type AppStep = "upload" | "agreement" | "link" | "matching" | "results";
