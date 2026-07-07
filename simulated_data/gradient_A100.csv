@@ -1,0 +1,6 @@
+k_variables,variables,mean_candidates,median_candidates,max_candidates,pct_unique,pct_ambiguous
+1,pct_poverty,217.44,237.5,342,1.3,98.7
+2,pct_poverty + pct_unemployment,3.01,3.0,9,24.4,75.6
+3,pct_poverty + pct_unemployment + median_rent,1.13,1.0,3,89.7,10.3
+4,pct_poverty + pct_unemployment + median_rent + pct_vacant_housing,1.0,1.0,1,100.0,0.0
+5,pct_poverty + pct_unemployment + median_rent + pct_vacant_housing + median_income,1.0,1.0,1,100.0,0.0

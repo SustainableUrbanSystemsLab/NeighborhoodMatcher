@@ -1,0 +1,7 @@
+scenario,n,pct_exact,pct_fuzzy,pct_correct_top1,mean_quality,min_quality,max_quality
+clean,10,0.0,100.0,70.0,91.4,88,97
+duplicate_group,3,0.0,100.0,66.7,93.7,91,96
+missing_all,1,0.0,0.0,0.0,0.0,0,0
+missing_one,2,0.0,100.0,50.0,93.5,92,95
+missing_three,1,0.0,100.0,0.0,91.0,91,91
+perturbed_pm2,3,0.0,100.0,33.3,89.3,85,92
