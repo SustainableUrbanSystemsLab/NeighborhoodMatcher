@@ -6,11 +6,9 @@ import numpy as np
 from .io import load_csv, clean_val, dump_csv
 from .align import find_common_headers
 from .standardize import dual_standardize, scale_compatibility_warnings
-from .distance import compute_sorted_distances
+from .distance import match_all
 from .merge import row_merge, new_header
 from .signals import (
-    cascading_nndr,
-    mnn_confirmed,
     per_row_feature_contribution,
     dataset_smd,
     build_flags,
@@ -91,18 +89,16 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     # Standardize across both datasets jointly
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
-    # Pass 1: match every target row, collect full distance distributions
-    matches = []
-    for i, row in enumerate(std_rows_1):
-        sorted_dists, j, repeats = compute_sorted_distances(row, std_rows_2)
-        matches.append((i, j, repeats, sorted_dists))
+    # Pass 1: vectorized brute-force matching (chunked; see distance.match_all —
+    # brute force is a privacy decision, only the arithmetic is vectorized)
+    res = match_all(std_rows_1, std_rows_2, threshold=threshold)
 
     # Dataset-level SMD — one computation across all validly matched pairs
-    valid = [(i, j) for i, j, _, sorted_dists in matches if np.isfinite(sorted_dists[0])]
-    if valid:
+    matched_mask = res["best_index"] >= 0
+    if matched_mask.any():
         smd = dataset_smd(
-            np.asarray(std_rows_1)[[i for i, _ in valid]],
-            [j for _, j in valid],
+            np.asarray(std_rows_1)[matched_mask],
+            res["best_index"][matched_mask],
             std_rows_2,
         )
     else:
@@ -112,9 +108,8 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     blank_supp_row = [""] * len(h2)
     linked_rows = []
     detail_rows = []
-    for i, j, repeats, sorted_dists in matches:
-        no_match = not np.isfinite(sorted_dists[0])
-        if no_match:
+    for i in range(len(std_rows_1)):
+        if not matched_mask[i]:
             flags = build_flags(
                 1.0, 0, threshold, 0, smd, feature_names,
                 target_missing=target_missing[i], no_match=True,
@@ -130,17 +125,20 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
             )
             continue
 
-        nndr_val, near_miss = cascading_nndr(sorted_dists, threshold)
-        confirmed, _         = mnn_confirmed(i, j, std_rows_1, std_rows_2)
-        contributions        = per_row_feature_contribution(std_rows_1[i], std_rows_2[j])
-        flags                = build_flags(
+        j = int(res["best_index"][i])
+        repeats = int(res["repeats"][i])
+        nndr_val = float(res["nndr"][i])
+        near_miss = int(res["near_miss"][i])
+        confirmed = bool(res["mnn_confirmed"][i])
+        contributions = per_row_feature_contribution(std_rows_1[i], std_rows_2[j])
+        flags = build_flags(
             nndr_val, near_miss, threshold, repeats, smd, feature_names,
             mnn_confirmed=confirmed,
             target_missing=target_missing[i],
             match_missing=supp_missing[j],
         )
 
-        dist = float(sorted_dists[0])
+        dist = float(res["best_distance"][i])
         linked_rows.append(
             row_merge(rs1[i], rs2[j], common)
             + [dist, repeats, round(nndr_val, 4), near_miss, int(confirmed), flags]

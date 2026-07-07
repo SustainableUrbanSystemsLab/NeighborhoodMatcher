@@ -83,6 +83,18 @@ Distance computation is `O(N × M × d)` — every target row is compared to eve
 supplemental row. No indexing structures (kd-trees, ball trees, FLANN) are used
 because:
 
+**Vectorized, not indexed.** `matcher.distance.match_all` runs the brute-force
+comparison in chunked numpy blocks (one `chunk_size × M` slab at a time), fuses
+the MNN reverse search into the same pass as a running per-supplemental-row
+minimum, and retains only per-target statistics (best/second distance, tie and
+near-miss counts, optional top-k + histogram) — never a full N × M matrix.
+This changes the constant factor, not the algorithm: every pair is still
+compared. Measured on a laptop (single core): 70k × 70k in ~97 s (complete
+data) and 10k × 73k real ACS data with suppressed blanks in ~18 s, versus
+~36 min for the per-row loop it replaced. The per-row functions
+(`euclidean_distance`, `compute_sorted_distances`, `brute_find_best_match`)
+remain as the executable spec; `tests/test_match_all.py` pins the equivalence.
+
 - Standardization is joint across both datasets, so any index would need to be
   rebuilt per run.
 - The signals pipeline (especially `cascading_nndr` and the histograms in

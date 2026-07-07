@@ -12,12 +12,10 @@ import numpy as np
 
 from .align import find_common_headers
 from .standardize import dual_standardize, scale_compatibility_warnings
-from .distance import compute_sorted_distances
+from .distance import match_all
 from .merge import row_merge, new_header
 from .pipeline import extract_features, missing_counts
 from .signals import (
-    cascading_nndr,
-    mnn_confirmed,
     per_row_feature_contribution,
     dataset_smd,
     build_flags,
@@ -37,14 +35,6 @@ def _parse_csv_string(csv_str, file_label):
                 f"expected {len(headers)} (matching the header)"
             )
     return headers, rows
-
-
-def _histogram(dists, bins):
-    finite = dists[np.isfinite(dists)]
-    if finite.size == 0:
-        return [], []
-    counts, edges = np.histogram(finite, bins=bins)
-    return counts.tolist(), edges.tolist()
 
 
 def coordinate_in_memory(
@@ -115,31 +105,32 @@ def coordinate_in_memory(
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
     n_target = len(std_rows_1)
-    step = max(1, n_target // 50)
 
-    def _report(phase_offset, i):
+    # Distance pass dominates the wall clock; reserve the last 5% of the
+    # progress bar for output assembly.
+    def _match_progress(frac):
         if progress_cb is None:
             return
-        # Overall progress spans two passes (0..1); each pass is half.
-        frac = (phase_offset + (i / n_target)) / 2.0 if n_target else 1.0
         try:
-            progress_cb(frac)
+            progress_cb(0.95 * frac)
         except Exception:
             pass
 
-    matches = []
-    for i, row in enumerate(std_rows_1):
-        sorted_dists, j, repeats = compute_sorted_distances(row, std_rows_2)
-        matches.append((i, j, repeats, sorted_dists))
-        if i % step == 0:
-            _report(0.0, i)
+    # Vectorized brute-force matching (chunked; brute force is a privacy
+    # decision — see docs/architecture.md). chunk_size=32 keeps the transient
+    # broadcast block small enough for the WASM heap in Pyodide.
+    res = match_all(
+        std_rows_1, std_rows_2, threshold=threshold,
+        top_k=top_k, hist_bins=hist_bins,
+        chunk_size=32, progress_cb=_match_progress,
+    )
 
     # Dataset-level SMD — computed across validly matched pairs only
-    valid = [(i, j) for i, j, _, sorted_dists in matches if np.isfinite(sorted_dists[0])]
-    if valid:
+    matched_mask = res["best_index"] >= 0
+    if matched_mask.any():
         smd = dataset_smd(
-            np.asarray(std_rows_1)[[i for i, _ in valid]],
-            [j for _, j in valid],
+            np.asarray(std_rows_1)[matched_mask],
+            res["best_index"][matched_mask],
             std_rows_2,
         )
     else:
@@ -166,12 +157,8 @@ def coordinate_in_memory(
     nndr_sum = 0.0
     best_distance_sum = 0.0
 
-    for idx_iter, (i, j, repeats, sorted_dists) in enumerate(matches):
-        if idx_iter % step == 0:
-            _report(1.0, idx_iter)
-
-        no_match = not np.isfinite(sorted_dists[0])
-        if no_match:
+    for i in range(n_target):
+        if not matched_mask[i]:
             flags = build_flags(
                 1.0, 0, threshold, 0, smd, feature_names,
                 target_missing=target_missing[i], no_match=True,
@@ -207,8 +194,11 @@ def coordinate_in_memory(
             no_match_count += 1
             continue
 
-        nndr_val, near_miss = cascading_nndr(sorted_dists, threshold)
-        confirmed, _ = mnn_confirmed(i, j, std_rows_1, std_rows_2)
+        j = int(res["best_index"][i])
+        repeats = int(res["repeats"][i])
+        nndr_val = float(res["nndr"][i])
+        near_miss = int(res["near_miss"][i])
+        confirmed = bool(res["mnn_confirmed"][i])
         contributions = per_row_feature_contribution(std_rows_1[i], std_rows_2[j])
         flags = build_flags(
             nndr_val, near_miss, threshold, repeats, smd, feature_names,
@@ -217,12 +207,9 @@ def coordinate_in_memory(
             match_missing=supp_missing[j],
         )
 
-        best_distance = float(sorted_dists[0])
-        second_distance = (
-            float(sorted_dists[1])
-            if len(sorted_dists) > 1 and np.isfinite(sorted_dists[1])
-            else float("nan")
-        )
+        best_distance = float(res["best_distance"][i])
+        second = res["second_distance"][i]
+        second_distance = float(second) if np.isfinite(second) else float("nan")
 
         linked_rows.append(
             row_merge(rs1[i], rs2[j], common)
@@ -235,9 +222,8 @@ def coordinate_in_memory(
             + [flags]
         )
 
-        hist_counts, hist_edges = _histogram(sorted_dists, bins=hist_bins)
-        finite_sorted = sorted_dists[np.isfinite(sorted_dists)]
-        top_dists = finite_sorted[: min(top_k, len(finite_sorted))].tolist()
+        hist_counts, hist_edges = res["histograms"][i] if hist_bins > 0 else ([], [])
+        top_dists = res["top_k"][i] if top_k > 0 else []
 
         per_target.append({
             "target_idx": int(i),
@@ -271,7 +257,7 @@ def coordinate_in_memory(
         except Exception:
             pass
 
-    n = len(matches)
+    n = n_target
     n_matched = n - no_match_count
     summary = {
         "total": n,
