@@ -253,7 +253,7 @@ Small, purpose-built datasets for user education. Goals:
 ## Change Log
 | Date | Note |
 |------|------|
-| 2026-04-06 | Initial brainstorm — T.S. + Claude |
+| 2026-04-06 | Initial brainstorm |
 | 2026-04-06 | Added downstream-aware matching architecture (3 tiers) + ethical constraint for Tier 3 |
 | 2026-04-06 | Defined MVP output format: zip with linked dataset, summary stats, high-res detail file, originals, use agreement |
 | 2026-04-06 | Added literature review; formalized signals as NNDR, MNN, SMD; partially resolved dimension-count question |

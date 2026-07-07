@@ -4,12 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "sync-assets": "node scripts/sync-assets.mjs",
+    "predev": "pnpm run sync-assets",
+    "prebuild": "pnpm run sync-assets",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "jszip": "^3.10.1",
     "papaparse": "^5.4.1",
+    "pyodide": "^0.29.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router": "^7.3.0"

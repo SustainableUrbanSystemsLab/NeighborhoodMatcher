@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # Shared data pool for all explanatory scenarios.
 # Values are adapted from U.S. Census Bureau American Community Survey (ACS) data.
 # Column names have been replaced with illustrative labels for demonstration purposes.

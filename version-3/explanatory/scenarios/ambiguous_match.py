@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # Ambiguous Match scenario.
 #
 # The supplemental pool contains two rows that are nearly identical to each other

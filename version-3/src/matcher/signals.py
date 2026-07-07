@@ -1,27 +1,12 @@
-# NOTE: Quality signals — to be implemented after design discussion.
-#
-# Planned signals (see docs/match_quality_brainstorm.md):
-#
-#   cascading_nndr(sorted_dists, threshold)
-#       Returns (nndr, near_miss_count).
-#       nndr     = d1/d2 ratio (Lowe 2004)
-#       near_miss_count = number of supplemental rows where d1/di >= threshold
-#
-#   mnn_confirmed(target_idx, best_supp_idx, std_rows_1, std_rows_2)
-#       Returns (confirmed, reverse_repeat_count).
-#       confirmed: True if match is symmetric (Muja & Lowe 2009).
-#       reverse_repeat_count: ties found in the reverse search.
-#
-#   per_row_feature_contribution(target_row, matched_row)
-#       Returns array of per-feature squared-distance proportions.
-#       Feeds the heat map.
-#
-#   dataset_smd(std_rows_1, matched_indices, std_rows_2)
-#       Returns per-feature SMD across all matched pairs (Austin, PMC3472075).
-#       Benchmark: |SMD| > 0.10 = imbalance, > 0.25 = poor.
-#
-#   build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature)
-#       Returns a plain-English string for the flags column.
+"""
+Match-quality signals computed for every target/supplemental pair.
+
+Each signal isolates one aspect of match confidence; together they form the
+content of the ``flags`` column written to the linked dataset and detail file.
+See ``docs/signals/`` for per-signal write-ups (definition, behavior, examples,
+edge cases) and ``docs/architecture.md`` for how these are wired into the
+pipeline.
+"""
 
 from matcher.distance import brute_find_best_match, euclidean_distance
 
@@ -66,7 +51,7 @@ def mnn_confirmed(target_idx, best_supp_idx, std_rows_1, std_rows_2):
     Runs a reverse search: if supplemental row at best_supp_idx has
     target_idx among its nearest target rows, the match is symmetric.
     Permissive on ties — ties are reported separately via
-    reverse_repeat_count (see match_quality_brainstorm.md §6).
+    reverse_repeat_count (see docs/signals/mnn_confirmed.md).
 
     Returns: (confirmed, reverse_repeat_count)
         confirmed            — bool. True if target_idx is among nearest.

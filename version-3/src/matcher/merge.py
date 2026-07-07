@@ -1,6 +1,3 @@
-# NOTE: Human authorized
-
-
 def row_merge(target_row, supplemental_row, common):
     """Appends non-shared supplemental columns to a target row."""
     shared_s_indices = {col["header2Index"] for col in common}

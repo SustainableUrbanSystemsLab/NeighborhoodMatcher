@@ -1,5 +1,3 @@
-# NOTE: Human authorized
-#
 # Exact Match scenario.
 # The target row is inserted verbatim as the 20th supplemental row.
 # Expected result: euc_distance=0, nndr=0, near_miss_count=0,

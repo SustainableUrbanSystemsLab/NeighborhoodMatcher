@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -34,12 +34,20 @@ export default function Home() {
           </div>
         </div>
 
-        <button
-          onClick={() => navigate("/match")}
-          className="rounded-xl bg-blue-600 px-8 py-3 text-lg font-semibold text-white shadow-lg transition-colors hover:bg-blue-700"
-        >
-          Get Started
-        </button>
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <button
+            onClick={() => navigate("/match")}
+            className="rounded-xl bg-blue-600 px-8 py-3 text-lg font-semibold text-white shadow-lg transition-colors hover:bg-blue-700"
+          >
+            Get Started
+          </button>
+          <Link
+            to="/about"
+            className="rounded-xl border border-gray-300 bg-white px-8 py-3 text-lg font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+          >
+            How it works
+          </Link>
+        </div>
 
         <div className="mt-6 rounded-lg bg-green-50 p-3">
           <p className="text-sm text-green-700">
