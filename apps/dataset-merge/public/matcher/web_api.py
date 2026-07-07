@@ -1,4 +1,3 @@
-# NOTE: Human authorized.
 # In-memory pipeline wrapper for the browser (Pyodide) frontend.
 # Wraps the same logic as pipeline.coordinator but:
 #   - takes CSV strings instead of file paths
@@ -11,11 +10,11 @@ import io as _io
 
 import numpy as np
 
-from .io import clean_val
 from .align import find_common_headers
-from .standardize import dual_standardize
+from .standardize import dual_standardize, scale_compatibility_warnings
 from .distance import compute_sorted_distances
 from .merge import row_merge, new_header
+from .pipeline import extract_features, missing_counts
 from .signals import (
     cascading_nndr,
     mnn_confirmed,
@@ -25,16 +24,26 @@ from .signals import (
 )
 
 
-def _parse_csv_string(csv_str):
-    reader = csv.reader(_io.StringIO(csv_str))
+def _parse_csv_string(csv_str, file_label):
+    reader = csv.reader(_io.StringIO(csv_str.lstrip("﻿")))
     data = list(reader)
     if not data:
         return [], []
-    return data[0], data[1:]
+    headers, rows = data[0], data[1:]
+    for i, row in enumerate(rows):
+        if len(row) != len(headers):
+            raise ValueError(
+                f"{file_label}: line {i + 2} has {len(row)} cells, "
+                f"expected {len(headers)} (matching the header)"
+            )
+    return headers, rows
 
 
 def _histogram(dists, bins):
-    counts, edges = np.histogram(dists, bins=bins)
+    finite = dists[np.isfinite(dists)]
+    if finite.size == 0:
+        return [], []
+    counts, edges = np.histogram(finite, bins=bins)
     return counts.tolist(), edges.tolist()
 
 
@@ -69,8 +78,8 @@ def coordinate_in_memory(
     if exclude is None:
         exclude = []
 
-    h1, rs1 = _parse_csv_string(target_csv)
-    h2, rs2 = _parse_csv_string(supplemental_csv)
+    h1, rs1 = _parse_csv_string(target_csv, "target file")
+    h2, rs2 = _parse_csv_string(supplemental_csv, "supplemental file")
 
     if links is None:
         common = find_common_headers(h1, h2, exclude)
@@ -93,8 +102,15 @@ def coordinate_in_memory(
     if not rs2:
         raise ValueError("Supplemental dataset has no rows.")
 
-    filtered_rs1 = [[clean_val(row[c["header1Index"]]) for c in common] for row in rs1]
-    filtered_rs2 = [[clean_val(row[c["header2Index"]]) for c in common] for row in rs2]
+    # Missing cells -> None -> NaN; never imputed — distances mask missing
+    # dimensions instead (see pipeline.coordinator, same behaviour).
+    filtered_rs1 = extract_features(rs1, common, "header1Index", "target file")
+    filtered_rs2 = extract_features(rs2, common, "header2Index", "supplemental file")
+
+    target_missing = missing_counts(filtered_rs1)
+    supp_missing = missing_counts(filtered_rs2)
+
+    warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
 
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
@@ -118,63 +134,123 @@ def coordinate_in_memory(
         if i % step == 0:
             _report(0.0, i)
 
-    matched_indices = [m[1] for m in matches]
-    smd = dataset_smd(std_rows_1, matched_indices, std_rows_2)
+    # Dataset-level SMD — computed across validly matched pairs only
+    valid = [(i, j) for i, j, _, sorted_dists in matches if np.isfinite(sorted_dists[0])]
+    if valid:
+        smd = dataset_smd(
+            np.asarray(std_rows_1)[[i for i, _ in valid]],
+            [j for _, j in valid],
+            std_rows_2,
+        )
+    else:
+        smd = np.zeros(len(feature_names))
 
     linked_headers = (
         new_header(h1, h2, common)
         + ["euc_distance", "repeats", "nndr", "near_miss_count", "mnn_confirmed", "flags"]
     )
     detail_headers = (
-        ["target_index", "euc_distance", "nndr", "near_miss_count", "mnn_confirmed"]
+        ["target_index", "euc_distance", "nndr", "near_miss_count", "mnn_confirmed",
+         "target_missing", "match_missing"]
         + [f"contrib_{name}" for name in feature_names]
         + ["flags"]
     )
 
+    blank_supp_row = [""] * len(h2)
     linked_rows = []
     detail_rows = []
     per_target = []
     flagged_count = 0
     mnn_confirmed_count = 0
+    no_match_count = 0
     nndr_sum = 0.0
     best_distance_sum = 0.0
 
     for idx_iter, (i, j, repeats, sorted_dists) in enumerate(matches):
         if idx_iter % step == 0:
             _report(1.0, idx_iter)
+
+        no_match = not np.isfinite(sorted_dists[0])
+        if no_match:
+            flags = build_flags(
+                1.0, 0, threshold, 0, smd, feature_names,
+                target_missing=target_missing[i], no_match=True,
+            )
+            linked_rows.append(
+                row_merge(rs1[i], blank_supp_row, common)
+                + ["", 0, "", 0, 0, flags]
+            )
+            detail_rows.append(
+                [i, "", "", 0, 0, target_missing[i], ""]
+                + ["" for _ in feature_names]
+                + [flags]
+            )
+            per_target.append({
+                "target_idx": int(i),
+                "match_idx": None,
+                "no_match": True,
+                "best_distance": None,
+                "second_distance": None,
+                "nndr": None,
+                "near_miss": 0,
+                "mnn_confirmed": False,
+                "repeats": 0,
+                "target_missing": int(target_missing[i]),
+                "match_missing": None,
+                "contributions": [0.0 for _ in feature_names],
+                "flags": flags,
+                "hist_counts": [],
+                "hist_edges": [],
+                "top_k_distances": [],
+            })
+            flagged_count += 1
+            no_match_count += 1
+            continue
+
         nndr_val, near_miss = cascading_nndr(sorted_dists, threshold)
         confirmed, _ = mnn_confirmed(i, j, std_rows_1, std_rows_2)
         contributions = per_row_feature_contribution(std_rows_1[i], std_rows_2[j])
         flags = build_flags(
             nndr_val, near_miss, threshold, repeats, smd, feature_names,
             mnn_confirmed=confirmed,
+            target_missing=target_missing[i],
+            match_missing=supp_missing[j],
         )
 
         best_distance = float(sorted_dists[0])
-        second_distance = float(sorted_dists[1]) if len(sorted_dists) > 1 else float("nan")
+        second_distance = (
+            float(sorted_dists[1])
+            if len(sorted_dists) > 1 and np.isfinite(sorted_dists[1])
+            else float("nan")
+        )
 
         linked_rows.append(
             row_merge(rs1[i], rs2[j], common)
             + [best_distance, repeats, round(nndr_val, 4), near_miss, int(confirmed), flags]
         )
         detail_rows.append(
-            [i, best_distance, round(nndr_val, 4), near_miss, int(confirmed)]
+            [i, best_distance, round(nndr_val, 4), near_miss, int(confirmed),
+             target_missing[i], supp_missing[j]]
             + [round(float(c), 6) for c in contributions]
             + [flags]
         )
 
         hist_counts, hist_edges = _histogram(sorted_dists, bins=hist_bins)
-        top_dists = sorted_dists[: min(top_k, len(sorted_dists))].tolist()
+        finite_sorted = sorted_dists[np.isfinite(sorted_dists)]
+        top_dists = finite_sorted[: min(top_k, len(finite_sorted))].tolist()
 
         per_target.append({
             "target_idx": int(i),
             "match_idx": int(j),
+            "no_match": False,
             "best_distance": best_distance,
             "second_distance": second_distance,
             "nndr": float(nndr_val),
             "near_miss": int(near_miss),
             "mnn_confirmed": bool(confirmed),
             "repeats": int(repeats),
+            "target_missing": int(target_missing[i]),
+            "match_missing": int(supp_missing[j]),
             "contributions": [float(c) for c in contributions],
             "flags": flags,
             "hist_counts": hist_counts,
@@ -196,12 +272,14 @@ def coordinate_in_memory(
             pass
 
     n = len(matches)
+    n_matched = n - no_match_count
     summary = {
         "total": n,
         "flagged": flagged_count,
         "mnn_confirmed": mnn_confirmed_count,
-        "mean_nndr": (nndr_sum / n) if n else 0.0,
-        "mean_best_distance": (best_distance_sum / n) if n else 0.0,
+        "no_match": no_match_count,
+        "mean_nndr": (nndr_sum / n_matched) if n_matched else 0.0,
+        "mean_best_distance": (best_distance_sum / n_matched) if n_matched else 0.0,
         "threshold": threshold,
     }
 
@@ -214,6 +292,7 @@ def coordinate_in_memory(
         "feature_names": feature_names,
         "smd": [float(s) for s in smd],
         "threshold": float(threshold),
+        "warnings": list(warnings),
         "linked_headers": linked_headers,
         "linked_rows": linked_rows_str,
         "detail_headers": detail_headers,

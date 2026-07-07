@@ -107,3 +107,58 @@ def test_repeat_count_on_tie():
     ])
     _, _, repeat_count = compute_sorted_distances(target, pool)
     assert repeat_count == 2
+
+# ── missing data (NaN masking) ────────────────────────────────────────────────
+
+def test_nan_dims_charge_missing_penalty():
+    """Observed dims contribute squared diffs; missing dims contribute
+    MISSING_PENALTY each — a neutral prior, not an optimistic rescale."""
+    from matcher.distance import MISSING_PENALTY
+    a = np.array([0.0, 0.0, np.nan])
+    b = np.array([3.0, 4.0, 1.0])
+    # observed: (0-3)^2 + (0-4)^2 = 25; + one missing dim penalty
+    assert euclidean_distance(a, b) == pytest.approx(np.sqrt(25 + MISSING_PENALTY))
+
+def test_partial_agreement_cannot_fake_an_exact_match():
+    """A row that agrees on observed dims but is missing others must NOT
+    beat a complete exact match (the impostor-at-distance-0 regression)."""
+    target = np.array([1.0, 2.0])
+    complete_exact = np.array([1.0, 2.0])
+    partial_agree = np.array([1.0, np.nan])
+    assert euclidean_distance(target, complete_exact) == 0.0
+    assert euclidean_distance(target, partial_agree) > 0.0
+
+def test_nan_in_either_row_masks_dimension():
+    a = np.array([1.0, np.nan])
+    b = np.array([np.nan, 1.0])
+    assert euclidean_distance(a, b) == np.inf  # no shared observed dims
+
+def test_complete_rows_unchanged_by_masking_logic():
+    """Complete rows must take the exact fast path — identical to plain Euclidean."""
+    a = np.array([0.0, 0.0])
+    b = np.array([3.0, 4.0])
+    assert euclidean_distance(a, b) == 5.0
+
+def test_all_missing_target_returns_inf_everywhere():
+    target = np.array([np.nan, np.nan])
+    pool = np.array([[1.0, 2.0], [3.0, 4.0]])
+    sorted_dists, _, repeat_count = compute_sorted_distances(target, pool)
+    assert np.all(np.isinf(sorted_dists))
+    assert repeat_count == 0  # inf ties are not real ties
+
+def test_brute_find_best_match_all_inf_returns_none_index():
+    target = np.array([np.nan, np.nan])
+    pool = np.array([[1.0, 2.0], [3.0, 4.0]])
+    (dist, idx), repeats = brute_find_best_match(target, pool)
+    assert np.isinf(dist)
+    assert idx is None
+    assert repeats == 0
+
+def test_partial_missing_still_finds_best():
+    from matcher.distance import MISSING_PENALTY
+    target = np.array([1.0, np.nan])
+    pool = np.array([[1.0, 99.0], [50.0, 99.0]])
+    (dist, idx), _ = brute_find_best_match(target, pool)
+    assert idx == 0
+    # observed dim matches exactly; the missing dim still costs its penalty
+    assert dist == pytest.approx(np.sqrt(MISSING_PENALTY))

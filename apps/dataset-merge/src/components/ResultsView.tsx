@@ -65,10 +65,10 @@ export function ResultsView({
           cmp = a.target_idx - b.target_idx;
           break;
         case "best_distance":
-          cmp = a.best_distance - b.best_distance;
+          cmp = (a.best_distance ?? Infinity) - (b.best_distance ?? Infinity);
           break;
         case "nndr":
-          cmp = a.nndr - b.nndr;
+          cmp = (a.nndr ?? Infinity) - (b.nndr ?? Infinity);
           break;
         case "near_miss":
           cmp = a.near_miss - b.near_miss;
@@ -121,6 +121,28 @@ export function ResultsView({
           tone="gray"
         />
       </div>
+
+      {/* Dataset-level warnings (e.g. scale mismatch, no-match rows) */}
+      {(output.warnings?.length > 0 || summary.no_match > 0) && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="mb-1 text-xs font-semibold text-red-800">
+            Dataset warnings
+          </p>
+          <ul className="list-disc pl-4 text-xs text-red-800">
+            {summary.no_match > 0 && (
+              <li>
+                {summary.no_match} target row(s) have no valid match — they
+                share no observed features with any supplemental row (all
+                shared columns missing). They appear with blank match cells
+                in the output.
+              </li>
+            )}
+            {(output.warnings ?? []).map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* SMD bar chart */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -219,10 +241,10 @@ export function ResultsView({
                         {row.target_idx}
                       </td>
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
-                        {row.best_distance.toFixed(4)}
+                        {row.best_distance != null ? row.best_distance.toFixed(4) : "—"}
                       </td>
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
-                        {row.nndr.toFixed(3)}
+                        {row.nndr != null ? row.nndr.toFixed(3) : "—"}
                       </td>
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
                         {row.near_miss}
@@ -619,11 +641,13 @@ function DrilldownPanel({
       <div className="mb-3 flex items-start justify-between">
         <div>
           <h3 className="text-base font-semibold text-gray-900">
-            Target row {detail.target_idx} ↔ Supplemental row {detail.match_idx}
+            {detail.no_match
+              ? `Target row ${detail.target_idx} — no valid match`
+              : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
           </h3>
           <p className="mt-0.5 text-xs text-gray-500">
-            Distance {detail.best_distance.toFixed(4)} · NNDR{" "}
-            {detail.nndr.toFixed(3)} · MNN{" "}
+            Distance {detail.best_distance != null ? detail.best_distance.toFixed(4) : "—"} · NNDR{" "}
+            {detail.nndr != null ? detail.nndr.toFixed(3) : "—"} · MNN{" "}
             {detail.mnn_confirmed ? "✓ confirmed" : "✗ not confirmed"} ·{" "}
             repeats {detail.repeats} · near-miss {detail.near_miss}
           </p>

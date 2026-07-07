@@ -88,3 +88,24 @@ def test_all_distances_equal():
     nndr, near_miss_count = cascading_nndr(dists, threshold=0.8)
     assert nndr == pytest.approx(1.0)
     assert near_miss_count == 3
+
+# ── tied exact matches (d1 == 0 == d2) ───────────────────────────────────────
+
+def test_tied_exact_matches_are_maximally_ambiguous():
+    """d1 == d2 == 0 is a tie between exact matches, not a confident match."""
+    nndr, near_miss_count = cascading_nndr(np.array([0.0, 0.0, 0.0, 1.0]))
+    assert nndr == 1.0
+    assert near_miss_count == 2  # the two zero-distance runners-up
+
+def test_unique_exact_match_still_confident():
+    nndr, near_miss_count = cascading_nndr(np.array([0.0, 0.5, 1.0]))
+    assert nndr == 0.0
+    assert near_miss_count == 0
+
+
+# ── no valid match (all inf) ─────────────────────────────────────────────────
+
+def test_inf_best_distance_is_ambiguous_sentinel():
+    nndr, near_miss_count = cascading_nndr(np.array([np.inf, np.inf]))
+    assert nndr == 1.0
+    assert near_miss_count == 0

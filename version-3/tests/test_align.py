@@ -34,3 +34,21 @@ def test_exclude_defaults_to_empty():
     h2 = ["feature_a"]
     result = find_common_headers(h1, h2)
     assert len(result) == 1
+
+def test_duplicate_shared_header_raises():
+    import pytest
+    with pytest.raises(ValueError, match="pct_poverty"):
+        find_common_headers(["id", "pct_poverty", "pct_poverty"], ["pct_poverty", "x"])
+
+def test_duplicate_header_in_supplemental_raises():
+    import pytest
+    with pytest.raises(ValueError, match="rent"):
+        find_common_headers(["rent"], ["rent", "rent"])
+
+def test_duplicate_non_shared_header_is_fine():
+    common = find_common_headers(["a", "b"], ["a", "junk", "junk"])
+    assert [c["headerName"] for c in common] == ["a"]
+
+def test_duplicate_excluded_header_is_fine():
+    common = find_common_headers(["a", "dup", "dup"], ["a", "dup"], exclude=["dup"])
+    assert [c["headerName"] for c in common] == ["a"]

@@ -19,12 +19,18 @@ Order shown matches the order they appear in the joined string.
 
 | Trigger | Message format |
 |---------|----------------|
+| no valid match (all distances inf) | `WARNING: no valid match — target shares no observed features with any supplemental row` |
 | `nndr ≥ threshold` | `ambiguous match — NNDR {nndr:.2f} (>= {threshold:.2f})` |
 | `near_miss_count > 0` | `{n} near-miss row(s) within distance ratio threshold` |
 | `repeat_count > 1` | `{n} exact-distance tie(s)` |
 | `mnn_confirmed=False` | `MNN not confirmed — supplemental row is closer to a different target; this record may have no valid match` |
+| `target_missing > 0` | `target row missing {k} of {n} shared feature(s); match uses observed features only` |
+| `match_missing > 0` | `matched supplemental row missing {k} of {n} shared feature(s)` |
 | `SMD > 0.25` for any feature | `poor feature balance — {features} (|SMD| > 0.25)` |
 | `0.10 < SMD ≤ 0.25` for any feature | `feature imbalance — {features} (|SMD| > 0.10)` |
+
+A no-match row reports only the no-match warning (plus its missing-feature
+count) — the per-match flags would be meaningless without a match.
 
 Boundaries:
 

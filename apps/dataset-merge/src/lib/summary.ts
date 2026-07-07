@@ -113,8 +113,12 @@ function percentile(sortedAsc: number[], p: number): number {
 export function buildMatchStatsCsv(output: MatchOutput): string {
   const { summary, per_target } = output;
   const total = summary.total;
-  const distances = per_target.map((r) => r.best_distance).sort((a, b) => a - b);
-  const nndrs = per_target.map((r) => r.nndr);
+  // no-match rows have null distance/nndr — exclude them from the stats
+  const matched = per_target.filter((r) => !r.no_match);
+  const distances = matched
+    .map((r) => r.best_distance as number)
+    .sort((a, b) => a - b);
+  const nndrs = matched.map((r) => r.nndr as number);
 
   const nearMissRows = per_target.filter((r) => r.near_miss > 0).length;
   const tiedRows = per_target.filter((r) => r.repeats > 1).length;
@@ -123,6 +127,7 @@ export function buildMatchStatsCsv(output: MatchOutput): string {
 
   const metrics: [string, string | number][] = [
     ["total_rows", total],
+    ["no_match_count", summary.no_match],
     ["flagged_count", summary.flagged],
     ["flagged_pct", pct(summary.flagged)],
     ["mnn_confirmed_count", summary.mnn_confirmed],

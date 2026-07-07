@@ -54,8 +54,16 @@ on every row.
 - **Empty distance vector** → `(0.0, 0)`.
 - **Single supplemental row** (no `d2`) → `(0.0, 0)`. No ambiguity is
   computable.
-- **Exact match** (`d1 == 0`) → `(0.0, 0)`. The ratio collapses to 0/x and
-  no near misses are countable.
+- **Unique exact match** (`d1 == 0 < d2`) → `(0.0, 0)`. A perfect match with
+  no competitor at the same distance is maximally confident.
+- **Tied exact matches** (`d1 == d2 == 0`) → `(1.0, k)` where `k` is the
+  number of zero-distance runners-up. Several rows match perfectly — the
+  matcher cannot tell them apart, so the row is maximally *ambiguous*, not
+  maximally confident. (Before this contract, a 771-way tie of blank
+  Census-suppressed rows reported NNDR 0.0.)
+- **No valid match** (`d1 == inf`, no overlapping observed features) →
+  `(1.0, 0)`. The pipeline additionally writes an explicit
+  `WARNING: no valid match` flag and blanks the match columns.
 - **Threshold boundary is inclusive.** `nndr == threshold` raises the flag,
   matching the test in `tests/signals/test_build_flags.py`.
 

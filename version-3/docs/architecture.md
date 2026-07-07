@@ -51,6 +51,32 @@ The two-pass split exists because dataset-level SMD needs the full set of
 matched indices before per-row flags can be assembled (a feature flagged as
 imbalanced shows up in every row's `flags` column).
 
+## Missing data
+
+Missing cells (`""`, `NA`, `N/A`, `null`, `none`, `-`, `.`, `NaN`, `#N/A`;
+case-insensitive — see `matcher.io.MISSING_TOKENS`) are **never imputed**:
+
+- `clean_val` parses them to `None`, which becomes NaN in the standardized
+  matrix. Column means/stds are computed over observed values only, so a
+  missing cell neither shifts the statistics nor receives a fabricated value.
+- `euclidean_distance` sums squared differences over the dimensions observed
+  on both sides and charges `MISSING_PENALTY` (= 2.0, the expected squared
+  difference between two unrelated z-scored rows) for every other dimension.
+  The penalty — rather than rescaling the observed dimensions — prevents a
+  partially-blank row that happens to agree on its few observed values from
+  impersonating an exact match at distance 0.
+- A pair with **zero** overlapping observed dimensions has distance inf. A
+  target that is inf from every supplemental row becomes a **no-match row**:
+  blank match cells and a `WARNING: no valid match` flag, instead of a
+  fabricated confident match.
+- Rows with missing shared features carry `missing k of n` flags on both the
+  target and matched-supplemental side.
+
+Empirically (see the simulated-data benchmark), the previous behaviour —
+coercing missing to raw `0` before z-scoring — put every missing-data row at
+0% top-1 accuracy and let all-blank rows "exact-match" each other at distance
+0.0 with confident-looking signals.
+
 ## Brute force, by design
 
 Distance computation is `O(N × M × d)` — every target row is compared to every
