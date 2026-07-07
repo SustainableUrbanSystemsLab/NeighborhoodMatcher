@@ -1,4 +1,3 @@
-# NOTE: Human authorized
 import csv
 
 

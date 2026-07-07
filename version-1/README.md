@@ -1,5 +1,9 @@
 # acs-matcher (Version 1)
 
+> **Archived.** Version 1 is kept for reference only. The R package is
+> unmaintained and not run in CI; Python (`version-3/`) is the only supported
+> path going forward.
+
 Match participant-level CSVs to ACS tracts and copy over a `new_feature` column.
 
 ## Project layout

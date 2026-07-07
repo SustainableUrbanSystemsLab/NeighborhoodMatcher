@@ -1,0 +1,39 @@
+name: Python tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  version-3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.10"
+      - name: Run pytest
+        working-directory: version-3
+        run: uv run --project . pytest
+      - name: Webapp matcher copy is in sync
+        run: |
+          node apps/dataset-merge/scripts/sync-assets.mjs
+          git diff --exit-code apps/dataset-merge/public/matcher
+
+  version-1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.10"
+      - name: Run unittest
+        working-directory: version-1/python
+        run: uv run --project . python -m unittest discover tests

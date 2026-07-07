@@ -8,6 +8,9 @@ version = "0.1.0"
 requires-python = ">=3.9"
 dependencies = ["numpy", "matplotlib", "jinja2"]
 
+[dependency-groups]
+dev = ["pytest"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -144,6 +144,9 @@ cython_debug/
 # Netlify
 .netlify
 
+# Agent tooling
+.serena/
+
 # Node
 node_modules/
 npm-debug.log*
