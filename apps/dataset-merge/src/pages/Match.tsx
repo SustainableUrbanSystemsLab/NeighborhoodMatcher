@@ -53,6 +53,7 @@ export default function Match() {
   const [pyStatus, setPyStatus] = useState<PyodideStatus>({ phase: "idle" });
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [runDurationMs, setRunDurationMs] = useState<number | null>(null);
   const [progressPct, setProgressPct] = useState(0);
   const tickRef = useRef<number | null>(null);
 
@@ -111,6 +112,7 @@ export default function Match() {
     setStep("matching");
     setRunError(null);
 
+    const t0 = performance.now();
     try {
       const output = await runMatching(
         target,
@@ -120,6 +122,7 @@ export default function Match() {
         setPyStatus,
         setProgressPct
       );
+      setRunDurationMs(performance.now() - t0);
       setMatchOutput(output);
       // The worker's last status message is "running"; without this the
       // link step shows a phantom "Running matcher…" forever after a run.
@@ -141,6 +144,7 @@ export default function Match() {
     setMatchOutput(null);
     setThreshold(DEFAULT_THRESHOLD);
     setRunError(null);
+    setRunDurationMs(null);
   }, []);
 
   return (
@@ -292,6 +296,7 @@ export default function Match() {
                 target={target}
                 supplemental={supplemental}
                 links={links.filter((l) => !l.excluded)}
+                runDurationMs={runDurationMs}
                 onStartOver={handleStartOver}
               />
             </ErrorBoundary>

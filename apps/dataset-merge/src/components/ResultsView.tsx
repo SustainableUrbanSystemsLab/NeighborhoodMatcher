@@ -17,7 +17,17 @@ interface ResultsViewProps {
   target: ParsedDataset;
   supplemental: ParsedDataset;
   links: ColumnLink[];
+  /** wall-clock duration of the matching run (null if unknown) */
+  runDurationMs: number | null;
   onStartOver: () => void;
+}
+
+function formatDuration(ms: number): string {
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)} s`;
+  const m = Math.floor(s / 60);
+  const rest = Math.round(s - m * 60);
+  return `${m}m ${rest.toString().padStart(2, "0")}s`;
 }
 
 type SortKey = "target_idx" | "best_distance" | "nndr" | "near_miss" | "flags";
@@ -27,6 +37,7 @@ export function ResultsView({
   target,
   supplemental,
   links,
+  runDurationMs,
   onStartOver,
 }: ResultsViewProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -101,7 +112,7 @@ export function ResultsView({
   return (
     <div className="space-y-4">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <SummaryCard label="Rows matched" value={summary.total.toString()} tone="blue" />
         <SummaryCard
           label="Flagged"
@@ -121,6 +132,11 @@ export function ResultsView({
         <SummaryCard
           label="Mean distance"
           value={summary.mean_best_distance.toFixed(3)}
+          tone="gray"
+        />
+        <SummaryCard
+          label="Processing time"
+          value={runDurationMs != null ? formatDuration(runDurationMs) : "—"}
           tone="gray"
         />
       </div>
