@@ -89,11 +89,17 @@ the MNN reverse search into the same pass as a running per-supplemental-row
 minimum, and retains only per-target statistics (best/second distance, tie and
 near-miss counts, optional top-k + histogram) — never a full N × M matrix.
 This changes the constant factor, not the algorithm: every pair is still
-compared. Measured on a laptop (single core): 70k × 70k in ~97 s (complete
-data) and 10k × 73k real ACS data with suppressed blanks in ~18 s, versus
-~36 min for the per-row loop it replaced. The per-row functions
-(`euclidean_distance`, `compute_sorted_distances`, `brute_find_best_match`)
-remain as the executable spec; `tests/test_match_all.py` pins the equivalence.
+compared. The default engine is bitwise identical to the per-row functions
+and independent of chunk size — coincidental exact-distance ties in
+quantized data are counted exactly. `fast=True` opts into a fused einsum
+reduction, ~25% faster, at the cost of up-to-1-ulp accumulation drift (a
+coincidental tie between two *different* rows may round apart; identical
+rows still tie exactly). Measured on a laptop (single core): 70k × 70k in
+~124 s exact / ~97 s fast, and the 10k × 73k real-ACS benchmark (with
+suppressed blanks) in ~29 s / ~18 s end-to-end, versus ~36 min for the
+per-row loop both replace. The per-row functions (`euclidean_distance`,
+`compute_sorted_distances`, `brute_find_best_match`) remain as the
+executable spec; `tests/test_match_all.py` pins the equivalence.
 
 - Standardization is joint across both datasets, so any index would need to be
   rebuilt per run.

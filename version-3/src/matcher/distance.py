@@ -31,8 +31,11 @@ def euclidean_distance(row_a, row_b):
         return np.inf
     if n_observed == n_features:
         return np.sqrt(np.sum(diff ** 2))
-    sq = np.sum(diff[observed] ** 2) + MISSING_PENALTY * (n_features - n_observed)
-    return np.sqrt(sq)
+    # Penalty terms are summed in place (not appended) so this reduction is
+    # bitwise identical to the chunked engine in match_all, which writes
+    # MISSING_PENALTY into the missing positions of the same sequence.
+    sq = np.where(observed, diff * diff, MISSING_PENALTY)
+    return np.sqrt(np.sum(sq))
 
 
 def compute_sorted_distances(target_row, reference_rows):
@@ -56,13 +59,13 @@ def compute_sorted_distances(target_row, reference_rows):
 
 
 def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
-              chunk_size=64, progress_cb=None):
+              chunk_size=64, progress_cb=None, fast=False):
     """
     Vectorized brute-force matching of every target row against every
-    supplemental row. Semantically identical to calling
-    compute_sorted_distances per target plus the mnn_confirmed reverse
-    search, but runs in chunked numpy operations and never materializes a
-    full N x M distance matrix (peak transient memory is one
+    supplemental row. Bitwise identical to calling compute_sorted_distances
+    per target plus the mnn_confirmed reverse search (pinned by
+    tests/test_match_all.py), but runs in chunked numpy operations and never
+    materializes a full N x M distance matrix (peak transient memory is one
     chunk_size x M block).
 
     This stays brute force ON PURPOSE — the privacy posture of this project
@@ -77,6 +80,17 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
     chunk_size : target rows per block; bounds transient memory at
                  chunk_size * M * d floats.
     progress_cb: optional callable(fraction in 0..1), called once per chunk.
+    fast       : False (default) computes every distance with the exact
+                 subtract/square/np.sum sequence of euclidean_distance —
+                 results are bitwise reproducible and independent of
+                 chunk_size. True switches to a fused einsum reduction (plus
+                 inner-product corrections on missing data), roughly 25%
+                 faster, whose accumulation can differ from the exact path
+                 in the last ulp: distances/NNDR drift by ~1e-16 relative,
+                 and a COINCIDENTAL exact-distance tie between two different
+                 supplemental rows may round apart (identical rows still tie
+                 exactly). Use for exploratory runs where throughput matters
+                 more than tie-exact reproducibility.
 
     Returns a dict of per-target arrays/lists (length N):
         best_index    int,   -1 for a no-match row
@@ -95,7 +109,7 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
     m = refs.shape[0]
 
     has_nan = bool(np.isnan(targets).any() or np.isnan(refs).any())
-    if has_nan:
+    if has_nan and fast:
         # Missing-data algebra (see chunk loop): precompute zero-filled
         # copies and per-side observation masks once.
         refs_z = np.nan_to_num(refs, nan=0.0)
@@ -120,13 +134,15 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
         hi = min(lo + chunk_size, n)
         chunk = targets[lo:hi]
 
-        # (t, M, d) broadcast + fused square-sum. Same subtract/square/add
-        # operations as the per-row euclidean_distance; einsum's accumulation
-        # can differ from np.sum in the last ulp, but exact matches are
-        # exactly 0 and identical rows produce identical entries, so ties,
-        # exact matches, and MNN equality are all preserved exactly.
-        if has_nan:
-            # Zero-fill + exact corrections: with az/bz = values (NaN -> 0),
+        # (t, M, d) broadcast. The exact path (default) reproduces the
+        # per-row euclidean_distance bitwise: same subtract, square, np.sum
+        # reduction and penalty writes per cell, independent of chunk_size.
+        # The fast path fuses the reduction (einsum) and computes missing-
+        # data corrections as inner products — up to 1 ulp accumulation
+        # drift; see the docstring.
+        diff = chunk[:, None, :] - refs[None, :, :]
+        if has_nan and fast:
+            # Zero-fill + corrections: with az/bz = values (NaN -> 0),
             #   base(i,j)  = sum_d (az - bz)^2      (einsum, one broadcast pass)
             # overcounts a^2 on dims where only the target is observed and
             # b^2 where only the ref is observed; both corrections are exact
@@ -145,9 +161,18 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
             sq += MISSING_PENALTY * (d - n_obs)
             dists = np.sqrt(sq)
             dists[n_obs == 0] = np.inf
-        else:
-            diff = chunk[:, None, :] - refs[None, :, :]
+        elif has_nan:
+            observed = ~np.isnan(diff)
+            np.multiply(diff, diff, out=diff)
+            diff[~observed] = MISSING_PENALTY
+            n_obs = observed.sum(axis=2)
+            dists = np.sqrt(diff.sum(axis=2))
+            dists[n_obs == 0] = np.inf
+        elif fast:
             dists = np.sqrt(np.einsum("tmd,tmd->tm", diff, diff))
+        else:
+            np.multiply(diff, diff, out=diff)
+            dists = np.sqrt(diff.sum(axis=2))
 
         np.minimum(col_min, dists.min(axis=0), out=col_min)
 

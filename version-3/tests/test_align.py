@@ -52,3 +52,18 @@ def test_duplicate_non_shared_header_is_fine():
 def test_duplicate_excluded_header_is_fine():
     common = find_common_headers(["a", "dup", "dup"], ["a", "dup"], exclude=["dup"])
     assert [c["headerName"] for c in common] == ["a"]
+
+
+def test_whitespace_padded_headers_still_link():
+    """Excel pads headers; ' rent ' and 'rent' are the same column."""
+    common = find_common_headers([" rent ", "a"], ["rent", "b"])
+    assert [c["headerName"] for c in common] == ["rent"]
+    assert common[0]["header1Index"] == 0
+    assert common[0]["header2Index"] == 0
+
+
+def test_empty_header_names_never_link():
+    """A trailing comma on every line yields a shared '' column; linking it
+    would charge every pair the missing penalty."""
+    common = find_common_headers(["a", "b", ""], ["a", ""])
+    assert [c["headerName"] for c in common] == ["a"]

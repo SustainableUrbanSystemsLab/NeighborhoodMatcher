@@ -85,6 +85,21 @@ function send(msg: WorkerResponse) {
 async function init(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
+    try {
+      await initInner();
+    } catch (err) {
+      // Do not cache a failed init: a transient CDN/network failure would
+      // otherwise make every later run fail instantly until page reload.
+      initPromise = null;
+      pyodide = null;
+      throw err;
+    }
+  })();
+  return initPromise;
+}
+
+async function initInner(): Promise<void> {
+  {
     send({ type: "status", phase: "loading-runtime" });
     pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
 
@@ -110,8 +125,7 @@ from matcher.web_api import coordinate_in_memory
 `);
 
     send({ type: "status", phase: "ready" });
-  })();
-  return initPromise;
+  }
 }
 
 async function runMatch(req: MatchRequest): Promise<void> {

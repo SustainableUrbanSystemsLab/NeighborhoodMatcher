@@ -95,3 +95,19 @@ def test_dump_then_load_roundtrip(tmp_path):
     headers, rows = load_csv(out)
     assert headers == ["x", "y"]
     assert rows == [["1", "2"], ["3", "4"]]
+
+
+def test_load_csv_skips_blank_lines(tmp_path):
+    """Trailing/interior blank lines are a benign export artifact, not an
+    error (regression: they aborted the run as '0 cells')."""
+    path = _write(tmp_path, "blank.csv", "a,b\n1,2\n\n3,4\n\n")
+    headers, rows = load_csv(path)
+    assert rows == [["1", "2"], ["3", "4"]]
+
+
+def test_dump_csv_writes_utf8(tmp_path):
+    """Non-cp1252 characters must survive the round trip on any platform."""
+    out = str(tmp_path / "u.csv")
+    dump_csv(out, ["name"], [["Peña – tract №5"]])
+    headers, rows = load_csv(out)
+    assert rows == [["Peña – tract №5"]]

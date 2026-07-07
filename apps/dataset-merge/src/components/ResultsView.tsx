@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { buildResultsZip, triggerDownload } from "@/lib/zip-builder";
 import type {
+  ColumnLink,
   MatchOutput,
   ParsedDataset,
   PerTargetDetail,
@@ -15,6 +16,7 @@ interface ResultsViewProps {
   output: MatchOutput;
   target: ParsedDataset;
   supplemental: ParsedDataset;
+  links: ColumnLink[];
   onStartOver: () => void;
 }
 
@@ -24,6 +26,7 @@ export function ResultsView({
   output,
   target,
   supplemental,
+  links,
   onStartOver,
 }: ResultsViewProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -278,7 +281,8 @@ export function ResultsView({
                             features={feature_names}
                             target={target}
                             supplemental={supplemental}
-                            output={output}
+                            links={links}
+                            threshold={output.threshold}
                             onClose={() => setSelectedIdx(null)}
                           />
                         </td>
@@ -608,31 +612,33 @@ function DrilldownPanel({
   features,
   target,
   supplemental,
-  output,
+  links,
+  threshold,
   onClose,
 }: {
   detail: PerTargetDetail;
   features: string[];
   target: ParsedDataset;
   supplemental: ParsedDataset;
-  output: MatchOutput;
+  links: ColumnLink[];
+  threshold: number;
   onClose: () => void;
 }) {
   const maxCount = Math.max(1, ...detail.hist_counts);
   const maxContrib = Math.max(...detail.contributions, 0.001);
 
-  // Feature values: pair the raw target vs. supplemental cells for the linked columns.
-  // To find raw cells, use feature_names as target headers (since linked headers are
-  // target-named via web_api).
-  const featurePairs = features.map((f) => {
-    const tIdx = target.headers.indexOf(f);
-    // The supplemental header for this feature is harder to recover without the
-    // original links. Show the target header and value only.
-    return {
-      name: f,
-      targetVal: tIdx >= 0 ? target.rows[detail.target_idx]?.[tIdx] ?? "" : "",
-    };
-  });
+  // Feature values: pair the raw target cell with the raw cell of the
+  // MATCHED SUPPLEMENTAL ROW, using the column links the run was made with.
+  // (Reading the shared columns out of linked_rows shows the target's own
+  // values — row_merge keeps the target copy — which fabricates agreement.)
+  const featurePairs = links.map((link) => ({
+    name: link.headerName,
+    targetVal: target.rows[detail.target_idx]?.[link.targetIndex] ?? "",
+    matchedVal:
+      detail.match_idx != null
+        ? supplemental.rows[detail.match_idx]?.[link.supplementalIndex] ?? ""
+        : "",
+  }));
 
   const flagList = detail.flags ? detail.flags.split(" | ") : [];
 
@@ -714,7 +720,7 @@ function DrilldownPanel({
           </p>
           <RankPlot
             distances={detail.top_k_distances}
-            threshold={output.threshold}
+            threshold={threshold}
           />
 
           <h4 className="mt-3 mb-1 text-xs font-semibold text-gray-700">
@@ -758,28 +764,21 @@ function DrilldownPanel({
               <tr>
                 <th className="px-2 py-1">Feature</th>
                 <th className="px-2 py-1">Target</th>
-                <th className="px-2 py-1">Matched (from linked output)</th>
+                <th className="px-2 py-1">Matched supplemental row</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {featurePairs.map((p, i) => {
-                const linkedIdx = output.linked_headers.indexOf(p.name);
-                const matched =
-                  linkedIdx >= 0
-                    ? output.linked_rows[detail.target_idx]?.[linkedIdx] ?? ""
-                    : "";
-                return (
-                  <tr key={i}>
-                    <td className="px-2 py-1 text-gray-700">{p.name}</td>
-                    <td className="px-2 py-1 font-mono text-gray-900">
-                      {p.targetVal}
-                    </td>
-                    <td className="px-2 py-1 font-mono text-gray-900">
-                      {matched}
-                    </td>
-                  </tr>
-                );
-              })}
+              {featurePairs.map((p, i) => (
+                <tr key={i}>
+                  <td className="px-2 py-1 text-gray-700">{p.name}</td>
+                  <td className="px-2 py-1 font-mono text-gray-900">
+                    {p.targetVal}
+                  </td>
+                  <td className="px-2 py-1 font-mono text-gray-900">
+                    {p.matchedVal}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           <p className="mt-1 text-[10px] text-gray-400">

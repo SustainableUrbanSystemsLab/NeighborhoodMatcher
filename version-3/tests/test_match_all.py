@@ -46,11 +46,9 @@ def _assert_equivalent(targets, refs, threshold=0.8, chunk_size=3):
     np.testing.assert_array_equal(got["repeats"], want["repeats"])
     np.testing.assert_array_equal(got["near_miss"], want["near_miss"])
     np.testing.assert_array_equal(got["mnn_confirmed"], want["mnn_confirmed"])
-    # einsum accumulation may differ from np.sum in the last ulp; exact
-    # zeros and ties are still exact (identical inputs -> identical entries).
-    np.testing.assert_allclose(got["best_distance"], want["best_distance"],
-                               rtol=1e-12)
-    np.testing.assert_allclose(got["nndr"], want["nndr"], rtol=1e-12)
+    # Exact mode (default) must be BITWISE identical to the per-row spec.
+    np.testing.assert_array_equal(got["best_distance"], want["best_distance"])
+    np.testing.assert_array_equal(got["nndr"], want["nndr"])
 
 
 def test_random_complete_data_exact():
@@ -93,8 +91,7 @@ def test_missing_data_cases():
     np.testing.assert_array_equal(got["repeats"], want["repeats"])
     np.testing.assert_array_equal(got["near_miss"], want["near_miss"])
     np.testing.assert_array_equal(got["mnn_confirmed"], want["mnn_confirmed"])
-    np.testing.assert_allclose(got["best_distance"], want["best_distance"],
-                               rtol=1e-12)
+    np.testing.assert_array_equal(got["best_distance"], want["best_distance"])
     assert got["best_index"][2] == -1  # fully-missing target is a no-match
 
 
@@ -110,8 +107,7 @@ def test_random_data_with_random_missingness():
     np.testing.assert_array_equal(got["repeats"], want["repeats"])
     np.testing.assert_array_equal(got["near_miss"], want["near_miss"])
     np.testing.assert_array_equal(got["mnn_confirmed"], want["mnn_confirmed"])
-    np.testing.assert_allclose(got["best_distance"], want["best_distance"],
-                               rtol=1e-12)
+    np.testing.assert_array_equal(got["best_distance"], want["best_distance"])
 
 
 def test_single_supplemental_row():
@@ -134,6 +130,56 @@ def test_chunk_boundary_does_not_change_results():
                 "near_miss", "mnn_confirmed"):
         np.testing.assert_array_equal(a[key], b[key])
         np.testing.assert_array_equal(a[key], c[key])
+
+
+def test_chunk_boundary_does_not_change_results_with_missing_data():
+    """Regression: the fast NaN path's GEMM corrections made results depend
+    on chunk_size. The exact (default) path must not."""
+    rng = np.random.default_rng(13)
+    targets = rng.normal(size=(12, 5))
+    refs = rng.normal(size=(30, 5))
+    targets[rng.random(targets.shape) < 0.3] = np.nan
+    refs[rng.random(refs.shape) < 0.3] = np.nan
+    a = match_all(targets, refs, chunk_size=1)
+    b = match_all(targets, refs, chunk_size=12)
+    c = match_all(targets, refs, chunk_size=5)
+    for key in ("best_index", "best_distance", "repeats", "nndr",
+                "near_miss", "mnn_confirmed"):
+        np.testing.assert_array_equal(a[key], b[key])
+        np.testing.assert_array_equal(a[key], c[key])
+
+
+def test_exact_mode_preserves_coincidental_ties():
+    """Quantized data can put two DIFFERENT supplemental rows at exactly the
+    same distance. The default engine must count that tie exactly like the
+    per-row spec (regression: the einsum path rounded such ties apart)."""
+    # |t - a|^2 = 9 + 16 = 25 and |t - b|^2 = 25 + 0 = 25 — a true tie
+    # between different rows, exact in float arithmetic.
+    targets = np.array([[0.0, 0.0]])
+    refs = np.array([[3.0, 4.0], [5.0, 0.0], [9.0, 9.0]])
+    got = match_all(targets, refs)
+    want = _reference(targets, refs, 0.8)
+    assert want["repeats"][0] == 2  # sanity: the spec sees the tie
+    np.testing.assert_array_equal(got["repeats"], want["repeats"])
+    np.testing.assert_array_equal(got["best_index"], want["best_index"])
+    np.testing.assert_array_equal(got["nndr"], want["nndr"])
+
+
+def test_fast_mode_matches_within_float_noise():
+    """fast=True trades bitwise tie reproducibility for speed; it must stay
+    within float noise of the exact engine on untied data."""
+    rng = np.random.default_rng(21)
+    targets = rng.normal(size=(20, 5))
+    refs = rng.normal(size=(40, 5))
+    targets[rng.random(targets.shape) < 0.2] = np.nan
+    refs[rng.random(refs.shape) < 0.2] = np.nan
+    exact = match_all(targets, refs)
+    fast = match_all(targets, refs, fast=True)
+    np.testing.assert_array_equal(exact["best_index"], fast["best_index"])
+    np.testing.assert_array_equal(exact["mnn_confirmed"], fast["mnn_confirmed"])
+    np.testing.assert_allclose(exact["best_distance"], fast["best_distance"],
+                               rtol=1e-9)
+    np.testing.assert_allclose(exact["nndr"], fast["nndr"], rtol=1e-9)
 
 
 def test_top_k_and_histograms():

@@ -121,6 +121,9 @@ export default function Match() {
         setProgressPct
       );
       setMatchOutput(output);
+      // The worker's last status message is "running"; without this the
+      // link step shows a phantom "Running matcher…" forever after a run.
+      setPyStatus({ phase: "ready" });
       setStep("results");
     } catch (err) {
       console.error("runMatching failed:", err);
@@ -288,6 +291,7 @@ export default function Match() {
                 output={matchOutput}
                 target={target}
                 supplemental={supplemental}
+                links={links.filter((l) => !l.excluded)}
                 onStartOver={handleStartOver}
               />
             </ErrorBoundary>

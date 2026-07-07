@@ -27,14 +27,45 @@ def _parse_csv_string(csv_str, file_label):
     data = list(reader)
     if not data:
         return [], []
-    headers, rows = data[0], data[1:]
-    for i, row in enumerate(rows):
+    headers, raw_rows = data[0], data[1:]
+    rows = []
+    for i, row in enumerate(raw_rows):
+        if not row:  # blank line — skip, matching io.load_csv
+            continue
         if len(row) != len(headers):
             raise ValueError(
                 f"{file_label}: line {i + 2} has {len(row)} cells, "
                 f"expected {len(headers)} (matching the header)"
             )
+        rows.append(row)
     return headers, rows
+
+
+def _validate_links(links):
+    """
+    The explicit-links path bypasses find_common_headers, so it needs its
+    own ambiguity guard: two links sharing a name or a column index would
+    silently double-weight one column or link the wrong one (last-wins).
+    """
+    names = [l["headerName"] for l in links]
+    t_idx = [l["header1Index"] for l in links]
+    s_idx = [l["header2Index"] for l in links]
+    problems = []
+    for label, values in (("column name", names),
+                          ("target column index", t_idx),
+                          ("supplemental column index", s_idx)):
+        seen, dupes = set(), set()
+        for v in values:
+            if v in seen:
+                dupes.add(v)
+            seen.add(v)
+        if dupes:
+            problems.append(f"duplicate {label}(s): {', '.join(str(d) for d in sorted(dupes))}")
+    if problems:
+        raise ValueError(
+            "Ambiguous column links — " + "; ".join(problems)
+            + ". Each shared column must be linked exactly once."
+        )
 
 
 def coordinate_in_memory(
@@ -83,6 +114,7 @@ def coordinate_in_memory(
             }
             for link in links
         ]
+        _validate_links(common)
     feature_names = [c["headerName"] for c in common]
 
     if not common:

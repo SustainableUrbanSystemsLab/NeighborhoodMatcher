@@ -42,7 +42,8 @@ def missing_counts(extracted_rows):
     return [sum(1 for v in row if v is None) for row in extracted_rows]
 
 
-def coordinator(target, supplemental, output="data/output.csv", exclude=None, threshold=0.8):
+def coordinator(target, supplemental, output="data/output.csv", exclude=None, threshold=0.8,
+                fast=False):
     """
     Full matching pipeline.
 
@@ -51,6 +52,8 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     output       : path for linked dataset output CSV
     exclude      : list of column names to skip even if shared
     threshold    : NNDR threshold used for near-miss flagging (default 0.8, Lowe 2004)
+    fast         : opt into the faster distance engine (~25%) at the cost of
+                   bitwise tie reproducibility — see distance.match_all
 
     Returns the list of dataset-level warnings emitted for this run
     (currently: scale-compatibility warnings, also printed to stderr).
@@ -91,7 +94,7 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
 
     # Pass 1: vectorized brute-force matching (chunked; see distance.match_all —
     # brute force is a privacy decision, only the arithmetic is vectorized)
-    res = match_all(std_rows_1, std_rows_2, threshold=threshold)
+    res = match_all(std_rows_1, std_rows_2, threshold=threshold, fast=fast)
 
     # Dataset-level SMD — one computation across all validly matched pairs
     matched_mask = res["best_index"] >= 0

@@ -7,15 +7,21 @@ import type { MatchOutput, ParsedDataset } from "@/types";
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
 
+// Must agree with matcher.io.MISSING_TOKENS — the data_stats.csv this file
+// produces sits next to the match flags in the same zip, and a cell the
+// matcher treats as missing must not be counted as observed here.
+const MISSING_TOKENS = new Set([
+  "", "na", "n/a", "null", "none", "-", ".", "nan", "#n/a",
+]);
+
 function isMissingCell(cell: string | undefined): boolean {
   if (cell === undefined) return true;
-  const v = cell.trim();
-  return v === "" || v.toUpperCase() === "NA";
+  return MISSING_TOKENS.has(cell.replace(/,/g, "").replace(/\$/g, "").trim().toLowerCase());
 }
 
 function parseNumeric(cell: string): number | null {
+  if (isMissingCell(cell)) return null;
   const cleaned = cell.replace(/,/g, "").replace(/\$/g, "").trim();
-  if (cleaned === "" || cleaned.toUpperCase() === "NA") return null;
   const n = parseFloat(cleaned);
   return Number.isFinite(n) ? n : null;
 }

@@ -20,13 +20,17 @@ def load_csv(filepath):
         data = list(csv.reader(f))
     if not data:
         raise ValueError(f"{filepath}: file is empty (no header row)")
-    headers, rows = data[0], data[1:]
-    for i, row in enumerate(rows):
+    headers, raw_rows = data[0], data[1:]
+    rows = []
+    for i, row in enumerate(raw_rows):
+        if not row:  # blank line (common as a trailing artifact) — skip
+            continue
         if len(row) != len(headers):
             raise ValueError(
                 f"{filepath}: line {i + 2} has {len(row)} cells, "
                 f"expected {len(headers)} (matching the header)"
             )
+        rows.append(row)
     return headers, rows
 
 
@@ -51,8 +55,8 @@ def clean_val(v):
 
 
 def dump_csv(filepath, headers, rows):
-    """Writes headers and rows to a CSV file."""
-    with open(filepath, "w", newline="") as f:
+    """Writes headers and rows to a CSV file (utf-8, matching load_csv)."""
+    with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
         writer.writerows(rows)
