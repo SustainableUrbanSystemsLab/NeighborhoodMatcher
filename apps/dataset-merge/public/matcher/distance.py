@@ -100,6 +100,10 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
         nndr          float, per the cascading_nndr contract
         near_miss     int,   per the cascading_nndr contract
         mnn_confirmed bool,  fused reverse-search confirmation
+        col_min       (M,) float — per-supplemental-row minimum distance over
+                      THESE targets. mnn_confirmed is derived from it; it is
+                      returned so sharded callers can merge partial minima
+                      (elementwise min) and re-derive confirmation globally.
         top_k         list of ascending distance lists (only if top_k > 0)
         histograms    list of (counts, edges) tuples (only if hist_bins > 0)
     """
@@ -257,6 +261,7 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
         "nndr": nndr,
         "near_miss": near_miss,
         "mnn_confirmed": confirmed,
+        "col_min": col_min,
     }
     if top_k_lists is not None:
         result["top_k"] = top_k_lists

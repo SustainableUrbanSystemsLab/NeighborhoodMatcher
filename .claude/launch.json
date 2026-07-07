@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dataset-merge",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/dataset-merge", "dev"],
+      "port": 5173,
+      "autoPort": true,
+      "env": { "COREPACK_DEFAULT_TO_LATEST": "0" }
+    }
+  ]
+}

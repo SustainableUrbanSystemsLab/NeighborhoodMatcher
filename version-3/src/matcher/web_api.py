@@ -4,6 +4,15 @@
 #   - returns structured data instead of writing CSV files
 #   - includes per-target diagnostics needed for the Results UI
 #       (distance histogram, top-k near-miss distances, feature contributions)
+#
+# Parallelism: the browser cannot thread a single WASM interpreter, so the
+# frontend runs a POOL of Pyodide workers instead. Each worker calls
+# match_shard on a contiguous slice of target rows; one worker then calls
+# assemble_results on the collected shard outputs. Joint standardization is
+# deterministic over the full datasets, so every shard computes identical
+# global statistics and the shard results merge exactly.
+# coordinate_in_memory (single worker) is match_shard + assemble_results
+# over one full-range shard — one code path, sharded or not.
 
 import csv
 import io as _io
@@ -12,11 +21,10 @@ import numpy as np
 
 from .align import find_common_headers
 from .standardize import dual_standardize, scale_compatibility_warnings
-from .distance import match_all
+from .distance import MISSING_PENALTY, match_all
 from .merge import row_merge, new_header
 from .pipeline import extract_features, missing_counts
 from .signals import (
-    per_row_feature_contribution,
     dataset_smd,
     build_flags,
 )
@@ -68,33 +76,11 @@ def _validate_links(links):
         )
 
 
-def coordinate_in_memory(
-    target_csv,
-    supplemental_csv,
-    links=None,
-    exclude=None,
-    threshold=0.8,
-    hist_bins=30,
-    top_k=50,
-    progress_cb=None,
-):
+def _prepare(target_csv, supplemental_csv, links, exclude):
     """
-    Browser-facing entry point.
-
-    target_csv, supplemental_csv : CSV strings (header row + data rows).
-    links                        : optional list of explicit column pairings
-                                   [{"headerName", "header1Index", "header2Index"}].
-                                   When None, falls back to shared-name auto-detection
-                                   via find_common_headers (matches CLI behaviour).
-    exclude                      : list of shared column names to skip. Only used
-                                   when `links` is None.
-    threshold                    : NNDR threshold for near-miss flagging.
-    hist_bins                    : number of bins in the per-target distance histogram.
-    top_k                        : number of nearest distances returned per target
-                                   (used to draw the near-miss cluster).
-
-    Returns a dict consumable from JavaScript via Pyodide (all leaf values are
-    plain Python lists / numbers / strings, so .toJs() yields clean data).
+    Shared front half of every entry point: parse, link columns, extract,
+    count missingness, standardize jointly. Deterministic — every shard
+    worker running this on the same inputs gets identical arrays.
     """
     if exclude is None:
         exclude = []
@@ -136,33 +122,178 @@ def coordinate_in_memory(
 
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
-    n_target = len(std_rows_1)
+    return {
+        "h1": h1, "rs1": rs1, "h2": h2, "rs2": rs2,
+        "common": common, "feature_names": feature_names,
+        "target_missing": target_missing, "supp_missing": supp_missing,
+        "warnings": warnings,
+        "std_rows_1": std_rows_1, "std_rows_2": std_rows_2,
+    }
 
-    # Distance pass dominates the wall clock; reserve the last 5% of the
-    # progress bar for output assembly.
-    def _match_progress(frac):
-        if progress_cb is None:
-            return
-        try:
-            progress_cb(0.95 * frac)
-        except Exception:
-            pass
 
-    # Vectorized brute-force matching (chunked; brute force is a privacy
-    # decision — see docs/architecture.md). chunk_size=32 keeps the transient
-    # broadcast block small enough for the WASM heap in Pyodide.
+def _shard_contributions(std_slice, std_rows_2, best_index):
+    """
+    Per-feature squared-difference proportions for each row of the slice
+    against its matched supplemental row — vectorized equivalent of
+    signals.per_row_feature_contribution (missing dims contribute their
+    MISSING_PENALTY share; no-match rows are all zeros).
+    """
+    t, d = std_slice.shape
+    contributions = np.zeros((t, d))
+    matched = best_index >= 0
+    if matched.any():
+        diff = std_slice[matched] - std_rows_2[best_index[matched]]
+        sq = np.where(np.isnan(diff), MISSING_PENALTY, diff * diff)
+        denom = sq.sum(axis=1, keepdims=True)
+        safe = np.where(denom == 0, 1.0, denom)
+        contributions[matched] = np.where(denom == 0, 0.0, sq / safe)
+    return contributions
+
+
+def _match_shard_prepared(prep, threshold, row_lo, row_hi, top_k, hist_bins, progress_cb):
+    std_rows_1 = prep["std_rows_1"]
+    n = len(std_rows_1)
+    if row_hi is None:
+        row_hi = n
+    if not (0 <= row_lo <= row_hi <= n):
+        raise ValueError(f"invalid shard range [{row_lo}, {row_hi}) for {n} target rows")
+
+    std_slice = std_rows_1[row_lo:row_hi]
+    t = len(std_slice)
     res = match_all(
-        std_rows_1, std_rows_2, threshold=threshold,
+        std_slice, prep["std_rows_2"], threshold=threshold,
         top_k=top_k, hist_bins=hist_bins,
-        chunk_size=32, progress_cb=_match_progress,
+        chunk_size=32, progress_cb=progress_cb,
+    )
+    contributions = _shard_contributions(std_slice, prep["std_rows_2"], res["best_index"])
+    top_k_lists = res.get("top_k", [[] for _ in range(t)])
+    histograms = res.get("histograms", [([], []) for _ in range(t)])
+
+    def _num_or_none(x):
+        return None if not np.isfinite(x) else float(x)
+
+    return {
+        "row_lo": int(row_lo),
+        "row_hi": int(row_hi),
+        "best_index": [int(v) for v in res["best_index"]],
+        "best_distance": [_num_or_none(v) for v in res["best_distance"]],
+        "second_distance": [_num_or_none(v) for v in res["second_distance"]],
+        "repeats": [int(v) for v in res["repeats"]],
+        "nndr": [float(v) for v in res["nndr"]],
+        "near_miss": [int(v) for v in res["near_miss"]],
+        "col_min": [_num_or_none(v) for v in res["col_min"]],
+        "top_k": top_k_lists,
+        "histograms": [[list(c), list(e)] for c, e in histograms],
+        "contributions": [[float(c) for c in row] for row in contributions],
+    }
+
+
+def match_shard(
+    target_csv,
+    supplemental_csv,
+    links=None,
+    exclude=None,
+    threshold=0.8,
+    row_lo=0,
+    row_hi=None,
+    top_k=50,
+    hist_bins=30,
+    progress_cb=None,
+):
+    """
+    Matches target rows [row_lo, row_hi) against the FULL supplemental set.
+
+    Returns a plain dict of lists (JSON-serializable, so shard results can
+    round-trip through postMessage between workers):
+        row_lo/row_hi, and per shard-row: best_index (-1 = no match),
+        best_distance (None = no match), second_distance (None when absent),
+        repeats, nndr, near_miss, top_k (ascending lists), histograms
+        ([counts, edges] pairs), contributions; plus col_min — this shard's
+        per-supplemental-row minimum, merged globally by assemble_results
+        for the MNN check.
+    """
+    prep = _prepare(target_csv, supplemental_csv, links, exclude)
+    return _match_shard_prepared(prep, threshold, row_lo, row_hi, top_k, hist_bins, progress_cb)
+
+
+def assemble_results(
+    target_csv,
+    supplemental_csv,
+    shards,
+    links=None,
+    exclude=None,
+    threshold=0.8,
+):
+    """
+    Merges shard outputs (any order; ranges must tile [0, N) exactly) and
+    assembles the full result dict — dataset-level SMD, global MNN
+    confirmation from the merged column minima, flags, linked/detail rows,
+    per-target diagnostics, and the run summary.
+    """
+    prep = _prepare(target_csv, supplemental_csv, links, exclude)
+    return _assemble_prepared(prep, shards, threshold)
+
+
+def _assemble_prepared(prep, shards, threshold):
+    h1, rs1, h2, rs2 = prep["h1"], prep["rs1"], prep["h2"], prep["rs2"]
+    common, feature_names = prep["common"], prep["feature_names"]
+    target_missing, supp_missing = prep["target_missing"], prep["supp_missing"]
+    warnings = prep["warnings"]
+    std_rows_1, std_rows_2 = prep["std_rows_1"], prep["std_rows_2"]
+
+    n_target = len(std_rows_1)
+    m = len(std_rows_2)
+
+    shards = sorted((dict(s) for s in shards), key=lambda s: s["row_lo"])
+    covered = [(s["row_lo"], s["row_hi"]) for s in shards]
+    expected_lo = 0
+    for lo, hi in covered:
+        if lo != expected_lo:
+            raise ValueError(f"shard ranges do not tile the target rows: {covered}")
+        expected_lo = hi
+    if expected_lo != n_target:
+        raise ValueError(f"shard ranges do not cover all {n_target} target rows: {covered}")
+
+    def _cat(key):
+        out = []
+        for s in shards:
+            out.extend(s[key])
+        return out
+
+    best_index = np.asarray(_cat("best_index"), dtype=np.int64)
+    best_distance = np.asarray(
+        [np.inf if v is None else v for v in _cat("best_distance")], dtype=float
+    )
+    second_distance = _cat("second_distance")
+    repeats = _cat("repeats")
+    nndr = _cat("nndr")
+    near_miss = _cat("near_miss")
+    top_k_lists = _cat("top_k")
+    histograms = _cat("histograms")
+    contributions = _cat("contributions")
+
+    # Global MNN: merge each shard's per-supplemental-row minimum, then a
+    # match is confirmed when its distance equals the global minimum —
+    # identical to what match_all computes unsharded.
+    col_min = np.full(m, np.inf)
+    for s in shards:
+        partial = np.asarray(
+            [np.inf if v is None else v for v in s["col_min"]], dtype=float
+        )
+        if partial.shape[0] != m:
+            raise ValueError("shard col_min length does not match the supplemental set")
+        np.minimum(col_min, partial, out=col_min)
+    matched_mask = best_index >= 0
+    confirmed = np.zeros(n_target, dtype=bool)
+    confirmed[matched_mask] = (
+        best_distance[matched_mask] == col_min[best_index[matched_mask]]
     )
 
     # Dataset-level SMD — computed across validly matched pairs only
-    matched_mask = res["best_index"] >= 0
     if matched_mask.any():
         smd = dataset_smd(
             np.asarray(std_rows_1)[matched_mask],
-            res["best_index"][matched_mask],
+            best_index[matched_mask],
             std_rows_2,
         )
     else:
@@ -226,73 +357,66 @@ def coordinate_in_memory(
             no_match_count += 1
             continue
 
-        j = int(res["best_index"][i])
-        repeats = int(res["repeats"][i])
-        nndr_val = float(res["nndr"][i])
-        near_miss = int(res["near_miss"][i])
-        confirmed = bool(res["mnn_confirmed"][i])
-        contributions = per_row_feature_contribution(std_rows_1[i], std_rows_2[j])
+        j = int(best_index[i])
+        row_repeats = int(repeats[i])
+        nndr_val = float(nndr[i])
+        row_near_miss = int(near_miss[i])
+        row_confirmed = bool(confirmed[i])
+        row_contributions = contributions[i]
         flags = build_flags(
-            nndr_val, near_miss, threshold, repeats, smd, feature_names,
-            mnn_confirmed=confirmed,
+            nndr_val, row_near_miss, threshold, row_repeats, smd, feature_names,
+            mnn_confirmed=row_confirmed,
             target_missing=target_missing[i],
             match_missing=supp_missing[j],
         )
 
-        best_distance = float(res["best_distance"][i])
-        second = res["second_distance"][i]
-        second_distance = float(second) if np.isfinite(second) else float("nan")
+        row_best = float(best_distance[i])
+        second = second_distance[i]
+        row_second = float(second) if second is not None else float("nan")
 
         linked_rows.append(
             row_merge(rs1[i], rs2[j], common)
-            + [best_distance, repeats, round(nndr_val, 4), near_miss, int(confirmed), flags]
+            + [row_best, row_repeats, round(nndr_val, 4), row_near_miss,
+               int(row_confirmed), flags]
         )
         detail_rows.append(
-            [i, best_distance, round(nndr_val, 4), near_miss, int(confirmed),
+            [i, row_best, round(nndr_val, 4), row_near_miss, int(row_confirmed),
              target_missing[i], supp_missing[j]]
-            + [round(float(c), 6) for c in contributions]
+            + [round(float(c), 6) for c in row_contributions]
             + [flags]
         )
 
-        hist_counts, hist_edges = res["histograms"][i] if hist_bins > 0 else ([], [])
-        top_dists = res["top_k"][i] if top_k > 0 else []
+        hist_counts, hist_edges = histograms[i]
 
         per_target.append({
             "target_idx": int(i),
-            "match_idx": int(j),
+            "match_idx": j,
             "no_match": False,
-            "best_distance": best_distance,
-            "second_distance": second_distance,
-            "nndr": float(nndr_val),
-            "near_miss": int(near_miss),
-            "mnn_confirmed": bool(confirmed),
-            "repeats": int(repeats),
+            "best_distance": row_best,
+            "second_distance": row_second,
+            "nndr": nndr_val,
+            "near_miss": row_near_miss,
+            "mnn_confirmed": row_confirmed,
+            "repeats": row_repeats,
             "target_missing": int(target_missing[i]),
             "match_missing": int(supp_missing[j]),
-            "contributions": [float(c) for c in contributions],
+            "contributions": [float(c) for c in row_contributions],
             "flags": flags,
-            "hist_counts": hist_counts,
-            "hist_edges": hist_edges,
-            "top_k_distances": top_dists,
+            "hist_counts": list(hist_counts),
+            "hist_edges": list(hist_edges),
+            "top_k_distances": list(top_k_lists[i]),
         })
 
         if flags:
             flagged_count += 1
-        if confirmed:
+        if row_confirmed:
             mnn_confirmed_count += 1
-        nndr_sum += float(nndr_val)
-        best_distance_sum += best_distance
+        nndr_sum += nndr_val
+        best_distance_sum += row_best
 
-    if progress_cb is not None:
-        try:
-            progress_cb(1.0)
-        except Exception:
-            pass
-
-    n = n_target
-    n_matched = n - no_match_count
+    n_matched = n_target - no_match_count
     summary = {
-        "total": n,
+        "total": n_target,
         "flagged": flagged_count,
         "mnn_confirmed": mnn_confirmed_count,
         "no_match": no_match_count,
@@ -318,3 +442,40 @@ def coordinate_in_memory(
         "per_target": per_target,
         "summary": summary,
     }
+
+
+def coordinate_in_memory(
+    target_csv,
+    supplemental_csv,
+    links=None,
+    exclude=None,
+    threshold=0.8,
+    hist_bins=30,
+    top_k=50,
+    progress_cb=None,
+):
+    """
+    Browser-facing single-worker entry point: one full-range shard plus
+    assembly. The worker-pool path calls match_shard / assemble_results
+    directly. Arguments and the returned dict are unchanged from the
+    original API (see assemble_results).
+    """
+    def _match_progress(frac):
+        if progress_cb is None:
+            return
+        try:
+            progress_cb(0.95 * frac)  # reserve the tail for assembly
+        except Exception:
+            pass
+
+    prep = _prepare(target_csv, supplemental_csv, links, exclude)
+    shard = _match_shard_prepared(
+        prep, threshold, 0, None, top_k, hist_bins, _match_progress,
+    )
+    result = _assemble_prepared(prep, [shard], threshold)
+    if progress_cb is not None:
+        try:
+            progress_cb(1.0)
+        except Exception:
+            pass
+    return result

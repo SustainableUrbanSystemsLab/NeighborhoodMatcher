@@ -22,23 +22,61 @@ const MATCHER_MODULES = [
   "web_api",
 ];
 
+export interface LinkPayload {
+  headerName: string;
+  header1Index: number;
+  header2Index: number;
+}
+
 export interface MatchRequest {
   type: "match";
   targetCsv: string;
   supplementalCsv: string;
-  links: Array<{
-    headerName: string;
-    header1Index: number;
-    header2Index: number;
-  }>;
+  links: LinkPayload[];
   threshold: number;
+}
+
+// One slice of target rows, matched against the full supplemental set.
+// Several workers each run one of these concurrently — a single WASM
+// interpreter is single-threaded, so parallelism = one Pyodide per worker.
+export interface MatchShardRequest {
+  type: "match_shard";
+  targetCsv: string;
+  supplementalCsv: string;
+  links: LinkPayload[];
+  threshold: number;
+  rowLo: number;
+  rowHi: number;
+}
+
+// Merge shard payloads (from match_shard, any worker) into the final
+// MatchOutput. Runs on one worker after all shards complete.
+export interface AssembleRequest {
+  type: "assemble";
+  targetCsv: string;
+  supplementalCsv: string;
+  links: LinkPayload[];
+  threshold: number;
+  shards: ShardPayload[];
+}
+
+// Opaque to TS beyond what the pool needs for ordering; produced by
+// matcher.web_api.match_shard (plain JSON — safe to structured-clone).
+export interface ShardPayload {
+  row_lo: number;
+  row_hi: number;
+  [key: string]: unknown;
 }
 
 export interface InitRequest {
   type: "init";
 }
 
-export type WorkerRequest = InitRequest | MatchRequest;
+export type WorkerRequest =
+  | InitRequest
+  | MatchRequest
+  | MatchShardRequest
+  | AssembleRequest;
 
 export type StatusPhase =
   | "loading-runtime"
@@ -62,6 +100,11 @@ export interface ResultMessage {
   payload: MatchOutput;
 }
 
+export interface ShardResultMessage {
+  type: "shard_result";
+  payload: ShardPayload;
+}
+
 export interface ErrorMessage {
   type: "error";
   message: string;
@@ -71,6 +114,7 @@ export type WorkerResponse =
   | StatusMessage
   | ProgressMessage
   | ResultMessage
+  | ShardResultMessage
   | ErrorMessage;
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -121,7 +165,7 @@ async function initInner(): Promise<void> {
 import sys
 if '/' not in sys.path:
     sys.path.insert(0, '/')
-from matcher.web_api import coordinate_in_memory
+from matcher.web_api import coordinate_in_memory, match_shard, assemble_results
 `);
 
     send({ type: "status", phase: "ready" });
@@ -169,6 +213,84 @@ _result
   }
 }
 
+async function runShard(req: MatchShardRequest): Promise<void> {
+  await init();
+  if (!pyodide) throw new Error("Pyodide not initialized.");
+
+  send({ type: "status", phase: "running" });
+
+  pyodide.globals.set("target_csv", req.targetCsv);
+  pyodide.globals.set("supp_csv", req.supplementalCsv);
+  pyodide.globals.set("links_json", JSON.stringify(req.links));
+  pyodide.globals.set("threshold", req.threshold);
+  pyodide.globals.set("row_lo", req.rowLo);
+  pyodide.globals.set("row_hi", req.rowHi);
+  pyodide.globals.set("progress_cb", (pct: number) => {
+    send({ type: "progress", pct });
+  });
+
+  try {
+    const pyResult = pyodide.runPython(`
+import json
+_links = json.loads(links_json)
+_shard = match_shard(
+    target_csv, supp_csv,
+    links=_links, threshold=threshold,
+    row_lo=row_lo, row_hi=row_hi,
+    progress_cb=progress_cb,
+)
+_shard
+`);
+    const jsShard = pyResult.toJs({
+      dict_converter: Object.fromEntries,
+      create_pyproxies: false,
+    }) as ShardPayload;
+    if (pyResult && typeof pyResult.destroy === "function") pyResult.destroy();
+
+    send({ type: "shard_result", payload: jsShard });
+  } finally {
+    pyodide.globals.set("target_csv", "");
+    pyodide.globals.set("supp_csv", "");
+    pyodide.globals.set("links_json", "");
+  }
+}
+
+async function runAssemble(req: AssembleRequest): Promise<void> {
+  await init();
+  if (!pyodide) throw new Error("Pyodide not initialized.");
+
+  pyodide.globals.set("target_csv", req.targetCsv);
+  pyodide.globals.set("supp_csv", req.supplementalCsv);
+  pyodide.globals.set("links_json", JSON.stringify(req.links));
+  pyodide.globals.set("threshold", req.threshold);
+  pyodide.globals.set("shards_js", req.shards);
+
+  try {
+    const pyResult = pyodide.runPython(`
+import json
+_links = json.loads(links_json)
+_shards = shards_js.to_py()
+_result = assemble_results(
+    target_csv, supp_csv, _shards,
+    links=_links, threshold=threshold,
+)
+_result
+`);
+    const jsResult = pyResult.toJs({
+      dict_converter: Object.fromEntries,
+      create_pyproxies: false,
+    }) as MatchOutput;
+    if (pyResult && typeof pyResult.destroy === "function") pyResult.destroy();
+
+    send({ type: "result", payload: jsResult });
+  } finally {
+    pyodide.globals.set("target_csv", "");
+    pyodide.globals.set("supp_csv", "");
+    pyodide.globals.set("links_json", "");
+    pyodide.globals.set("shards_js", null);
+  }
+}
+
 ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const msg = event.data;
   try {
@@ -176,6 +298,10 @@ ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       await init();
     } else if (msg.type === "match") {
       await runMatch(msg);
+    } else if (msg.type === "match_shard") {
+      await runShard(msg);
+    } else if (msg.type === "assemble") {
+      await runAssemble(msg);
     }
   } catch (err) {
     send({
