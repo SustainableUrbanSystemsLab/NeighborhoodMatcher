@@ -19,6 +19,8 @@ interface ResultsViewProps {
   links: ColumnLink[];
   /** wall-clock duration of the matching run (null if unknown) */
   runDurationMs: number | null;
+  /** Pyodide workers (≈ CPU cores) the run used (null if unknown) */
+  workersUsed: number | null;
   onStartOver: () => void;
 }
 
@@ -38,6 +40,7 @@ export function ResultsView({
   supplemental,
   links,
   runDurationMs,
+  workersUsed,
   onStartOver,
 }: ResultsViewProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -136,7 +139,15 @@ export function ResultsView({
         />
         <SummaryCard
           label="Processing time"
-          value={runDurationMs != null ? formatDuration(runDurationMs) : "—"}
+          value={
+            runDurationMs != null
+              ? `${formatDuration(runDurationMs)}${
+                  workersUsed != null
+                    ? ` · ${workersUsed} core${workersUsed === 1 ? "" : "s"}`
+                    : ""
+                }`
+              : "—"
+          }
           tone="gray"
         />
       </div>
@@ -179,8 +190,9 @@ export function ResultsView({
           ))}
         </div>
         <p className="mt-3 text-xs text-gray-500">
-          |SMD| &gt; 0.10 indicates feature imbalance; &gt; 0.25 is poor (Austin,
-          PMC3472075).
+          |SMD| &gt; 0.10 indicates feature imbalance; &gt; 0.25 is poor (
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Austin, PMC3472075</a>
+          ).
         </p>
       </div>
 

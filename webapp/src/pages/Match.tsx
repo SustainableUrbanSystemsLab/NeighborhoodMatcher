@@ -54,6 +54,7 @@ export default function Match() {
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [runDurationMs, setRunDurationMs] = useState<number | null>(null);
+  const [workersUsed, setWorkersUsed] = useState<number | null>(null);
   const [progressPct, setProgressPct] = useState(0);
   const tickRef = useRef<number | null>(null);
 
@@ -114,7 +115,7 @@ export default function Match() {
 
     const t0 = performance.now();
     try {
-      const output = await runMatching(
+      const { output, workersUsed: nWorkers } = await runMatching(
         target,
         supplemental,
         links,
@@ -123,6 +124,7 @@ export default function Match() {
         setProgressPct
       );
       setRunDurationMs(performance.now() - t0);
+      setWorkersUsed(nWorkers);
       setMatchOutput(output);
       // The worker's last status message is "running"; without this the
       // link step shows a phantom "Running matcher…" forever after a run.
@@ -145,6 +147,7 @@ export default function Match() {
     setThreshold(DEFAULT_THRESHOLD);
     setRunError(null);
     setRunDurationMs(null);
+    setWorkersUsed(null);
   }, []);
 
   return (
@@ -300,6 +303,7 @@ export default function Match() {
                 supplemental={supplemental}
                 links={links.filter((l) => !l.excluded)}
                 runDurationMs={runDurationMs}
+                workersUsed={workersUsed}
                 onStartOver={handleStartOver}
               />
             </ErrorBoundary>
@@ -339,7 +343,7 @@ function ThresholdControl({
       />
       <p className="mt-2 text-xs text-gray-500">
         A match is flagged when the ratio of the best distance to the i-th
-        distance is ≥ threshold. Lower = stricter. Default 0.80 (Lowe 2004).
+        distance is ≥ threshold. Lower = stricter. Default 0.80 (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>).
       </p>
     </div>
   );

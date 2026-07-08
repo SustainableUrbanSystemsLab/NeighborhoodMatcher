@@ -186,6 +186,12 @@ function runAssembleOn(
   });
 }
 
+export interface RunResult {
+  output: MatchOutput;
+  /** Pyodide workers (≈ CPU cores) the matching ran on */
+  workersUsed: number;
+}
+
 export async function runMatching(
   target: ParsedDataset,
   supplemental: ParsedDataset,
@@ -193,13 +199,14 @@ export async function runMatching(
   threshold: number,
   onStatus?: StatusCallback,
   onProgress?: ProgressCallback
-): Promise<MatchOutput> {
+): Promise<RunResult> {
   const payloads = buildPayloads(target, supplemental, links, threshold);
   const nRows = target.rows.length;
   const nWorkers = poolSizeFor(nRows);
 
   if (nWorkers <= 1) {
-    return runSingle(payloads, onStatus, onProgress);
+    const output = await runSingle(payloads, onStatus, onProgress);
+    return { output, workersUsed: 1 };
   }
 
   // Even, contiguous shards; weights drive the aggregate progress bar.
@@ -241,7 +248,7 @@ export async function runMatching(
     shards.sort((a, b) => a.row_lo - b.row_lo);
     const result = await runAssembleOn(getWorker(0), payloads, shards);
     onProgress?.(1);
-    return result;
+    return { output: result, workersUsed: nWorkers };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     onStatus?.({ phase: "error", message });

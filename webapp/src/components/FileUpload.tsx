@@ -18,6 +18,7 @@ export function FileUpload({
   dataset,
 }: FileUploadProps) {
   const [dragOver, setDragOver] = useState(false);
+  const [columnsExpanded, setColumnsExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,19 +66,26 @@ export function FileUpload({
           <span>{dataset.rows.length} rows</span>
           <span>{dataset.headers.length} columns</span>
         </div>
-        <div className="mt-2 flex flex-wrap gap-1">
-          {dataset.headers.slice(0, 5).map((h) => (
-            <span
-              key={h}
-              className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800"
-            >
-              {h}
-            </span>
-          ))}
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {(columnsExpanded ? dataset.headers : dataset.headers.slice(0, 5)).map(
+            (h, i) => (
+              <span
+                key={`${h}-${i}`}
+                className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800"
+              >
+                {h}
+              </span>
+            )
+          )}
           {dataset.headers.length > 5 && (
-            <span className="text-xs text-gray-400">
-              +{dataset.headers.length - 5} more
-            </span>
+            <button
+              onClick={() => setColumnsExpanded((v) => !v)}
+              className="rounded px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+            >
+              {columnsExpanded
+                ? "show fewer"
+                : `+${dataset.headers.length - 5} more`}
+            </button>
           )}
         </div>
       </div>
