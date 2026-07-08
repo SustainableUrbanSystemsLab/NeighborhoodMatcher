@@ -152,6 +152,17 @@ export function ResultsView({
         />
       </div>
 
+      {runDurationMs != null && workersUsed != null && (
+        <p className="text-[11px] leading-relaxed text-gray-400">
+          The worker pool is sized to the job: comparing every target row
+          against every supplemental row is split across up to all-but-one of
+          your CPU cores, but small jobs deliberately use fewer — below a few
+          million row comparisons, loading and standardizing the files (which
+          every worker does) takes longer than the matching itself, so extra
+          cores wouldn&apos;t make the run faster.
+        </p>
+      )}
+
       {/* Dataset-level warnings (e.g. scale mismatch, no-match rows) */}
       {(output.warnings?.length > 0 || summary.no_match > 0) && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3">
