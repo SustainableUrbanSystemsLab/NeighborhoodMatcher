@@ -57,6 +57,34 @@ function getWorker(index: number): Worker {
   return pool[index]!;
 }
 
+// Browsers under-report navigator.hardwareConcurrency as fingerprinting
+// protection (Brave randomizes it, Firefox strict mode pins it to 2, Safari
+// caps it), so a 12-core machine may look like 2-4 cores. Users can pin the
+// real count; the choice persists per device.
+const WORKERS_KEY = "nbhdmatch:workers";
+
+export function getSavedWorkerCount(): number | null {
+  try {
+    const v = Number(localStorage.getItem(WORKERS_KEY));
+    return Number.isFinite(v) && v >= 1 ? Math.floor(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveWorkerCount(n: number | null): void {
+  try {
+    if (n == null) localStorage.removeItem(WORKERS_KEY);
+    else localStorage.setItem(WORKERS_KEY, String(Math.floor(n)));
+  } catch {
+    /* private mode — no persistence */
+  }
+}
+
+export function reportedCores(): number {
+  return navigator.hardwareConcurrency || 4;
+}
+
 // Exported so the UI can show the planned pool size while the run is in
 // flight (deterministic — same inputs the run itself will use).
 export function poolSizeFor(nRows: number, mRows: number): number {
@@ -68,7 +96,13 @@ export function poolSizeFor(nRows: number, mRows: number): number {
     return Math.min(Math.floor(forced), MAX_POOL_WORKERS, nRows);
   }
 
-  const cores = navigator.hardwareConcurrency || 4;
+  // User-pinned core count (see WORKERS_KEY note above).
+  const saved = getSavedWorkerCount();
+  if (saved != null) {
+    return Math.max(1, Math.min(saved, MAX_POOL_WORKERS, nRows));
+  }
+
+  const cores = reportedCores();
   // deviceMemory (GB, Chrome-only, capped at 8) as a low-RAM guard.
   const memGb = (navigator as { deviceMemory?: number }).deviceMemory;
   const byCpu = Math.max(1, Math.min(MAX_POOL_WORKERS, cores - 1));

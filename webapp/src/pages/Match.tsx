@@ -9,9 +9,12 @@ import type {
 } from "@/types";
 import {
   findCommonHeaders,
+  getSavedWorkerCount,
   poolSizeFor,
   prefetchPyodide,
+  reportedCores,
   runMatching,
+  saveWorkerCount,
   type PyodideStatus,
 } from "@/lib/matching";
 import { detectPII } from "@/lib/pii-detector";
@@ -70,6 +73,9 @@ export default function Match() {
   const [workersUsed, setWorkersUsed] = useState<number | null>(null);
   const [agreementSavedAt, setAgreementSavedAt] = useState<string | null>(
     () => loadSavedAgreement()?.acceptedAt ?? null
+  );
+  const [workerOverride, setWorkerOverride] = useState<number | null>(() =>
+    getSavedWorkerCount()
   );
   const [progressPct, setProgressPct] = useState(0);
   const tickRef = useRef<number | null>(null);
@@ -268,6 +274,14 @@ export default function Match() {
 
               <ThresholdControl threshold={threshold} onChange={setThreshold} />
 
+              <WorkerControl
+                value={workerOverride}
+                onChange={(n) => {
+                  setWorkerOverride(n);
+                  saveWorkerCount(n);
+                }}
+              />
+
               {runError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   Matching failed: {runError}
@@ -332,12 +346,15 @@ export default function Match() {
                   {formatComparisons(
                     target.rows.length * supplemental.rows.length
                   )}{" "}
-                  row comparisons — on {workersUsed} of your{" "}
-                  {navigator.hardwareConcurrency || "?"} CPU cores. Small jobs
-                  deliberately use fewer cores: below a few million
-                  comparisons, loading and standardizing the files (which
-                  every worker does) takes longer than the matching itself, so
-                  extra cores wouldn&apos;t make the run faster.
+                  row comparisons — on {workersUsed} of the{" "}
+                  {navigator.hardwareConcurrency || "?"} CPU cores your
+                  browser reports. Small jobs deliberately use fewer cores:
+                  below a few million comparisons, loading and standardizing
+                  the files (which every worker does) takes longer than the
+                  matching itself, so extra cores wouldn&apos;t make the run
+                  faster. If the core count looks too low, your browser may
+                  under-report it for privacy — pin the real number under
+                  &ldquo;Parallel workers&rdquo; on the previous step.
                 </p>
               )}
             </div>
@@ -382,6 +399,49 @@ export default function Match() {
             </ErrorBoundary>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkerControl({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (n: number | null) => void;
+}) {
+  const reported = reportedCores();
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            Parallel workers
+          </h3>
+          <p className="mt-0.5 max-w-md text-xs text-gray-500">
+            Your browser reports {reported} CPU core
+            {reported === 1 ? "" : "s"}. Privacy protections in some browsers
+            (Brave, Firefox strict mode, Safari) deliberately under-report the
+            real count — if your machine has more cores, set the number here.
+          </p>
+        </div>
+        <select
+          value={value ?? "auto"}
+          onChange={(e) =>
+            onChange(e.target.value === "auto" ? null : Number(e.target.value))
+          }
+          className="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-800"
+        >
+          <option value="auto">
+            Auto ({Math.max(1, reported - 1)} of {reported} reported)
+          </option>
+          {[1, 2, 3, 4, 6, 8, 10, 12, 14, 16].map((n) => (
+            <option key={n} value={n}>
+              {n} worker{n === 1 ? "" : "s"}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

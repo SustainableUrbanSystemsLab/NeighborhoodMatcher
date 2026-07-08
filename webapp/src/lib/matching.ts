@@ -8,6 +8,9 @@ export {
   runMatching,
   prefetchPyodide,
   poolSizeFor,
+  getSavedWorkerCount,
+  saveWorkerCount,
+  reportedCores,
   type PyodideStatus,
 } from "./pyodide-runtime";
 
