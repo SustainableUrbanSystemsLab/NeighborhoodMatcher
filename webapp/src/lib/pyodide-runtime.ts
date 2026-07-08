@@ -35,11 +35,18 @@ type ProgressCallback = (pct: number) => void;
 // Absolute ceiling — even a 32-core machine should not hold 32 Pyodide +
 // numpy instances (~150 MB each).
 const MAX_POOL_WORKERS = 16;
-// The matching work is N_target x M_supplemental pair comparisons; a shard
-// below this many pairs finishes faster than a fresh worker warms up.
-// Sizing by pairs (not target rows) matters: 2k targets x 73k tracts is
-// 146M comparisons and deserves every core, even though 2k rows is "small".
-const MIN_PAIRS_PER_WORKER = 250_000;
+// The matching work is N_target x M_supplemental pair comparisons. Sizing
+// by pairs (not target rows) matters: 2k targets x 73k tracts is 146M
+// comparisons and deserves every core, even though 2k rows is "small".
+//
+// Threshold measured on a 12-core M-series laptop (?workers=N override):
+//   44M pairs (2.2k x 20k): 1w 3.1s | 2w 3.0s | 4w 3.4s | 11w 2.8-3.5s — flat;
+//     per-worker fixed costs (each worker parses + standardizes both CSVs)
+//     dominate, so extra workers neither help nor hurt wall clock.
+//   365M pairs (5k x 73k): 1w 33.9s | 11w 12.1s — parallelism pays.
+// The wall-clock loss function is flat for anything in ~1M-10M; 5M spins
+// up the pool only when matching compute is actually the bottleneck.
+const MIN_PAIRS_PER_WORKER = 5_000_000;
 
 const pool: Worker[] = [];
 
@@ -51,6 +58,14 @@ function getWorker(index: number): Worker {
 }
 
 function poolSizeFor(nRows: number, mRows: number): number {
+  // Power-user/debug override: ?workers=N pins the pool size (clamped).
+  const forced = Number(
+    new URLSearchParams(window.location.search).get("workers")
+  );
+  if (Number.isFinite(forced) && forced >= 1) {
+    return Math.min(Math.floor(forced), MAX_POOL_WORKERS, nRows);
+  }
+
   const cores = navigator.hardwareConcurrency || 4;
   // deviceMemory (GB, Chrome-only, capped at 8) as a low-RAM guard.
   const memGb = (navigator as { deviceMemory?: number }).deviceMemory;
