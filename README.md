@@ -56,8 +56,8 @@ pnpm dev          # http://localhost:5173
 The dev/build step copies the Python matcher sources from
 [`matcher/`](matcher/) into `webapp/public/` (see
 `webapp/scripts/sync-assets.mjs`), so the app always runs the same code the
-tests cover. Matching runs in a pool of Pyodide Web Workers — one per CPU
-core, up to 8.
+tests cover. Matching runs in a pool of Pyodide Web Workers sized to the
+job — all CPU cores but one for anything non-trivial.
 
 </details>
 

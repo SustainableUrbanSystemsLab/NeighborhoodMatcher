@@ -32,12 +32,14 @@ export type PyodideStatus =
 type StatusCallback = (status: PyodideStatus) => void;
 type ProgressCallback = (pct: number) => void;
 
-// Each pool worker holds a full Pyodide + numpy instance (~150 MB), so cap
-// the pool even on many-core machines; leave one core for the UI thread.
-const MAX_POOL_WORKERS = 8;
-// Below this many target rows a second worker costs more (init + merge)
-// than it saves.
-const MIN_ROWS_PER_WORKER = 1000;
+// Absolute ceiling — even a 32-core machine should not hold 32 Pyodide +
+// numpy instances (~150 MB each).
+const MAX_POOL_WORKERS = 16;
+// The matching work is N_target x M_supplemental pair comparisons; a shard
+// below this many pairs finishes faster than a fresh worker warms up.
+// Sizing by pairs (not target rows) matters: 2k targets x 73k tracts is
+// 146M comparisons and deserves every core, even though 2k rows is "small".
+const MIN_PAIRS_PER_WORKER = 250_000;
 
 const pool: Worker[] = [];
 
@@ -48,11 +50,14 @@ function getWorker(index: number): Worker {
   return pool[index]!;
 }
 
-function poolSizeFor(nRows: number): number {
+function poolSizeFor(nRows: number, mRows: number): number {
   const cores = navigator.hardwareConcurrency || 4;
+  // deviceMemory (GB, Chrome-only, capped at 8) as a low-RAM guard.
+  const memGb = (navigator as { deviceMemory?: number }).deviceMemory;
   const byCpu = Math.max(1, Math.min(MAX_POOL_WORKERS, cores - 1));
-  const byRows = Math.max(1, Math.floor(nRows / MIN_ROWS_PER_WORKER));
-  return Math.min(byCpu, byRows);
+  const byMemory = memGb ? Math.max(2, Math.round(memGb * 2)) : MAX_POOL_WORKERS;
+  const byWork = Math.max(1, Math.floor((nRows * mRows) / MIN_PAIRS_PER_WORKER));
+  return Math.max(1, Math.min(byCpu, byMemory, byWork, nRows));
 }
 
 export function prefetchPyodide(onStatus?: StatusCallback): void {
@@ -202,7 +207,7 @@ export async function runMatching(
 ): Promise<RunResult> {
   const payloads = buildPayloads(target, supplemental, links, threshold);
   const nRows = target.rows.length;
-  const nWorkers = poolSizeFor(nRows);
+  const nWorkers = poolSizeFor(nRows, supplemental.rows.length);
 
   if (nWorkers <= 1) {
     const output = await runSingle(payloads, onStatus, onProgress);
