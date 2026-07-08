@@ -1,82 +1,8 @@
 import { Link } from "react-router";
+import { ScenarioExplainer, type ScenarioData } from "@/components/ScenarioExplainer";
+import scenariosJson from "@/data/scenarios.json";
 
-interface Scenario {
-  label: string;
-  title: string;
-  summary: string;
-  takeaway: string;
-  slug: string;
-}
-
-const SCENARIOS: Scenario[] = [
-  {
-    label: "Scenario 1",
-    title: "Exact Match",
-    summary:
-      "The target row appears verbatim in the supplemental dataset. Distance = 0, NNDR = 0, MNN confirmed, no flags.",
-    takeaway:
-      "Baseline: shows what a perfect match looks like across every signal.",
-    slug: "exact_match",
-  },
-  {
-    label: "Scenario 2",
-    title: "Rounding Discrepancy",
-    summary:
-      "Target values are rounded to coarser precision than the supplemental. The correct row is still selected, but with non-zero distance.",
-    takeaway:
-      "Small, evenly-spread contributions across features indicate noise from unit conversion rather than a structural mismatch.",
-    slug: "rounding_discrepancy",
-  },
-  {
-    label: "Scenario 3",
-    title: "Scale Mismatch",
-    summary:
-      "One feature is reported in different units (e.g. thousands vs. raw counts). That single feature dominates the distance.",
-    takeaway:
-      "A contribution bar overwhelmingly driven by one column is the signal to investigate unit alignment.",
-    slug: "scale_mismatch",
-  },
-  {
-    label: "Scenario 4",
-    title: "Ambiguous Match",
-    summary:
-      "Two supplemental rows sit at nearly identical distances from the target. NNDR approaches 1.0, triggering the near-miss flag.",
-    takeaway:
-      "A high NNDR with multiple near-misses means the match was not clearly determined — treat the link with caution.",
-    slug: "ambiguous_match",
-  },
-  {
-    label: "Scenario 5",
-    title: "MNN Not Confirmed",
-    summary:
-      "The forward match picks supplemental row X, but X's closest target is a different row. Mutual Nearest Neighbor check fails.",
-    takeaway:
-      "Asymmetric neighbours are a sign the supplemental row may be a better fit for another target — this record may have no valid supplemental match.",
-    slug: "mnn_not_confirmed",
-  },
-];
-
-function PdfFrame({ slug, suffix, label }: { slug: string; suffix: string; label: string }) {
-  return (
-    <figure className="overflow-hidden rounded-lg border border-gray-200">
-      <figcaption className="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700">
-        {label}
-      </figcaption>
-      <object
-        data={`${import.meta.env.BASE_URL}explanatory/${slug}${suffix}.pdf`}
-        type="application/pdf"
-        className="h-96 w-full"
-      >
-        <a
-          href={`${import.meta.env.BASE_URL}explanatory/${slug}${suffix}.pdf`}
-          className="text-sm text-blue-600"
-        >
-          Open {slug}{suffix}.pdf
-        </a>
-      </object>
-    </figure>
-  );
-}
+const SCENARIOS = scenariosJson as unknown as ScenarioData[];
 
 export default function About() {
   return (
@@ -188,36 +114,16 @@ export default function About() {
             Worked scenarios
           </h2>
           <p className="mb-4 text-sm text-gray-600">
-            Each scenario below is a small, curated dataset that demonstrates
-            one characteristic situation. The scatter chart shows the target
-            against the supplemental pool; the histogram shows the full
-            distance distribution.
+            Each scenario is a small, curated dataset (one target row, twenty
+            supplemental rows) that demonstrates one characteristic situation.
+            The numbers shown are the matcher&apos;s real outputs on that
+            data — expand the sections inside each card for the full tables
+            and the worked math.
           </p>
 
           <div className="space-y-8">
-            {SCENARIOS.map((s) => (
-              <article
-                key={s.slug}
-                className="rounded-lg border border-gray-200 bg-white p-5"
-              >
-                <div className="mb-3">
-                  <p className="text-xs uppercase tracking-wider text-blue-600">
-                    {s.label}
-                  </p>
-                  <h3 className="text-base font-semibold text-gray-900">
-                    {s.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-700">{s.summary}</p>
-                  <p className="mt-2 rounded bg-blue-50 px-3 py-2 text-xs text-blue-900">
-                    <strong>Reading the signal:</strong> {s.takeaway}
-                  </p>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <PdfFrame slug={s.slug} suffix="" label="Scatter view" />
-                  <PdfFrame slug={s.slug} suffix="_hist" label="Distance histogram" />
-                </div>
-              </article>
+            {SCENARIOS.map((s, i) => (
+              <ScenarioExplainer key={s.scenario_label} scenario={s} index={i} />
             ))}
           </div>
         </section>

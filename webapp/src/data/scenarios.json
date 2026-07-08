@@ -1,0 +1,1722 @@
+[
+ {
+  "scenario_title": "Scenario 1: The Exact Match",
+  "scenario_subtitle": "What happens when the target row exists verbatim in the supplemental dataset",
+  "scenario_label": "exact_match",
+  "description": "This scenario asks a simple question: what does the system report when there is a perfect match \u2014 a supplemental row that is completely identical to the target in every feature? This is the best possible outcome and serves as our baseline. All signals should be at their ideal values: zero distance, zero ambiguity, and a confirmed symmetric match. If any signal were to fire under these conditions, something would be wrong with the system.",
+  "columns": [
+   {
+    "real": "Total population",
+    "silly": "dragon_sightings",
+    "display": "Dragon Sightings",
+    "unit": "count",
+    "fmt": "d"
+   },
+   {
+    "real": "Median age in years",
+    "silly": "avg_wizard_age",
+    "display": "Avg. Wizard Age",
+    "unit": "years",
+    "fmt": ".1f"
+   },
+   {
+    "real": "pctUnits1Detached",
+    "silly": "pct_leprechaun_cottages",
+    "display": "Pct. Leprechaun Cottages",
+    "unit": "percent",
+    "fmt": ".1f"
+   },
+   {
+    "real": "Family households",
+    "silly": "goblin_family_units",
+    "display": "Goblin Family Units",
+    "unit": "count",
+    "fmt": "d"
+   }
+  ],
+  "display_names": [
+   "Dragon Sightings",
+   "Avg. Wizard Age",
+   "Pct. Leprechaun Cottages",
+   "Goblin Family Units"
+  ],
+  "target_raw": [
+   2469.0,
+   40.2,
+   99.5,
+   649.0
+  ],
+  "supp_table": [
+   {
+    "rank": 1,
+    "raw": [
+     2469.0,
+     40.2,
+     99.5,
+     649.0
+    ],
+    "dist": 0.0,
+    "is_best": true
+   },
+   {
+    "rank": 2,
+    "raw": [
+     2948.0,
+     33.4,
+     98.5,
+     687.0
+    ],
+    "dist": 1.025095,
+    "is_best": false
+   },
+   {
+    "rank": 3,
+    "raw": [
+     2524.0,
+     30.0,
+     99.5,
+     557.0
+    ],
+    "dist": 1.251128,
+    "is_best": false
+   },
+   {
+    "rank": 4,
+    "raw": [
+     3885.0,
+     37.2,
+     100.0,
+     1004.0
+    ],
+    "dist": 1.481198,
+    "is_best": false
+   },
+   {
+    "rank": 5,
+    "raw": [
+     3849.0,
+     42.2,
+     99.5,
+     1043.0
+    ],
+    "dist": 1.496866,
+    "is_best": false
+   },
+   {
+    "rank": 6,
+    "raw": [
+     4158.0,
+     29.8,
+     99.4,
+     1089.0
+    ],
+    "dist": 2.125291,
+    "is_best": false
+   },
+   {
+    "rank": 7,
+    "raw": [
+     4555.0,
+     26.5,
+     99.4,
+     930.0
+    ],
+    "dist": 2.342049,
+    "is_best": false
+   },
+   {
+    "rank": 8,
+    "raw": [
+     2512.0,
+     25.8,
+     96.1,
+     521.0
+    ],
+    "dist": 2.475713,
+    "is_best": false
+   },
+   {
+    "rank": 9,
+    "raw": [
+     4822.0,
+     25.7,
+     98.2,
+     914.0
+    ],
+    "dist": 2.600803,
+    "is_best": false
+   },
+   {
+    "rank": 10,
+    "raw": [
+     5094.0,
+     27.3,
+     100.0,
+     1041.0
+    ],
+    "dist": 2.663634,
+    "is_best": false
+   },
+   {
+    "rank": 11,
+    "raw": [
+     4891.0,
+     34.4,
+     99.6,
+     1339.0
+    ],
+    "dist": 2.682225,
+    "is_best": false
+   },
+   {
+    "rank": 12,
+    "raw": [
+     5006.0,
+     30.1,
+     97.5,
+     1230.0
+    ],
+    "dist": 2.897007,
+    "is_best": false
+   },
+   {
+    "rank": 13,
+    "raw": [
+     5296.0,
+     25.4,
+     99.3,
+     1128.0
+    ],
+    "dist": 2.991252,
+    "is_best": false
+   },
+   {
+    "rank": 14,
+    "raw": [
+     4223.0,
+     36.3,
+     94.2,
+     1132.0
+    ],
+    "dist": 3.306443,
+    "is_best": false
+   },
+   {
+    "rank": 15,
+    "raw": [
+     4701.0,
+     58.7,
+     100.0,
+     1519.0
+    ],
+    "dist": 3.6746,
+    "is_best": false
+   },
+   {
+    "rank": 16,
+    "raw": [
+     6303.0,
+     29.8,
+     100.0,
+     1490.0
+    ],
+    "dist": 3.813915,
+    "is_best": false
+   },
+   {
+    "rank": 17,
+    "raw": [
+     3465.0,
+     47.9,
+     92.5,
+     1080.0
+    ],
+    "dist": 3.950899,
+    "is_best": false
+   },
+   {
+    "rank": 18,
+    "raw": [
+     6516.0,
+     23.3,
+     99.3,
+     1385.0
+    ],
+    "dist": 4.068086,
+    "is_best": false
+   },
+   {
+    "rank": 19,
+    "raw": [
+     6668.0,
+     32.0,
+     98.5,
+     1641.0
+    ],
+    "dist": 4.220935,
+    "is_best": false
+   },
+   {
+    "rank": 20,
+    "raw": [
+     7389.0,
+     35.0,
+     100.0,
+     1851.0
+    ],
+    "dist": 4.896759,
+    "is_best": false
+   }
+  ],
+  "example": {
+   "rank": 2,
+   "raw": [
+    2948.0,
+    33.4,
+    98.5,
+    687.0
+   ],
+   "raw_means": [
+    4463.952381,
+    33.866667,
+    98.595238,
+    1089.47619
+   ],
+   "raw_stds": [
+    1421.921754,
+    8.33897,
+    1.958006,
+    353.654071
+   ],
+   "z_target": [
+    -1.402997,
+    0.759486,
+    0.462083,
+    -1.2455
+   ],
+   "z_example": [
+    -1.066129,
+    -0.055962,
+    -0.04864,
+    -1.13805
+   ],
+   "sq_diffs": [
+    0.11348,
+    0.664956,
+    0.260839,
+    0.011545
+   ],
+   "distance": 1.025095
+  },
+  "signals": {
+   "contributions": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "euc_distance": 0.0,
+   "nndr": 0.0,
+   "near_miss_count": 0,
+   "mnn_confirmed": true,
+   "repeats": 1,
+   "smd": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "flags": ""
+  },
+  "signal_explanations": {
+   "per_feature_contribution": "Because the distance is exactly 0, no feature contributed anything \u2014 all values are identical between the target and the matched row. The table shows n/a for all features.",
+   "euc_distance": "The distance between the target and its best match is exactly **0.0000**. This means the two rows are identical in every feature \u2014 a perfect match.",
+   "nndr": "The Nearest Neighbor Distance Ratio (NNDR) compares the best match distance to the second-best match distance: d\u2081 / d\u2082. Because d\u2081 = 0, the ratio is 0 \u00f7 anything = 0. A value of **0.0000** is the best possible score \u2014 no ambiguity whatsoever. No flag raised (threshold is 0.80).",
+   "near_miss_count": "The near-miss count checks how many supplemental rows have a ratio d\u2081 / d\u1d62 \u2265 0.80. Since d\u2081 = 0, every ratio is 0 \u00f7 d\u1d62 = 0, well below the threshold. **0 near misses.** No flag raised.",
+   "mnn_confirmed": "Mutual Nearest Neighbor (MNN) confirmation runs the search in reverse: does the matched supplemental row also point back to this target as its nearest neighbor? Since the matched row is an exact copy of the target, of course it does. **Confirmed: True.** This symmetry is a strong indicator of match quality.",
+   "repeats": "Only **one** supplemental row matched at distance 0 \u2014 the exact copy we inserted. If a second identical row had been present, repeats would be 2 and the tie flag would fire.",
+   "smd": "The Standardized Mean Difference (SMD) measures whether the distribution of the target dataset is systematically misaligned with its matches. With only **one target row**, there is no distribution to measure \u2014 SMD is undefined and reported as 0 for all features. In a real research run with many target rows, this signal would flag any feature that is consistently off across all matches.",
+   "flags": "**No flags raised.** This is the ideal outcome: perfect match, zero ambiguity, no ties, and a symmetric confirmation. Any well-functioning match on a row that exists verbatim in the supplemental dataset should produce this result."
+  },
+  "nndr_threshold": 0.8
+ },
+ {
+  "scenario_title": "Scenario 2: Rounding Discrepancy",
+  "scenario_subtitle": "What happens when the target uses coarser precision than the supplemental dataset",
+  "scenario_label": "rounding_discrepancy",
+  "description": "A common real-world problem: the same data appears at different levels of precision in different sources. Here the target dataset rounds population counts to the nearest 100, ages to the nearest year, and percentages to the nearest whole number. The supplemental dataset retains the original decimal precision. The two records describe the same real-world unit \u2014 but because they report values at different precisions, the system cannot find an exact match. The correct row is still selected as the best match, but the distance is non-zero and the signals reveal the imprecision introduced by rounding.",
+  "rounding_note": "The target values above have been rounded from their original precision. Original values: Dragon Sightings = 2{,}469; Avg. Wizard Age = 40.2; Pct. Leprechaun Cottages = 99.5; Goblin Family Units = 649. The supplemental dataset retains this original precision \u2014 see rank~1 in the candidate table.",
+  "columns": [
+   {
+    "real": "Total population",
+    "silly": "dragon_sightings",
+    "display": "Dragon Sightings",
+    "unit": "count",
+    "fmt": "d"
+   },
+   {
+    "real": "Median age in years",
+    "silly": "avg_wizard_age",
+    "display": "Avg. Wizard Age",
+    "unit": "years",
+    "fmt": ".1f"
+   },
+   {
+    "real": "pctUnits1Detached",
+    "silly": "pct_leprechaun_cottages",
+    "display": "Pct. Leprechaun Cottages",
+    "unit": "percent",
+    "fmt": ".1f"
+   },
+   {
+    "real": "Family households",
+    "silly": "goblin_family_units",
+    "display": "Goblin Family Units",
+    "unit": "count",
+    "fmt": "d"
+   }
+  ],
+  "display_names": [
+   "Dragon Sightings",
+   "Avg. Wizard Age",
+   "Pct. Leprechaun Cottages",
+   "Goblin Family Units"
+  ],
+  "target_raw": [
+   2500.0,
+   40.0,
+   100.0,
+   600.0
+  ],
+  "supp_table": [
+   {
+    "rank": 1,
+    "raw": [
+     2469.0,
+     40.2,
+     99.5,
+     649.0
+    ],
+    "dist": 0.290207,
+    "is_best": true
+   },
+   {
+    "rank": 2,
+    "raw": [
+     2948.0,
+     33.4,
+     98.5,
+     687.0
+    ],
+    "dist": 1.168419,
+    "is_best": false
+   },
+   {
+    "rank": 3,
+    "raw": [
+     2524.0,
+     30.0,
+     99.5,
+     557.0
+    ],
+    "dist": 1.232733,
+    "is_best": false
+   },
+   {
+    "rank": 4,
+    "raw": [
+     3885.0,
+     37.2,
+     100.0,
+     1004.0
+    ],
+    "dist": 1.532062,
+    "is_best": false
+   },
+   {
+    "rank": 5,
+    "raw": [
+     3849.0,
+     42.2,
+     99.5,
+     1043.0
+    ],
+    "dist": 1.605956,
+    "is_best": false
+   },
+   {
+    "rank": 6,
+    "raw": [
+     4158.0,
+     29.8,
+     99.4,
+     1089.0
+    ],
+    "dist": 2.198686,
+    "is_best": false
+   },
+   {
+    "rank": 7,
+    "raw": [
+     4555.0,
+     26.5,
+     99.4,
+     930.0
+    ],
+    "dist": 2.380873,
+    "is_best": false
+   },
+   {
+    "rank": 8,
+    "raw": [
+     2512.0,
+     25.8,
+     96.1,
+     521.0
+    ],
+    "dist": 2.62023,
+    "is_best": false
+   },
+   {
+    "rank": 9,
+    "raw": [
+     5094.0,
+     27.3,
+     100.0,
+     1041.0
+    ],
+    "dist": 2.681345,
+    "is_best": false
+   },
+   {
+    "rank": 10,
+    "raw": [
+     4822.0,
+     25.7,
+     98.2,
+     914.0
+    ],
+    "dist": 2.688556,
+    "is_best": false
+   },
+   {
+    "rank": 11,
+    "raw": [
+     4891.0,
+     34.4,
+     99.6,
+     1339.0
+    ],
+    "dist": 2.760585,
+    "is_best": false
+   },
+   {
+    "rank": 12,
+    "raw": [
+     5006.0,
+     30.1,
+     97.5,
+     1230.0
+    ],
+    "dist": 3.041999,
+    "is_best": false
+   },
+   {
+    "rank": 13,
+    "raw": [
+     5296.0,
+     25.4,
+     99.3,
+     1128.0
+    ],
+    "dist": 3.043923,
+    "is_best": false
+   },
+   {
+    "rank": 14,
+    "raw": [
+     4223.0,
+     36.3,
+     94.2,
+     1132.0
+    ],
+    "dist": 3.542031,
+    "is_best": false
+   },
+   {
+    "rank": 15,
+    "raw": [
+     4701.0,
+     58.7,
+     100.0,
+     1519.0
+    ],
+    "dist": 3.752075,
+    "is_best": false
+   },
+   {
+    "rank": 16,
+    "raw": [
+     6303.0,
+     29.8,
+     100.0,
+     1490.0
+    ],
+    "dist": 3.859809,
+    "is_best": false
+   },
+   {
+    "rank": 17,
+    "raw": [
+     6516.0,
+     23.3,
+     99.3,
+     1385.0
+    ],
+    "dist": 4.121495,
+    "is_best": false
+   },
+   {
+    "rank": 18,
+    "raw": [
+     3465.0,
+     47.9,
+     92.5,
+     1080.0
+    ],
+    "dist": 4.19983,
+    "is_best": false
+   },
+   {
+    "rank": 19,
+    "raw": [
+     6668.0,
+     32.0,
+     98.5,
+     1641.0
+    ],
+    "dist": 4.316808,
+    "is_best": false
+   },
+   {
+    "rank": 20,
+    "raw": [
+     7389.0,
+     35.0,
+     100.0,
+     1851.0
+    ],
+    "dist": 4.951401,
+    "is_best": false
+   }
+  ],
+  "example": {
+   "rank": 2,
+   "raw": [
+    2948.0,
+    33.4,
+    98.5,
+    687.0
+   ],
+   "raw_means": [
+    4465.428571,
+    33.857143,
+    98.619048,
+    1087.142857
+   ],
+   "raw_stds": [
+    1419.8645,
+    8.331842,
+    1.971854,
+    356.70106
+   ],
+   "z_target": [
+    -1.384237,
+    0.737275,
+    0.700332,
+    -1.365689
+   ],
+   "z_example": [
+    -1.068714,
+    -0.054867,
+    -0.060373,
+    -1.121788
+   ],
+   "sq_diffs": [
+    0.099555,
+    0.627489,
+    0.578673,
+    0.059488
+   ],
+   "distance": 1.168419
+  },
+  "signals": {
+   "contributions": [
+    0.00566,
+    0.006842,
+    0.763437,
+    0.224061
+   ],
+   "euc_distance": 0.290207,
+   "nndr": 0.2484,
+   "near_miss_count": 0,
+   "mnn_confirmed": true,
+   "repeats": 1,
+   "smd": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "flags": ""
+  },
+  "signal_explanations": {
+   "per_feature_contribution": "Shows how much of the best-match distance each feature is responsible for. In a rounding scenario the contribution is spread across whichever features were rounded \u2014 no single feature should dominate unless one was rounded far more aggressively than the others.",
+   "euc_distance": "The best match distance is **0.2902** \u2014 non-zero despite the correct row existing in the supplemental dataset. The gap comes entirely from rounding: the target reports rounded values while the supplemental retains the original precision. In the exact match scenario this was 0.0000; here the same underlying record produces a small but real distance.",
+   "nndr": "NNDR = d\u2081 / d\u2082 = 0.2902 \u00f7 1.1684 = **0.2484**. This is below the 0.80 threshold, so no ambiguity flag is raised \u2014 the system is still confident the best match is correct. However, note that the NNDR is no longer 0.0000 as in the exact match: rounding has brought the second-best candidate slightly closer relative to the best match.",
+   "near_miss_count": "**0** supplemental row(s) fall within the near-miss threshold (d\u2081 / d\u1d62 \u2265 0.80). Because the best-match distance is small but non-zero, the ratio d\u2081 / d\u1d62 is also non-zero for all other rows \u2014 the cascading check stops quickly and no near misses are counted.",
+   "mnn_confirmed": "**Confirmed: True.** Running the search in reverse \u2014 from the matched supplemental row back to the target \u2014 still returns this target as the nearest record. Even with rounded target values, the match is symmetric.",
+   "repeats": "**1** row(s) tied at the minimum distance. No tie.",
+   "smd": "With only one target row, the SMD cannot be computed and is reported as 0 for all features. In a full run, systematic rounding of the target dataset would appear here as a consistent offset on the affected features.",
+   "flags": "**Flags: (none)**. No flags raised. Despite the non-zero distance, the system is confident enough in the match that no warnings are triggered. The distance and NNDR are visible in the output for the researcher to inspect."
+  },
+  "nndr_threshold": 0.8
+ },
+ {
+  "scenario_title": "Scenario 3: Scale Mismatch",
+  "scenario_subtitle": "What happens when one feature uses different units across the two datasets",
+  "scenario_label": "scale_mismatch",
+  "description": "One of the most dangerous data errors: the same variable measured in different units in the two datasets. Here the target reports Dragon Sightings as a per-thousand figure (2.469, meaning approximately 2{,}469), while every row in the supplemental dataset uses the raw count (2{,}469--7{,}389). After standardization, the target's Dragon Sightings value becomes an extreme outlier \u2014 pulling every candidate's distance upward by roughly the same large amount and effectively neutralising that feature's discriminating power. The system still selects the nearest row, but inspecting the per-feature contribution table alongside the large absolute distance reveals the problem: one feature is responsible for nearly all of the distance. Concentration alone is not a warning \u2014 any scenario where only one feature differs will show 100% contribution from that feature. The concern here is that concentration is paired with a large absolute distance, suggesting the dominant feature is not slightly off but fundamentally misscaled.",
+  "rounding_note": "Dragon Sightings in the target is entered as **2.469** (per-thousand units). The supplemental dataset records the same variable as a raw count; the correct raw value for this record is textbf{2{,}469}. All other features use consistent units across both datasets.",
+  "columns": [
+   {
+    "real": "Total population",
+    "silly": "dragon_sightings",
+    "display": "Dragon Sightings",
+    "unit": "count",
+    "fmt": "d"
+   },
+   {
+    "real": "Median age in years",
+    "silly": "avg_wizard_age",
+    "display": "Avg. Wizard Age",
+    "unit": "years",
+    "fmt": ".1f"
+   },
+   {
+    "real": "pctUnits1Detached",
+    "silly": "pct_leprechaun_cottages",
+    "display": "Pct. Leprechaun Cottages",
+    "unit": "percent",
+    "fmt": ".1f"
+   },
+   {
+    "real": "Family households",
+    "silly": "goblin_family_units",
+    "display": "Goblin Family Units",
+    "unit": "count",
+    "fmt": "d"
+   }
+  ],
+  "display_names": [
+   "Dragon Sightings",
+   "Avg. Wizard Age",
+   "Pct. Leprechaun Cottages",
+   "Goblin Family Units"
+  ],
+  "target_raw": [
+   2.469,
+   40.2,
+   99.5,
+   649.0
+  ],
+  "supp_table": [
+   {
+    "rank": 1,
+    "raw": [
+     2469.0,
+     40.2,
+     99.5,
+     649.0
+    ],
+    "dist": 1.482959,
+    "is_best": true
+   },
+   {
+    "rank": 2,
+    "raw": [
+     2524.0,
+     30.0,
+     99.5,
+     557.0
+    ],
+    "dist": 1.965238,
+    "is_best": false
+   },
+   {
+    "rank": 3,
+    "raw": [
+     2948.0,
+     33.4,
+     98.5,
+     687.0
+    ],
+    "dist": 2.018317,
+    "is_best": false
+   },
+   {
+    "rank": 4,
+    "raw": [
+     3849.0,
+     42.2,
+     99.5,
+     1043.0
+    ],
+    "dist": 2.578197,
+    "is_best": false
+   },
+   {
+    "rank": 5,
+    "raw": [
+     3885.0,
+     37.2,
+     100.0,
+     1004.0
+    ],
+    "dist": 2.578999,
+    "is_best": false
+   },
+   {
+    "rank": 6,
+    "raw": [
+     2512.0,
+     25.8,
+     96.1,
+     521.0
+    ],
+    "dist": 2.899096,
+    "is_best": false
+   },
+   {
+    "rank": 7,
+    "raw": [
+     4158.0,
+     29.8,
+     99.4,
+     1089.0
+    ],
+    "dist": 3.057472,
+    "is_best": false
+   },
+   {
+    "rank": 8,
+    "raw": [
+     4555.0,
+     26.5,
+     99.4,
+     930.0
+    ],
+    "dist": 3.290122,
+    "is_best": false
+   },
+   {
+    "rank": 9,
+    "raw": [
+     4822.0,
+     25.7,
+     98.2,
+     914.0
+    ],
+    "dist": 3.524519,
+    "is_best": false
+   },
+   {
+    "rank": 10,
+    "raw": [
+     4891.0,
+     34.4,
+     99.6,
+     1339.0
+    ],
+    "dist": 3.596049,
+    "is_best": false
+   },
+   {
+    "rank": 11,
+    "raw": [
+     5094.0,
+     27.3,
+     100.0,
+     1041.0
+    ],
+    "dist": 3.613558,
+    "is_best": false
+   },
+   {
+    "rank": 12,
+    "raw": [
+     5006.0,
+     30.1,
+     97.5,
+     1230.0
+    ],
+    "dist": 3.776116,
+    "is_best": false
+   },
+   {
+    "rank": 13,
+    "raw": [
+     5296.0,
+     25.4,
+     99.3,
+     1128.0
+    ],
+    "dist": 3.888965,
+    "is_best": false
+   },
+   {
+    "rank": 14,
+    "raw": [
+     4223.0,
+     36.3,
+     94.2,
+     1132.0
+    ],
+    "dist": 3.9812,
+    "is_best": false
+   },
+   {
+    "rank": 15,
+    "raw": [
+     4701.0,
+     58.7,
+     100.0,
+     1519.0
+    ],
+    "dist": 4.361057,
+    "is_best": false
+   },
+   {
+    "rank": 16,
+    "raw": [
+     3465.0,
+     47.9,
+     92.5,
+     1080.0
+    ],
+    "dist": 4.410532,
+    "is_best": false
+   },
+   {
+    "rank": 17,
+    "raw": [
+     6303.0,
+     29.8,
+     100.0,
+     1490.0
+    ],
+    "dist": 4.650293,
+    "is_best": false
+   },
+   {
+    "rank": 18,
+    "raw": [
+     6516.0,
+     23.3,
+     99.3,
+     1385.0
+    ],
+    "dist": 4.876984,
+    "is_best": false
+   },
+   {
+    "rank": 19,
+    "raw": [
+     6668.0,
+     32.0,
+     98.5,
+     1641.0
+    ],
+    "dist": 5.015591,
+    "is_best": false
+   },
+   {
+    "rank": 20,
+    "raw": [
+     7389.0,
+     35.0,
+     100.0,
+     1851.0
+    ],
+    "dist": 5.632815,
+    "is_best": false
+   }
+  ],
+  "example": {
+   "rank": 2,
+   "raw": [
+    2524.0,
+    30.0,
+    99.5,
+    557.0
+   ],
+   "raw_means": [
+    4346.498524,
+    33.866667,
+    98.595238,
+    1089.47619
+   ],
+   "raw_stds": [
+    1663.249635,
+    8.33897,
+    1.958006,
+    353.654071
+   ],
+   "z_target": [
+    -2.611772,
+    0.759486,
+    0.462083,
+    -1.2455
+   ],
+   "z_example": [
+    -1.095746,
+    -0.463686,
+    0.462083,
+    -1.505641
+   ],
+   "sq_diffs": [
+    2.298337,
+    1.496151,
+    0.0,
+    0.067673
+   ],
+   "distance": 1.965238
+  },
+  "signals": {
+   "contributions": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "euc_distance": 1.482959,
+   "nndr": 0.7546,
+   "near_miss_count": 0,
+   "mnn_confirmed": true,
+   "repeats": 1,
+   "smd": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "flags": ""
+  },
+  "signal_explanations": {
+   "per_feature_contribution": "**This is the key diagnostic for this scenario.** When one feature uses the wrong units, it generates an outsized squared difference that dwarfs all other features. Here **Dragon Sightings** accounts for **100.0%** of the total distance, with the remaining features contributing only 0.0%. Concentration alone is not a red flag \u2014 if only one feature differs, it will naturally account for 100% of the distance even when the difference is trivial. The warning sign here is that this concentration is paired with a large absolute distance (1.4830). Together they indicate the dominant feature is not slightly off but misscaled by orders of magnitude.",
+   "euc_distance": "The best-match distance is **1.4830** \u2014 far larger than the rounding scenario (0.2902) and orders of magnitude above the exact match (0.0000). The scale error inflates every candidate's distance by roughly the same large amount, making the absolute distance value unreliable as a quality signal on its own. The per-feature contribution table above is more informative here.",
+   "nndr": "NNDR = d\u2081 / d\u2082 = 1.4830 \u00f7 1.9652 = **0.7546**. This is below the 0.80 threshold. Despite the large absolute distance, the best match is still meaningfully closer than the second-best \u2014 likely because the correct row's other three features match exactly, giving it a small advantage even under the scale error.",
+   "near_miss_count": "**0** supplemental row(s) fall within the near-miss threshold (d\u2081 / d\u1d62 \u2265 0.80). The best match is still clearly separated from the others, likely because the correct row's remaining features match the target exactly while no other row does.",
+   "mnn_confirmed": "**Confirmed: True.** The matched row points back to this target as its nearest record in the reverse search. The match is symmetric despite the unit error.",
+   "repeats": "**1** row(s) tied at the minimum distance. No exact tie.",
+   "smd": "With one target row, SMD is not computable and is reported as 0. In a full run, the scale error on Dragon Sightings would appear as a very large SMD on that feature \u2014 potentially the most obvious diagnostic signal of all.",
+   "flags": "textbf{Flags: texttt{(none)}}. No flags raised. The NNDR is close to the 0.80 threshold, but the remaining three features were unique enough that the correct row still pulled ahead. The match succeeded despite the unit error."
+  },
+  "nndr_threshold": 0.8
+ },
+ {
+  "scenario_title": "Scenario 4: Ambiguous Match",
+  "scenario_subtitle": "What happens when two candidates are nearly equidistant from the target",
+  "scenario_label": "ambiguous_match",
+  "description": "The matching algorithm always returns the single closest supplemental row, but it cannot always tell the researcher how confident that choice is. This scenario shows what happens when two candidates are genuinely similar to each other \u2014 and both are a moderate, roughly equal distance from the target. The system picks the marginally closer row, but the Nearest Neighbor Distance Ratio (NNDR) approaches 1.0 and triggers an ambiguity flag. Unlike the scale-mismatch scenario, there is no data error here: the pool simply contains two similar records and the target falls between them. The flag tells the researcher to review the match before relying on it.",
+  "rounding_note": null,
+  "columns": [
+   {
+    "real": "Total population",
+    "silly": "dragon_sightings",
+    "display": "Dragon Sightings",
+    "unit": "count",
+    "fmt": "d"
+   },
+   {
+    "real": "Median age in years",
+    "silly": "avg_wizard_age",
+    "display": "Avg. Wizard Age",
+    "unit": "years",
+    "fmt": ".1f"
+   },
+   {
+    "real": "pctUnits1Detached",
+    "silly": "pct_leprechaun_cottages",
+    "display": "Pct. Leprechaun Cottages",
+    "unit": "percent",
+    "fmt": ".1f"
+   },
+   {
+    "real": "Family households",
+    "silly": "goblin_family_units",
+    "display": "Goblin Family Units",
+    "unit": "count",
+    "fmt": "d"
+   }
+  ],
+  "display_names": [
+   "Dragon Sightings",
+   "Avg. Wizard Age",
+   "Pct. Leprechaun Cottages",
+   "Goblin Family Units"
+  ],
+  "target_raw": [
+   2469.0,
+   40.2,
+   99.5,
+   649.0
+  ],
+  "supp_table": [
+   {
+    "rank": 1,
+    "raw": [
+     2948.0,
+     33.4,
+     98.5,
+     687.0
+    ],
+    "dist": 1.03229,
+    "is_best": true
+   },
+   {
+    "rank": 2,
+    "raw": [
+     2521.0,
+     30.2,
+     99.5,
+     558.0
+    ],
+    "dist": 1.238988,
+    "is_best": false
+   },
+   {
+    "rank": 3,
+    "raw": [
+     2524.0,
+     30.0,
+     99.5,
+     557.0
+    ],
+    "dist": 1.263345,
+    "is_best": false
+   },
+   {
+    "rank": 4,
+    "raw": [
+     3885.0,
+     37.2,
+     100.0,
+     1004.0
+    ],
+    "dist": 1.472725,
+    "is_best": false
+   },
+   {
+    "rank": 5,
+    "raw": [
+     3849.0,
+     42.2,
+     99.5,
+     1043.0
+    ],
+    "dist": 1.485321,
+    "is_best": false
+   },
+   {
+    "rank": 6,
+    "raw": [
+     4158.0,
+     29.8,
+     99.4,
+     1089.0
+    ],
+    "dist": 2.123136,
+    "is_best": false
+   },
+   {
+    "rank": 7,
+    "raw": [
+     4555.0,
+     26.5,
+     99.4,
+     930.0
+    ],
+    "dist": 2.352556,
+    "is_best": false
+   },
+   {
+    "rank": 8,
+    "raw": [
+     2512.0,
+     25.8,
+     96.1,
+     521.0
+    ],
+    "dist": 2.488072,
+    "is_best": false
+   },
+   {
+    "rank": 9,
+    "raw": [
+     4822.0,
+     25.7,
+     98.2,
+     914.0
+    ],
+    "dist": 2.612613,
+    "is_best": false
+   },
+   {
+    "rank": 10,
+    "raw": [
+     4891.0,
+     34.4,
+     99.6,
+     1339.0
+    ],
+    "dist": 2.66375,
+    "is_best": false
+   },
+   {
+    "rank": 11,
+    "raw": [
+     5094.0,
+     27.3,
+     100.0,
+     1041.0
+    ],
+    "dist": 2.66913,
+    "is_best": false
+   },
+   {
+    "rank": 12,
+    "raw": [
+     5006.0,
+     30.1,
+     97.5,
+     1230.0
+    ],
+    "dist": 2.890122,
+    "is_best": false
+   },
+   {
+    "rank": 13,
+    "raw": [
+     5296.0,
+     25.4,
+     99.3,
+     1128.0
+    ],
+    "dist": 2.996086,
+    "is_best": false
+   },
+   {
+    "rank": 14,
+    "raw": [
+     4223.0,
+     36.3,
+     94.2,
+     1132.0
+    ],
+    "dist": 3.299128,
+    "is_best": false
+   },
+   {
+    "rank": 15,
+    "raw": [
+     4701.0,
+     58.7,
+     100.0,
+     1519.0
+    ],
+    "dist": 3.66423,
+    "is_best": false
+   },
+   {
+    "rank": 16,
+    "raw": [
+     6303.0,
+     29.8,
+     100.0,
+     1490.0
+    ],
+    "dist": 3.798944,
+    "is_best": false
+   },
+   {
+    "rank": 17,
+    "raw": [
+     3465.0,
+     47.9,
+     92.5,
+     1080.0
+    ],
+    "dist": 3.947475,
+    "is_best": false
+   },
+   {
+    "rank": 18,
+    "raw": [
+     6516.0,
+     23.3,
+     99.3,
+     1385.0
+    ],
+    "dist": 4.066749,
+    "is_best": false
+   },
+   {
+    "rank": 19,
+    "raw": [
+     6668.0,
+     32.0,
+     98.5,
+     1641.0
+    ],
+    "dist": 4.19817,
+    "is_best": false
+   },
+   {
+    "rank": 20,
+    "raw": [
+     7389.0,
+     35.0,
+     100.0,
+     1851.0
+    ],
+    "dist": 4.865197,
+    "is_best": false
+   }
+  ],
+  "example": {
+   "rank": 2,
+   "raw": [
+    2521.0,
+    30.2,
+    99.5,
+    558.0
+   ],
+   "raw_means": [
+    4466.428571,
+    33.390476,
+    98.595238,
+    1085.142857
+   ],
+   "raw_stds": [
+    1418.486637,
+    8.248746,
+    1.958006,
+    359.533333
+   ],
+   "z_target": [
+    -1.408141,
+    0.825522,
+    0.462083,
+    -1.21308
+   ],
+   "z_example": [
+    -1.371482,
+    -0.386783,
+    0.462083,
+    -1.466186
+   ],
+   "sq_diffs": [
+    0.001344,
+    1.469685,
+    0.0,
+    0.064063
+   ],
+   "distance": 1.238988
+  },
+  "signals": {
+   "contributions": [
+    0.107008,
+    0.637733,
+    0.244776,
+    0.010483
+   ],
+   "euc_distance": 1.03229,
+   "nndr": 0.8332,
+   "near_miss_count": 2,
+   "mnn_confirmed": true,
+   "repeats": 1,
+   "smd": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "flags": "ambiguous match \u2014 NNDR 0.83 (>= 0.80) | 2 near-miss row(s) within distance ratio threshold"
+  },
+  "signal_explanations": {
+   "per_feature_contribution": "The per-feature breakdown here shows that no single feature dominates \u2014 the distance between the target and the best match is spread across multiple features. This distinguishes genuine candidate similarity from a data error: in the scale-mismatch scenario one feature accounted for nearly all the distance; here the contributions are distributed, reflecting that both rows are broadly similar to the target.",
+   "euc_distance": "The best-match distance is **1.0323**. On its own this value does not signal a problem \u2014 it is a real distance from a real mismatch between the target and the pool. The concern here is not the absolute distance but how close the runner-up is. See NNDR below.",
+   "nndr": "NNDR = d\u2081 / d\u2082 = 1.0323 \u00f7 1.2390 = **0.8332**. This meets or exceeds the 0.80 threshold \u2014 the ambiguity flag fires. The best and second-best candidates are only 16.7% apart in standardized distance. The system chose the marginally closer row, but swapping the two would change the match by almost nothing numerically \u2014 yet the two rows may represent meaningfully different real-world units.",
+   "near_miss_count": "**2** supplemental row(s) fall within the near-miss threshold (d\u2081 / d\u1d62 \u2265 0.80). With 2 near-miss(es), the match is not uniquely determined. These additional rows are close enough that a small change in the target's reported values could flip the selection.",
+   "mnn_confirmed": "**Confirmed: True.** Even with a high NNDR, the matched row still points back to this target as its nearest record in the reverse search. Ambiguity in the forward direction does not automatically break MNN symmetry.",
+   "repeats": "**1** row(s) tied at the minimum distance. No exact tie. The two similar candidates are close but not equidistant from the target.",
+   "smd": "With one target row, SMD is not computable and is reported as 0. In a full run where many targets fall in this dense region of the supplemental space, SMD would remain near 0 (both candidates are similar to the target) \u2014 but NNDR flags would accumulate, signaling that the pool is too dense for confident one-to-one matching.",
+   "flags": "textbf{Flags: texttt{ambiguous match \u2014 NNDR 0.83 (>= 0.80) | 2 near-miss row(s) within distance ratio threshold}}. One or more flags raised. This match requires researcher review. The flag does not mean the match is wrong \u2014 it means the system cannot confidently distinguish the best candidate from the runner-up. The researcher should inspect both rows and decide which, if either, is appropriate to use."
+  },
+  "nndr_threshold": 0.8
+ },
+ {
+  "scenario_title": "Scenario 5: MNN Not Confirmed",
+  "scenario_subtitle": "What happens when the matched row 'belongs' to a different target record",
+  "scenario_label": "mnn_not_confirmed",
+  "description": "In a real research run the target dataset contains many records, not just one. Mutual Nearest Neighbor (MNN) confirmation guards against a specific failure: the forward search assigns a supplemental row to Target A, but from that supplemental row's perspective, Target B is actually closer. The match is asymmetric \u2014 the supplemental row would prefer a different target. This scenario reproduces that condition with two target records. Target A is the record shown in the table below; Target B is an adjacent record with values textbf{[2{,}467, 40.6, 99.5%, 649]} \u2014 almost identical but shifted 0.4 years upward on Avg. Wizard Age. The inserted supplemental row (Rank~1 in the candidate table) sits between the two targets on that feature, closer to Target B. The forward match assigns it to Target A because it is still the nearest supplemental row available. The reverse search exposes the asymmetry.",
+  "rounding_note": "This scenario uses **two** target records to demonstrate MNN failure. Target A (shown above) has Avg. Wizard Age = 40.2; Target B (not shown) has Avg. Wizard Age = 40.6. The Rank~1 supplemental row has Avg. Wizard Age = 40.5, placing it marginally closer to Target B on that feature.",
+  "columns": [
+   {
+    "real": "Total population",
+    "silly": "dragon_sightings",
+    "display": "Dragon Sightings",
+    "unit": "count",
+    "fmt": "d"
+   },
+   {
+    "real": "Median age in years",
+    "silly": "avg_wizard_age",
+    "display": "Avg. Wizard Age",
+    "unit": "years",
+    "fmt": ".1f"
+   },
+   {
+    "real": "pctUnits1Detached",
+    "silly": "pct_leprechaun_cottages",
+    "display": "Pct. Leprechaun Cottages",
+    "unit": "percent",
+    "fmt": ".1f"
+   },
+   {
+    "real": "Family households",
+    "silly": "goblin_family_units",
+    "display": "Goblin Family Units",
+    "unit": "count",
+    "fmt": "d"
+   }
+  ],
+  "display_names": [
+   "Dragon Sightings",
+   "Avg. Wizard Age",
+   "Pct. Leprechaun Cottages",
+   "Goblin Family Units"
+  ],
+  "target_raw": [
+   2469.0,
+   40.2,
+   99.5,
+   649.0
+  ],
+  "supp_table": [
+   {
+    "rank": 1,
+    "raw": [
+     2468.0,
+     40.5,
+     99.5,
+     649.0
+    ],
+    "dist": 0.03625,
+    "is_best": true
+   },
+   {
+    "rank": 2,
+    "raw": [
+     2948.0,
+     33.4,
+     98.5,
+     687.0
+    ],
+    "dist": 1.032441,
+    "is_best": false
+   },
+   {
+    "rank": 3,
+    "raw": [
+     2524.0,
+     30.0,
+     99.5,
+     557.0
+    ],
+    "dist": 1.259448,
+    "is_best": false
+   },
+   {
+    "rank": 4,
+    "raw": [
+     3885.0,
+     37.2,
+     100.0,
+     1004.0
+    ],
+    "dist": 1.462345,
+    "is_best": false
+   },
+   {
+    "rank": 5,
+    "raw": [
+     3849.0,
+     42.2,
+     99.5,
+     1043.0
+    ],
+    "dist": 1.47598,
+    "is_best": false
+   },
+   {
+    "rank": 6,
+    "raw": [
+     4158.0,
+     29.8,
+     99.4,
+     1089.0
+    ],
+    "dist": 2.110118,
+    "is_best": false
+   },
+   {
+    "rank": 7,
+    "raw": [
+     4555.0,
+     26.5,
+     99.4,
+     930.0
+    ],
+    "dist": 2.330021,
+    "is_best": false
+   },
+   {
+    "rank": 8,
+    "raw": [
+     2512.0,
+     25.8,
+     96.1,
+     521.0
+    ],
+    "dist": 2.506825,
+    "is_best": false
+   },
+   {
+    "rank": 9,
+    "raw": [
+     4822.0,
+     25.7,
+     98.2,
+     914.0
+    ],
+    "dist": 2.590005,
+    "is_best": false
+   },
+   {
+    "rank": 10,
+    "raw": [
+     5094.0,
+     27.3,
+     100.0,
+     1041.0
+    ],
+    "dist": 2.641061,
+    "is_best": false
+   },
+   {
+    "rank": 11,
+    "raw": [
+     4891.0,
+     34.4,
+     99.6,
+     1339.0
+    ],
+    "dist": 2.647284,
+    "is_best": false
+   },
+   {
+    "rank": 12,
+    "raw": [
+     5006.0,
+     30.1,
+     97.5,
+     1230.0
+    ],
+    "dist": 2.876285,
+    "is_best": false
+   },
+   {
+    "rank": 13,
+    "raw": [
+     5296.0,
+     25.4,
+     99.3,
+     1128.0
+    ],
+    "dist": 2.967002,
+    "is_best": false
+   },
+   {
+    "rank": 14,
+    "raw": [
+     4223.0,
+     36.3,
+     94.2,
+     1132.0
+    ],
+    "dist": 3.333504,
+    "is_best": false
+   },
+   {
+    "rank": 15,
+    "raw": [
+     4701.0,
+     58.7,
+     100.0,
+     1519.0
+    ],
+    "dist": 3.65433,
+    "is_best": false
+   },
+   {
+    "rank": 16,
+    "raw": [
+     6303.0,
+     29.8,
+     100.0,
+     1490.0
+    ],
+    "dist": 3.764268,
+    "is_best": false
+   },
+   {
+    "rank": 17,
+    "raw": [
+     3465.0,
+     47.9,
+     92.5,
+     1080.0
+    ],
+    "dist": 4.00644,
+    "is_best": false
+   },
+   {
+    "rank": 18,
+    "raw": [
+     6516.0,
+     23.3,
+     99.3,
+     1385.0
+    ],
+    "dist": 4.025598,
+    "is_best": false
+   },
+   {
+    "rank": 19,
+    "raw": [
+     6668.0,
+     32.0,
+     98.5,
+     1641.0
+    ],
+    "dist": 4.163559,
+    "is_best": false
+   },
+   {
+    "rank": 20,
+    "raw": [
+     7389.0,
+     35.0,
+     100.0,
+     1851.0
+    ],
+    "dist": 4.824593,
+    "is_best": false
+   }
+  ],
+  "example": {
+   "rank": 2,
+   "raw": [
+    2948.0,
+    33.4,
+    98.5,
+    687.0
+   ],
+   "raw_means": [
+    4373.136364,
+    34.186364,
+    98.636364,
+    1069.454545
+   ],
+   "raw_stds": [
+    1450.226543,
+    8.277258,
+    1.922249,
+    357.497327
+   ],
+   "z_target": [
+    -1.312992,
+    0.726525,
+    0.449284,
+    -1.176105
+   ],
+   "z_example": [
+    -0.982699,
+    -0.095003,
+    -0.07094,
+    -1.069811
+   ],
+   "sq_diffs": [
+    0.109094,
+    0.674908,
+    0.270633,
+    0.011299
+   ],
+   "distance": 1.032441
+  },
+  "signals": {
+   "contributions": [
+    0.000362,
+    0.999638,
+    0.0,
+    0.0
+   ],
+   "euc_distance": 0.03625,
+   "nndr": 0.0351,
+   "near_miss_count": 0,
+   "mnn_confirmed": false,
+   "repeats": 1,
+   "smd": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "flags": "MNN not confirmed \u2014 supplemental row is closer to a different target; this record may have no valid match"
+  },
+  "signal_explanations": {
+   "per_feature_contribution": "The Rank~1 supplemental row is extremely close to Target A on all features \u2014 the total distance is tiny and the per-feature contributions reflect small differences spread across dimensions. The contribution table alone does not signal a problem. The MNN check below is what reveals the issue.",
+   "euc_distance": "The best-match distance is **0.0363** \u2014 very small, indicating a close match. On its own this looks like a high-quality result. The problem is not the distance but the direction: the selected row is almost as close to Target B as it is to Target A.",
+   "nndr": "NNDR = d\u2081 / d\u2082 = 0.0363 \u00f7 1.0324 = **0.0351**. This is well below the 0.80 threshold. The selected supplemental row is clearly the closest candidate \u2014 there is no ambiguity about which supplemental row wins. The MNN failure is a separate problem: the issue is not which supplemental row was chosen but whether this target should have claimed it.",
+   "near_miss_count": "**0** supplemental row(s) fall within the near-miss threshold. No near misses \u2014 the selected row is clearly the closest supplemental candidate. This reinforces that the MNN failure here is not about supplemental ambiguity but about target competition.",
+   "mnn_confirmed": "**Confirmed: False.** This is the key signal for this scenario. Running the match in reverse \u2014 from the selected supplemental row back across all target rows \u2014 the nearest target is **Target B**, not Target A. The supplemental row was assigned to Target A by the forward search, but from its own perspective it is closer to a different record. This asymmetry suggests Target A's match may have been 'stolen' from Target B, and the researcher should review both assignments before use.",
+   "repeats": "**1** row(s) tied at the minimum distance. No exact tie in the supplemental pool.",
+   "smd": "SMD is computed across all matched target--supplemental pairs in a full run. With only one target row being explained here, it is reported as 0. In a production run, widespread MNN failures would appear as elevated SMD on the features driving the competition between target records.",
+   "flags": "textbf{Flags: texttt{MNN not confirmed \u2014 supplemental row is closer to a different target; this record may have no valid match}}. The MNN flag is the primary concern. The researcher should inspect both Target A and Target B alongside the Rank~1 supplemental row and decide which assignment is correct for their analysis. In many cases the right action is to leave Target A unmatched rather than assign it a row that belongs elsewhere."
+  },
+  "nndr_threshold": 0.8,
+  "extra_target_rows": [
+   {
+    "label": "Target B",
+    "raw": [
+     2467.0,
+     40.6,
+     99.5,
+     649.0
+    ]
+   }
+  ]
+ }
+]
