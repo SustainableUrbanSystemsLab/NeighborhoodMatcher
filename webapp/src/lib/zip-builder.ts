@@ -1,5 +1,5 @@
 // Builds the MVP results zip as specified in
-// version-3/docs/match_quality_brainstorm.md (Output Format section).
+// matcher/docs/output_format.md.
 // All work is client-side; the zip blob is handed to the browser for download.
 
 import JSZip from "jszip";

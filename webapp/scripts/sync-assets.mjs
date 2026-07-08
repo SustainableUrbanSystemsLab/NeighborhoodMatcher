@@ -8,11 +8,11 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(__dirname, "..");
-const repoRoot = resolve(appRoot, "../..");
+const repoRoot = resolve(appRoot, "..");
 
-const matcherSrc = resolve(repoRoot, "version-3/src/matcher");
+const matcherSrc = resolve(repoRoot, "matcher/src/matcher");
 const matcherDest = resolve(appRoot, "public/matcher");
-const pdfSrc = resolve(repoRoot, "version-3/explanatory/output");
+const pdfSrc = resolve(repoRoot, "matcher/explanatory/output");
 const pdfDest = resolve(appRoot, "public/explanatory");
 
 function syncDir(src, dest, predicate) {

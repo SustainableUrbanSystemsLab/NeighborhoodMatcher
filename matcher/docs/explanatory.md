@@ -26,7 +26,7 @@ Output is written to `explanatory/output/<scenario>.pdf` (and an intermediate
 
 ## Building
 
-From `version-3/` with the project venv active and `pdflatex` on the path:
+From `matcher/` with the project venv active and `pdflatex` on the path:
 
 ```sh
 python explanatory/build.py                    # build all scenarios

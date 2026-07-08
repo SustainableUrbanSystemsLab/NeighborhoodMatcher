@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  version-3:
+  matcher:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,11 +18,11 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v3
       - name: Run pytest
-        working-directory: version-3
+        working-directory: matcher
         run: uv run --project . --python 3.10 pytest
       - name: Webapp matcher copy is in sync
         run: |
-          node apps/dataset-merge/scripts/sync-assets.mjs
+          node webapp/scripts/sync-assets.mjs
           # -N registers new files so untracked drift also fails the diff
-          git add -N apps/dataset-merge/public/matcher
-          git diff --exit-code apps/dataset-merge/public/matcher
+          git add -N webapp/public/matcher
+          git diff --exit-code webapp/public/matcher

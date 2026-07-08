@@ -9,7 +9,7 @@ failure modes: natural duplicate tracts, +/-2 perturbation, and 1/3/5
 missing features.
 
 Usage:
-    uv run --project version-3 python analysis/benchmark_simulated.py \
+    uv run --project matcher python analysis/benchmark_simulated.py \
         [--size A20|A100|A10000] [--data DIR] [--check]
 
 --check exits non-zero when any floor metric regresses; CI uses this via

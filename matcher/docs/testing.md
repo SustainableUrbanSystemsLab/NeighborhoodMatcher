@@ -1,6 +1,6 @@
 # Testing
 
-Pytest. Run from `version-3/` with the project venv active:
+Pytest. Run from `matcher/` with the project venv active:
 
 ```sh
 pytest

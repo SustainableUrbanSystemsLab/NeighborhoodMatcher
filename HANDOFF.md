@@ -1,5 +1,9 @@
 # Handoff Notes — Issues, Next Steps, Feedback
 
+> **Layout note (July 2026):** paths below refer to the spring-2026 tree.
+> `version-3/` is now `matcher/`, `apps/dataset-merge/` is now `webapp/`, and
+> `version-1/` / `version-2/` were removed (recoverable from git history).
+
 Captured at the end of the spring 2026 development cycle as a starting point
 for incoming researchers. Items below are a mix of author-flagged concerns,
 feedback from collaborators, and observations from the cleanup pass on the

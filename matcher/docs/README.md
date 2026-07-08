@@ -20,7 +20,7 @@ by an in-browser frontend (Pyodide-loaded `web_api`).
 
 - `src/matcher/` — the package. Pure functions, no global state.
   - `pipeline.py` — file-based entry point (`coordinator`).
-  - `web_api.py` — in-memory entry point used by the browser frontend (loaded via Pyodide by [`apps/dataset-merge/`](../../apps/dataset-merge/)).
+  - `web_api.py` — in-memory entry point used by the browser frontend (loaded via Pyodide by [`webapp/`](../../webapp/)).
   - `io.py`, `align.py`, `standardize.py`, `distance.py`, `merge.py` — stages.
   - `signals.py` — match-quality signals. See [signals/](signals/).
 - `tests/` — pytest suite. Mirror of the package layout; see [testing.md](testing.md).
@@ -53,5 +53,5 @@ column lists.
 pytest
 ```
 
-from `version-3/` (with the project venv active). Tests do not require any of
+from `matcher/` (with the project venv active). Tests do not require any of
 the sample CSVs — they use small in-memory fixtures.
