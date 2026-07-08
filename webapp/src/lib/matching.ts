@@ -7,6 +7,7 @@ import type { ColumnLink } from "@/types";
 export {
   runMatching,
   prefetchPyodide,
+  poolSizeFor,
   type PyodideStatus,
 } from "./pyodide-runtime";
 

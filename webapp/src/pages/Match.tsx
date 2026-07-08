@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import {
   findCommonHeaders,
+  poolSizeFor,
   prefetchPyodide,
   runMatching,
   type PyodideStatus,
@@ -27,6 +28,13 @@ import { ResultsView } from "@/components/ResultsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const DEFAULT_THRESHOLD = 0.8;
+
+function formatComparisons(n: number): string {
+  if (n >= 1e9) return `about ${(n / 1e9).toFixed(1)} billion`;
+  if (n >= 1e6)
+    return `about ${n >= 1e7 ? Math.round(n / 1e6) : (n / 1e6).toFixed(1)} million`;
+  return n.toLocaleString("en-US");
+}
 
 function statusLabel(status: PyodideStatus): string {
   switch (status.phase) {
@@ -143,6 +151,9 @@ export default function Match() {
 
     setStep("matching");
     setRunError(null);
+    // Planned pool size — deterministic, same computation the runner makes —
+    // so the run screen can show core usage while the job is in flight.
+    setWorkersUsed(poolSizeFor(target.rows.length, supplemental.rows.length));
 
     const t0 = performance.now();
     try {
@@ -306,19 +317,29 @@ export default function Match() {
                 {pyStatus.phase === "running"
                   ? `${Math.round(progressPct * 100)}% · elapsed ${elapsed}s`
                   : `elapsed ${elapsed}s`}
+                {workersUsed != null &&
+                  ` · ${workersUsed} core${workersUsed === 1 ? "" : "s"}`}
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 Computation runs entirely in your browser.
               </p>
-              <p className="mt-4 max-w-xl text-center text-[11px] leading-relaxed text-gray-400">
-                The worker pool is sized to the job: comparing every target
-                row against every supplemental row is split across up to
-                all-but-one of your CPU cores, but small jobs deliberately use
-                fewer — below a few million row comparisons, loading and
-                standardizing the files (which every worker does) takes longer
-                than the matching itself, so extra cores wouldn&apos;t make
-                the run faster.
-              </p>
+              {target && supplemental && workersUsed != null && (
+                <p className="mt-4 max-w-xl text-center text-[11px] leading-relaxed text-gray-400">
+                  This run compares {target.rows.length.toLocaleString("en-US")}{" "}
+                  target rows against{" "}
+                  {supplemental.rows.length.toLocaleString("en-US")}{" "}
+                  supplemental rows —{" "}
+                  {formatComparisons(
+                    target.rows.length * supplemental.rows.length
+                  )}{" "}
+                  row comparisons — on {workersUsed} of your{" "}
+                  {navigator.hardwareConcurrency || "?"} CPU cores. Small jobs
+                  deliberately use fewer cores: below a few million
+                  comparisons, loading and standardizing the files (which
+                  every worker does) takes longer than the matching itself, so
+                  extra cores wouldn&apos;t make the run faster.
+                </p>
+              )}
             </div>
           )}
 

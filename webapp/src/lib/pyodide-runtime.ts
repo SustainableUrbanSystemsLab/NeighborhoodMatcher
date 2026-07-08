@@ -57,7 +57,9 @@ function getWorker(index: number): Worker {
   return pool[index]!;
 }
 
-function poolSizeFor(nRows: number, mRows: number): number {
+// Exported so the UI can show the planned pool size while the run is in
+// flight (deterministic — same inputs the run itself will use).
+export function poolSizeFor(nRows: number, mRows: number): number {
   // Power-user/debug override: ?workers=N pins the pool size (clamped).
   const forced = Number(
     new URLSearchParams(window.location.search).get("workers")
