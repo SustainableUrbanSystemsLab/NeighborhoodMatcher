@@ -478,9 +478,11 @@ function RankPlot({
 
   const W = 300;
   const H = 120;
-  const padL = 28;
+  const padL = 38;
   const padR = 8;
-  const padT = 6;
+  // Top padding must fit a text line: labels near the top of the range
+  // (e.g. the cutoff line on a flat curve) were clipped by the viewBox.
+  const padT = 14;
   const padB = 18;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
@@ -499,12 +501,20 @@ function RankPlot({
     padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
   const y = (d: number) => padT + (1 - (d - dMin) / dRange) * plotH;
 
+  // Keep tick labels inside padL regardless of magnitude.
+  const fmt = (d: number) =>
+    Math.abs(d) >= 100 ? d.toFixed(1) : Math.abs(d) >= 10 ? d.toFixed(2) : d.toFixed(3);
+
   const linePath = distances
     .map((d, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(2)},${y(d).toFixed(2)}`)
     .join(" ");
 
   const best = distances[0]!;
   const yBest = y(best);
+
+  // The cutoff label hugs its line from above; clamp it into the viewBox and
+  // drop it below the line when it would collide with the top tick label.
+  const cutoffLabelY = y(cutoff) - 3 < 10 ? y(cutoff) + 9 : y(cutoff) - 3;
 
   // Show up to ~5 y-axis ticks (min, 25%, 50%, 75%, max).
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dMin + t * dRange);
@@ -514,7 +524,6 @@ function RankPlot({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
-        preserveAspectRatio="none"
         role="img"
         aria-label="Rank plot of top closest supplementals"
       >
@@ -539,7 +548,7 @@ function RankPlot({
                 fill="#64748b"
                 fontFamily="ui-monospace, monospace"
               >
-                {t.toFixed(3)}
+                {fmt(t)}
               </text>
             </g>
           );
@@ -557,7 +566,7 @@ function RankPlot({
         />
         <text
           x={W - padR}
-          y={y(cutoff) - 2}
+          y={cutoffLabelY}
           fontSize={8}
           textAnchor="end"
           fill="#be123c"
@@ -588,15 +597,16 @@ function RankPlot({
           );
         })}
 
-        {/* Best-match label */}
+        {/* Best-match label — the best dot sits on the bottom edge, so the
+            label goes just above it, clamped inside the plot. */}
         <text
           x={x(0) + 6}
-          y={yBest + 3}
+          y={Math.min(yBest + 3, padT + plotH - 2)}
           fontSize={8}
           fill="#1d4ed8"
           fontWeight={600}
         >
-          best {best.toFixed(3)}
+          best {fmt(best)}
         </text>
 
         {/* X-axis labels */}
@@ -641,7 +651,6 @@ function DrilldownPanel({
   onClose: () => void;
 }) {
   const maxCount = Math.max(1, ...detail.hist_counts);
-  const maxContrib = Math.max(...detail.contributions, 0.001);
 
   // Feature values: pair the raw target cell with the raw cell of the
   // MATCHED SUPPLEMENTAL ROW, using the column links the run was made with.
@@ -704,7 +713,10 @@ function DrilldownPanel({
           <div className="space-y-1">
             {features.map((f, i) => {
               const c = detail.contributions[i] ?? 0;
-              const pct = (c / maxContrib) * 100;
+              // Absolute scale: 100% = the whole squared distance. Scaling to
+              // the row max made the longest bar always fill the row, so bars
+              // were not comparable across drill-downs (HANDOFF issue).
+              const pct = c * 100;
               return (
                 <div key={f} className="flex items-center gap-2 text-xs">
                   <span className="w-32 truncate text-gray-700" title={f}>
