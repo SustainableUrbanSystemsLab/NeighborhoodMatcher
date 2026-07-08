@@ -4,7 +4,7 @@ import { useState } from "react";
 
 interface AgreementModalProps {
   open: boolean;
-  onAccept: () => void;
+  onAccept: (remember: boolean) => void;
   onDecline: () => void;
 }
 
@@ -19,6 +19,7 @@ export function AgreementModal({
     dataAccess: false,
     compliance: false,
   });
+  const [remember, setRemember] = useState(false);
 
   const allChecked = Object.values(checks).every(Boolean);
 
@@ -122,6 +123,17 @@ export function AgreementModal({
           To be expanded later
         </p>
 
+        <label className="mb-4 flex cursor-pointer items-center gap-2 text-xs text-gray-600">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={() => setRemember((v) => !v)}
+            className="h-3.5 w-3.5 rounded border-gray-300"
+          />
+          Save my selection on this device — skip this step next time (stored
+          locally only; nothing about your data is saved)
+        </label>
+
         <div className="flex justify-end gap-3">
           <button
             onClick={onDecline}
@@ -130,7 +142,7 @@ export function AgreementModal({
             Cancel
           </button>
           <button
-            onClick={onAccept}
+            onClick={() => onAccept(remember)}
             disabled={!allChecked}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >

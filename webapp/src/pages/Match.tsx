@@ -16,6 +16,11 @@ import {
 import { detectPII } from "@/lib/pii-detector";
 import { StepIndicator } from "@/components/StepIndicator";
 import { AgreementModal } from "@/components/AgreementModal";
+import {
+  clearAgreement,
+  loadSavedAgreement,
+  saveAgreement,
+} from "@/lib/agreement";
 import { FileUpload } from "@/components/FileUpload";
 import { ColumnLinker } from "@/components/ColumnLinker";
 import { ResultsView } from "@/components/ResultsView";
@@ -55,6 +60,9 @@ export default function Match() {
   const [elapsed, setElapsed] = useState(0);
   const [runDurationMs, setRunDurationMs] = useState<number | null>(null);
   const [workersUsed, setWorkersUsed] = useState<number | null>(null);
+  const [agreementSavedAt, setAgreementSavedAt] = useState<string | null>(
+    () => loadSavedAgreement()?.acceptedAt ?? null
+  );
   const [progressPct, setProgressPct] = useState(0);
   const tickRef = useRef<number | null>(null);
 
@@ -85,12 +93,7 @@ export default function Match() {
     };
   }, [step]);
 
-  const handleNext = useCallback(() => {
-    if (!target || !supplemental) return;
-    setStep("agreement");
-  }, [target, supplemental]);
-
-  const handleAgreementAccept = useCallback(() => {
+  const proceedToLink = useCallback(() => {
     if (!target || !supplemental) return;
 
     const autoLinks = findCommonHeaders(target.headers, supplemental.headers);
@@ -103,6 +106,34 @@ export default function Match() {
     setPiiWarnings(warnings);
     setStep("link");
   }, [target, supplemental]);
+
+  const handleNext = useCallback(() => {
+    if (!target || !supplemental) return;
+    const saved = loadSavedAgreement();
+    if (saved) {
+      setAgreementSavedAt(saved.acceptedAt);
+      proceedToLink();
+    } else {
+      setStep("agreement");
+    }
+  }, [target, supplemental, proceedToLink]);
+
+  const handleAgreementAccept = useCallback(
+    (remember: boolean) => {
+      if (remember) {
+        saveAgreement();
+        setAgreementSavedAt(new Date().toISOString());
+      }
+      proceedToLink();
+    },
+    [proceedToLink]
+  );
+
+  const handleAgreementRevoke = useCallback(() => {
+    clearAgreement();
+    setAgreementSavedAt(null);
+    setStep("agreement");
+  }, []);
 
   const handleRunMatching = useCallback(async () => {
     if (!target || !supplemental) return;
@@ -204,6 +235,18 @@ export default function Match() {
 
           {step === "link" && target && supplemental && (
             <div className="space-y-6">
+              {agreementSavedAt && (
+                <p className="text-xs text-gray-500">
+                  Data-use agreement previously accepted on this device (
+                  {new Date(agreementSavedAt).toLocaleDateString()}).{" "}
+                  <button
+                    onClick={handleAgreementRevoke}
+                    className="text-blue-600 underline hover:text-blue-800"
+                  >
+                    Review or revoke
+                  </button>
+                </p>
+              )}
               <ColumnLinker
                 target={target}
                 supplemental={supplemental}
