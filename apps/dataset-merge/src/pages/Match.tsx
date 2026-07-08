@@ -151,7 +151,10 @@ export default function Match() {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl p-4">
         <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Dataset Matcher</h1>
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.svg" alt="" className="h-8 w-8" />
+            <h1 className="text-2xl font-bold text-gray-900">Dataset Matcher</h1>
+          </div>
           <Link to="/about" className="text-sm text-blue-600 hover:text-blue-800">
             How it works →
           </Link>

@@ -6,6 +6,11 @@ export default function Home() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-xl text-center">
+        <img
+          src="/logo.svg"
+          alt=""
+          className="mx-auto mb-4 h-16 w-16"
+        />
         <h1 className="mb-2 text-4xl font-bold text-gray-900">
           Dataset Matcher
         </h1>
