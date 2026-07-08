@@ -202,10 +202,10 @@ export default function Match() {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl p-4">
         <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <Link to="/" className="flex items-center gap-2.5" title="Back to the landing page">
             <img src="/logo.svg" alt="" className="h-8 w-8" />
             <h1 className="text-2xl font-bold text-gray-900">Dataset Matcher</h1>
-          </div>
+          </Link>
           <Link to="/about" className="text-sm text-blue-600 hover:text-blue-800">
             How it works →
           </Link>
@@ -436,7 +436,7 @@ function WorkerControl({
           <option value="auto">
             Auto ({Math.max(1, reported - 1)} of {reported} reported)
           </option>
-          {[1, 2, 3, 4, 6, 8, 10, 12, 14, 16].map((n) => (
+          {Array.from({ length: 16 }, (_, i) => i + 1).map((n) => (
             <option key={n} value={n}>
               {n} worker{n === 1 ? "" : "s"}
             </option>
