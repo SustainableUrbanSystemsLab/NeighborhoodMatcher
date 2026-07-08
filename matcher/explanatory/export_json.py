@@ -50,19 +50,33 @@ _MATH_REPLACEMENTS = [
 
 
 def _clean_text(s):
-    # \textbf{...} / \emph{...} -> **...**
-    s = re.sub(r"\\textbf\{([^{}]*)\}", r"**\1**", s)
-    s = re.sub(r"\\emph\{([^{}]*)\}", r"**\1**", s)
-    # \text{...} inside math -> bare content
-    s = re.sub(r"\\text\{([^{}]*)\}", r"\1", s)
+    # LaTeX thousands separator first — it nests inside \textbf{...} args
+    # and would defeat the brace-matching below ("2{,}467" -> "2,467").
+    s = s.replace("{,}", ",")
+    # \textbf{...} / \emph{...} -> **...**, \texttt/\text -> bare content.
+    # Iterate the whole rule set until stable so nested commands
+    # (e.g. \textbf{Flags: \texttt{...}}) resolve inside-out.
+    rules = ((r"\\texttt\{([^{}]*)\}", r"\1"),
+             (r"\\text\{([^{}]*)\}", r"\1"),
+             (r"\\textbf\{([^{}]*)\}", r"**\1**"),
+             (r"\\emph\{([^{}]*)\}", r"**\1**"))
+    prev = None
+    while prev != s:
+        prev = s
+        for cmd, rep in rules:
+            s = re.sub(cmd, rep, s)
     for pat, rep in _MATH_REPLACEMENTS:
         s = re.sub(pat, rep, s)
     # inline math delimiters -> nothing (content already unicode-converted)
     s = s.replace("$", "")
-    # LaTeX em-dash
+    # LaTeX dashes: em first, then range en-dash
     s = s.replace("---", "—")
+    s = re.sub(r"(?<=[0-9%])--(?=[0-9])", "–", s)
+    s = s.replace("--", "—")
     # any straggler backslash command: keep its name as plain text
     s = re.sub(r"\\([A-Za-z]+)", r"\1", s)
+    # stray braces left by unhandled constructs
+    s = s.replace("{", "").replace("}", "")
     return re.sub(r"\s+", " ", s).strip()
 
 

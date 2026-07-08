@@ -235,15 +235,28 @@ export function ScenarioExplainer({
   const ex = scenario.example;
 
   return (
-    <article className="rounded-lg border border-gray-200 bg-white p-5">
-      <p className="text-xs uppercase tracking-wider text-blue-600">
-        Scenario {index + 1}
-      </p>
-      <h3 className="text-base font-semibold text-gray-900">
-        {scenario.scenario_title.replace(/^Scenario \d+:\s*/, "")}
-      </h3>
-      <p className="mt-0.5 text-xs text-gray-500">{scenario.scenario_subtitle}</p>
-      <p className="mt-2 text-sm text-gray-700">
+    <details
+      open={index === 0}
+      className="group rounded-lg border border-gray-200 bg-white"
+    >
+      <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
+        <span className="text-gray-400 transition-transform group-open:rotate-90">
+          ▸
+        </span>
+        <span>
+          <span className="block text-xs uppercase tracking-wider text-blue-600">
+            Scenario {index + 1}
+          </span>
+          <span className="block text-base font-semibold text-gray-900">
+            {scenario.scenario_title.replace(/^Scenario \d+:\s*/, "")}
+          </span>
+          <span className="block text-xs text-gray-500">
+            {scenario.scenario_subtitle}
+          </span>
+        </span>
+      </summary>
+      <div className="px-5 pb-5">
+      <p className="text-sm text-gray-700">
         <RichText text={scenario.description} />
       </p>
       {scenario.rounding_note && (
@@ -466,6 +479,7 @@ export function ScenarioExplainer({
           histogram PDF
         </a>
       </p>
-    </article>
+      </div>
+    </details>
   );
 }

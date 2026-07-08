@@ -86,11 +86,22 @@ export default function About() {
           </ol>
         </section>
 
-        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 text-lg font-semibold text-gray-900">
-            Quality signals
-          </h2>
-          <dl className="space-y-4 text-sm text-gray-700">
+        <details className="group mb-8 rounded-lg border border-gray-200 bg-white">
+          <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
+            <span className="text-gray-400 transition-transform group-open:rotate-90">
+              ▸
+            </span>
+            <span>
+              <span className="block text-lg font-semibold text-gray-900">
+                Quality signals
+              </span>
+              <span className="block text-xs text-gray-500">
+                What NNDR, MNN, per-feature contribution, SMD, and the flags
+                column mean
+              </span>
+            </span>
+          </summary>
+          <dl className="space-y-4 px-5 pb-5 text-sm text-gray-700">
             <div>
               <dt className="font-semibold text-gray-900">
                 Cascading NNDR + near-miss count
@@ -147,7 +158,7 @@ export default function About() {
               </dd>
             </div>
           </dl>
-        </section>
+        </details>
 
         <section className="mb-4">
           <h2 className="mb-3 text-lg font-semibold text-gray-900">
