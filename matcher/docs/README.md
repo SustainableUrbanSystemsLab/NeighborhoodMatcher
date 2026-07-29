@@ -1,6 +1,6 @@
-# Neighborhood Matcher — Version 3 Documentation
+# Neighborhood Matcher — `matcher/` Documentation
 
-Version 3 is the Python backend that links a target dataset to a supplemental
+`matcher/` is the Python backend that links a target dataset to a supplemental
 dataset using standardized Euclidean distance and reports a set of match-quality
 signals for each pair. It is consumed both by a CLI pipeline (writes CSVs) and
 by an in-browser frontend (Pyodide-loaded `web_api`).

@@ -25,7 +25,7 @@ pnpm install
 pnpm dev
 ```
 
-Full backend documentation: [`version-3/docs/`](../version-3/docs/).
+Full backend documentation: [`version-3/docs/`](../).
 
 ### Abstract
 
@@ -87,7 +87,7 @@ top-priority next step.
 ### Match quality signals
 
 Each linked row carries five signals plus a derived `flags` string. Brief
-summary; full reference at [`version-3/docs/signals/`](../version-3/docs/signals/).
+summary; full reference at [`version-3/docs/signals/`](../signals/).
 
 | Signal | What it captures |
 |--------|------------------|
@@ -165,7 +165,7 @@ brute-force constraint set by the privacy posture.
 
 ### Next steps
 
-Top priorities (full list in the repo's [`HANDOFF.md`](../HANDOFF.md)):
+Top priorities (full list in the repo's [`HANDOFF.md`](../../../HANDOFF.md)):
 
 1. **External HIPAA / ethics audit** of the matching methodology.
 2. **Harden the PII safeguard** beyond a soft warning.

@@ -24,7 +24,10 @@ export function detectPII(
 
   for (const header of headers) {
     for (const { pattern, reason } of PII_PATTERNS) {
-      if (pattern.test(header)) {
+      // snake_case/kebab-case headers (zip_code, patient-id) hide word
+      // boundaries from \b; normalize separators to spaces before testing.
+      const normalized = header.replace(/[_\-]+/g, " ");
+      if (pattern.test(normalized)) {
         warnings.push({ columnName: header, datasetLabel, reason });
         break; // One warning per column
       }

@@ -1,4 +1,4 @@
-name: Python tests
+name: Tests
 
 on:
   push:
@@ -24,5 +24,26 @@ jobs:
         run: |
           node webapp/scripts/sync-assets.mjs
           # -N registers new files so untracked drift also fails the diff
-          git add -N webapp/public/matcher
-          git diff --exit-code webapp/public/matcher
+          git add -N webapp/public/matcher webapp/public/explanatory
+          git diff --exit-code webapp/public/matcher webapp/public/explanatory
+
+  webapp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webapp
+    env:
+      # package.json pins pnpm via packageManager; corepack must not phone
+      # home for "latest" (stale signing keys break the fetch).
+      COREPACK_DEFAULT_TO_LATEST: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Type-check and build
+        run: pnpm build

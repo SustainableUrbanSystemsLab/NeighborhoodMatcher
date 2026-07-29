@@ -13,6 +13,25 @@ import numpy as np
 MISSING_PENALTY = 2.0
 
 
+def validate_threshold(threshold):
+    """
+    NNDR threshold domain check, shared by every public entry point.
+
+    Outside (0, 1] the near-miss cascade degenerates: at <= 0 every row
+    (including inf-distance no-overlap rows) counts as a near miss and the
+    ambiguity flag fires on perfect matches; above 1 nothing counts — not
+    even the best match itself — and the engine's self-exclusion would go
+    negative; NaN disables all flagging silently. 1.0 stays legal: it is
+    the meaningful 'count exact ties only' mode.
+    """
+    import math
+    if not (isinstance(threshold, (int, float)) and math.isfinite(threshold)
+            and 0 < threshold <= 1):
+        raise ValueError(
+            f"threshold must be a number in (0, 1], got {threshold!r}"
+        )
+
+
 def euclidean_distance(row_a, row_b):
     """
     Euclidean distance between two standardized numpy rows, tolerating
@@ -48,6 +67,8 @@ def compute_sorted_distances(target_row, reference_rows):
     repeat_count : number of rows tied at the minimum distance
                    (0 when even the best distance is inf — no valid match).
     """
+    if len(reference_rows) == 0:
+        raise ValueError("reference_rows is empty — nothing to match against")
     dists = np.array([euclidean_distance(target_row, ref) for ref in reference_rows])
     order = np.argsort(dists, kind='stable')
     sorted_dists = dists[order]
@@ -144,7 +165,6 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
         # The fast path fuses the reduction (einsum) and computes missing-
         # data corrections as inner products — up to 1 ulp accumulation
         # drift; see the docstring.
-        diff = chunk[:, None, :] - refs[None, :, :]
         if has_nan and fast:
             # Zero-fill + corrections: with az/bz = values (NaN -> 0),
             #   base(i,j)  = sum_d (az - bz)^2      (einsum, one broadcast pass)
@@ -166,6 +186,7 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
             dists = np.sqrt(sq)
             dists[n_obs == 0] = np.inf
         elif has_nan:
+            diff = chunk[:, None, :] - refs[None, :, :]
             observed = ~np.isnan(diff)
             np.multiply(diff, diff, out=diff)
             diff[~observed] = MISSING_PENALTY
@@ -173,8 +194,10 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
             dists = np.sqrt(diff.sum(axis=2))
             dists[n_obs == 0] = np.inf
         elif fast:
+            diff = chunk[:, None, :] - refs[None, :, :]
             dists = np.sqrt(np.einsum("tmd,tmd->tm", diff, diff))
         else:
+            diff = chunk[:, None, :] - refs[None, :, :]
             np.multiply(diff, diff, out=diff)
             dists = np.sqrt(diff.sum(axis=2))
 
@@ -207,7 +230,10 @@ def match_all(std_rows_1, std_rows_2, threshold=0.8, top_k=0, hist_bins=0,
                 with np.errstate(divide="ignore", invalid="ignore"):
                     counts = (d1_arr[pos, None] / dists[pos] >= threshold).sum(axis=1)
                 nndr[lo:hi][pos] = nndr_pos
-                near_miss[lo:hi][pos] = counts - 1
+                # counts includes d1/d1 only when threshold <= 1; the -1
+                # self-exclusion must never push the count negative
+                # (thresholds are validated upstream, this is belt-and-braces).
+                near_miss[lo:hi][pos] = np.maximum(counts - 1, 0)
 
             # d1 == 0 with d2 == 0: tied exact matches — maximally ambiguous.
             zero_tied = matched_rows & (d1_arr == 0) & (d2_arr == 0)

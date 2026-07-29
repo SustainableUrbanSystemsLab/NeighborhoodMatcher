@@ -1,6 +1,6 @@
 // TODO: Expand agreement — legal review pending
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface AgreementModalProps {
   open: boolean;
@@ -21,6 +21,20 @@ export function AgreementModal({
   });
   const [remember, setRemember] = useState(false);
 
+  // Reopening (e.g. after 'Review or revoke') must not inherit the previous
+  // acceptance — reset every checkbox each time the modal appears.
+  useEffect(() => {
+    if (open) {
+      setChecks({
+        noPHI: false,
+        phiGeneration: false,
+        dataAccess: false,
+        compliance: false,
+      });
+      setRemember(false);
+    }
+  }, [open]);
+
   const allChecked = Object.values(checks).every(Boolean);
 
   function toggle(key: keyof typeof checks) {
@@ -30,8 +44,8 @@ export function AgreementModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 backdrop-blur-sm">
-      <div className="mx-4 my-8 w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex overflow-y-auto bg-black/50 backdrop-blur-sm">
+      <div className="m-auto w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl">
         <h2 className="mb-4 text-xl font-semibold text-gray-900">
           Data Use Agreement
         </h2>

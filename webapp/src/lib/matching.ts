@@ -11,6 +11,7 @@ export {
   getSavedWorkerCount,
   saveWorkerCount,
   reportedCores,
+  terminatePool,
   type PyodideStatus,
 } from "./pyodide-runtime";
 

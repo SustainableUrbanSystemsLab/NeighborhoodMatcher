@@ -14,11 +14,15 @@ discovers everything below `tests/`.
 | File | Covers |
 |------|--------|
 | `tests/conftest.py` | Shared fixtures: `simple_common`, `tiny_rows_equal`, `tiny_rows_known_distance`, `reference_pool`. |
-| `tests/test_io.py` | `clean_val` — comma/dollar/whitespace stripping, NA / empty → "0". |
-| `tests/test_align.py` | `find_common_headers` — shared columns, exclude list, missing intersections. |
-| `tests/test_standardize.py` | `dual_standardize` — combined mean ≈ 0, std ≈ 1; constant-column guard; row-count preservation. |
-| `tests/test_distance.py` | `euclidean_distance`, `brute_find_best_match`, `compute_sorted_distances`. Includes 3-4-5 triangle, sort order, tie counting, agreement between brute and sorted variants. |
+| `tests/test_io.py` | `clean_val` — comma/dollar/whitespace stripping, missing tokens → `None`, garbage → `ValueError`; `load_csv` — BOM, blank lines, ragged rows, empty file; utf-8 round-trip. |
+| `tests/test_align.py` | `find_common_headers` — shared columns, exclude list, whitespace-trimmed names, empty-name and duplicate-name guards. |
+| `tests/test_standardize.py` | `dual_standardize` — combined mean ≈ 0, std ≈ 1; constant-column guard; missing-value (NaN) stats; `scale_compatibility_warnings`. |
+| `tests/test_distance.py` | `euclidean_distance`, `brute_find_best_match`, `compute_sorted_distances`. 3-4-5 triangle, sort order, tie counting, missing-dim penalty, no-overlap → inf. |
+| `tests/test_match_all.py` | Vectorized engine ↔ per-row reference equivalence (bitwise in exact mode), chunk-size independence, coincidental exact ties, fast-mode tolerance, top-k/histograms, progress callback. |
 | `tests/test_merge.py` | `row_merge`, `new_header` — non-shared appended, shared not duplicated. |
+| `tests/test_pipeline.py` | `coordinator` end-to-end: MNN flag in output, missing-data flags, no-match rows, all-blank supplemental rows, guards (no shared columns, empty datasets, parse errors with file/line/column), scale-mismatch warnings, detail columns. |
+| `tests/test_web_api_shards.py` | Sharded (`match_shard` + `assemble_results`) ↔ single-worker equality, shard-order independence, global MNN merge, gap/overlap rejection, JSON-safe payloads. |
+| `tests/test_simulated_benchmark.py` | Regression floors on the simulated ACS benchmark (accuracy per scenario, wrong-match flag rate, no-match tripwire, runtime cap). Skipped when `simulated_data/` is absent. |
 | `tests/signals/test_cascading_nndr.py` | Degenerate inputs, clear / ambiguous matches, threshold sensitivity, cascading stop condition, flat-landscape edge case. |
 | `tests/signals/test_mnn_confirmed.py` | Symmetric / one-directional matches, single-target row, tie handling (permissive — `reverse_repeat_count`). |
 | `tests/signals/test_per_row_feature_contribution.py` | Sums to 1.0, hand-computed decomposition, single-feature dominance, sign invariance, exact-match → all zeros. |

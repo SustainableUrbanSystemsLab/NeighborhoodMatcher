@@ -26,7 +26,9 @@ Output is written to `explanatory/output/<scenario>.pdf` (and an intermediate
 
 ## Building
 
-From `matcher/` with the project venv active and `pdflatex` on the path:
+From `matcher/` with `pdflatex` on the path. The PDF pipeline's extra
+dependencies (matplotlib, jinja2) live in the `explanatory` dependency
+group, so prefix commands with `uv run --group explanatory`:
 
 ```sh
 python explanatory/build.py                    # build all scenarios

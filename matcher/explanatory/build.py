@@ -1,5 +1,5 @@
 # Generates one PDF per scenario.
-# Run from version-3/ with the project venv active:
+# Run from matcher/ with the project venv active:
 #   python explanatory/build.py [scenario_label ...]
 # Omit arguments to build all scenarios.
 

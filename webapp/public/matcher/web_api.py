@@ -19,9 +19,9 @@ import io as _io
 
 import numpy as np
 
-from .align import find_common_headers
+from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
-from .distance import MISSING_PENALTY, match_all
+from .distance import MISSING_PENALTY, match_all, validate_threshold
 from .merge import row_merge, new_header
 from .pipeline import extract_features, missing_counts
 from .signals import (
@@ -34,9 +34,10 @@ def _parse_csv_string(csv_str, file_label):
     reader = csv.reader(_io.StringIO(csv_str.lstrip("﻿")))
     data = list(reader)
     if not data:
-        return [], []
+        raise ValueError(f"{file_label}: file is empty (no header row)")
     headers, raw_rows = data[0], data[1:]
     rows = []
+    line_numbers = []
     for i, row in enumerate(raw_rows):
         if not row:  # blank line — skip, matching io.load_csv
             continue
@@ -46,19 +47,41 @@ def _parse_csv_string(csv_str, file_label):
                 f"expected {len(headers)} (matching the header)"
             )
         rows.append(row)
-    return headers, rows
+        line_numbers.append(i + 2)
+    return headers, rows, line_numbers
 
 
-def _validate_links(links):
+def _validate_links(links, n_target_cols, n_supp_cols):
     """
     The explicit-links path bypasses find_common_headers, so it needs its
-    own ambiguity guard: two links sharing a name or a column index would
-    silently double-weight one column or link the wrong one (last-wins).
+    own guards: two links sharing a name or a column index would silently
+    double-weight one column or link the wrong one (last-wins), and an
+    out-of-range or NEGATIVE index would either crash deep in extraction or
+    — worse — silently index from the end of the row (JS indexOf() returns
+    -1 for 'not found', the exact value a frontend regression would send).
     """
+    problems = []
+
+    for link in links:
+        name = str(link["headerName"]).strip()
+        i1, i2 = link["header1Index"], link["header2Index"]
+        if not name:
+            problems.append("a link has an empty column name")
+        for label, idx, n_cols in (
+            ("header1Index", i1, n_target_cols),
+            ("header2Index", i2, n_supp_cols),
+        ):
+            if not float(idx).is_integer():
+                problems.append(f"{label} {idx!r} for '{name}' is not an integer")
+            elif not 0 <= int(idx) < n_cols:
+                problems.append(
+                    f"{label} {int(idx)} for '{name}' is out of range "
+                    f"(file has {n_cols} columns)"
+                )
+
     names = [l["headerName"] for l in links]
     t_idx = [l["header1Index"] for l in links]
     s_idx = [l["header2Index"] for l in links]
-    problems = []
     for label, values in (("column name", names),
                           ("target column index", t_idx),
                           ("supplemental column index", s_idx)):
@@ -69,6 +92,7 @@ def _validate_links(links):
             seen.add(v)
         if dupes:
             problems.append(f"duplicate {label}(s): {', '.join(str(d) for d in sorted(dupes))}")
+
     if problems:
         raise ValueError(
             "Ambiguous column links — " + "; ".join(problems)
@@ -81,16 +105,20 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
     Shared front half of every entry point: parse, link columns, extract,
     count missingness, standardize jointly. Deterministic — every shard
     worker running this on the same inputs gets identical arrays.
+
+    NOTE: `exclude` applies only when `links is None` (auto-detection);
+    explicit links are authoritative and bypass it.
     """
     if exclude is None:
         exclude = []
 
-    h1, rs1 = _parse_csv_string(target_csv, "target file")
-    h2, rs2 = _parse_csv_string(supplemental_csv, "supplemental file")
+    h1, rs1, lines1 = _parse_csv_string(target_csv, "target file")
+    h2, rs2, lines2 = _parse_csv_string(supplemental_csv, "supplemental file")
 
     if links is None:
         common = find_common_headers(h1, h2, exclude)
     else:
+        _validate_links(list(links), len(h1), len(h2))
         # Normalize dict-like entries coming from JS.
         common = [
             {
@@ -100,11 +128,10 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
             }
             for link in links
         ]
-        _validate_links(common)
     feature_names = [c["headerName"] for c in common]
 
     if not common:
-        raise ValueError("No shared columns to match on.")
+        raise no_shared_columns_error(h1, h2)
     if not rs1:
         raise ValueError("Target dataset has no rows.")
     if not rs2:
@@ -112,13 +139,14 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
 
     # Missing cells -> None -> NaN; never imputed — distances mask missing
     # dimensions instead (see pipeline.coordinator, same behaviour).
-    filtered_rs1 = extract_features(rs1, common, "header1Index", "target file")
-    filtered_rs2 = extract_features(rs2, common, "header2Index", "supplemental file")
+    filtered_rs1 = extract_features(rs1, common, "header1Index", "target file", lines1)
+    filtered_rs2 = extract_features(rs2, common, "header2Index", "supplemental file", lines2)
 
     target_missing = missing_counts(filtered_rs1)
     supp_missing = missing_counts(filtered_rs2)
 
     warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
+    warnings += header_warnings(h1, h2, feature_names)
 
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
@@ -175,6 +203,9 @@ def _match_shard_prepared(prep, threshold, row_lo, row_hi, top_k, hist_bins, pro
     return {
         "row_lo": int(row_lo),
         "row_hi": int(row_hi),
+        # Recorded so assembly can refuse to mix shards computed under a
+        # different threshold (nndr/near_miss would disagree with the flags).
+        "threshold": float(threshold),
         "best_index": [int(v) for v in res["best_index"]],
         "best_distance": [_num_or_none(v) for v in res["best_distance"]],
         "second_distance": [_num_or_none(v) for v in res["second_distance"]],
@@ -212,6 +243,7 @@ def match_shard(
         per-supplemental-row minimum, merged globally by assemble_results
         for the MNN check.
     """
+    validate_threshold(threshold)
     prep = _prepare(target_csv, supplemental_csv, links, exclude)
     return _match_shard_prepared(prep, threshold, row_lo, row_hi, top_k, hist_bins, progress_cb)
 
@@ -230,6 +262,7 @@ def assemble_results(
     confirmation from the merged column minima, flags, linked/detail rows,
     per-target diagnostics, and the run summary.
     """
+    validate_threshold(threshold)
     prep = _prepare(target_csv, supplemental_csv, links, exclude)
     return _assemble_prepared(prep, shards, threshold)
 
@@ -244,7 +277,10 @@ def _assemble_prepared(prep, shards, threshold):
     n_target = len(std_rows_1)
     m = len(std_rows_2)
 
-    shards = sorted((dict(s) for s in shards), key=lambda s: s["row_lo"])
+    # Sort by (row_lo, row_hi): row_lo alone is not a total order when an
+    # empty shard shares its row_lo with a real one — a pool larger than the
+    # row count produces exactly that, and workers finish in any order.
+    shards = sorted((dict(s) for s in shards), key=lambda s: (s["row_lo"], s["row_hi"]))
     covered = [(s["row_lo"], s["row_hi"]) for s in shards]
     expected_lo = 0
     for lo, hi in covered:
@@ -253,6 +289,26 @@ def _assemble_prepared(prep, shards, threshold):
         expected_lo = hi
     if expected_lo != n_target:
         raise ValueError(f"shard ranges do not cover all {n_target} target rows: {covered}")
+
+    per_row_keys = ("best_index", "best_distance", "second_distance",
+                    "repeats", "nndr", "near_miss", "top_k", "histograms",
+                    "contributions")
+    for s in shards:
+        n_rows = s["row_hi"] - s["row_lo"]
+        for key in per_row_keys:
+            if len(s[key]) != n_rows:
+                raise ValueError(
+                    f"shard [{s['row_lo']}, {s['row_hi']}) has {len(s[key])} "
+                    f"'{key}' entries, expected {n_rows} — truncated or "
+                    f"corrupted shard payload"
+                )
+        shard_threshold = s.get("threshold")
+        if shard_threshold is not None and shard_threshold != threshold:
+            raise ValueError(
+                f"shard [{s['row_lo']}, {s['row_hi']}) was computed at "
+                f"threshold {shard_threshold}, but assembly requested "
+                f"{threshold} — recompute the shards"
+            )
 
     def _cat(key):
         out = []
@@ -372,7 +428,10 @@ def _assemble_prepared(prep, shards, threshold):
 
         row_best = float(best_distance[i])
         second = second_distance[i]
-        row_second = float(second) if second is not None else float("nan")
+        # Keep None (not NaN): the result must stay JSON-safe and match the
+        # frontend's `number | null` contract — shards already encode
+        # non-finite as None, and NaN breaks dict equality and JSON.
+        row_second = float(second) if second is not None else None
 
         linked_rows.append(
             row_merge(rs1[i], rs2[j], common)
@@ -460,6 +519,8 @@ def coordinate_in_memory(
     directly. Arguments and the returned dict are unchanged from the
     original API (see assemble_results).
     """
+    validate_threshold(threshold)
+
     def _match_progress(frac):
         if progress_cb is None:
             return

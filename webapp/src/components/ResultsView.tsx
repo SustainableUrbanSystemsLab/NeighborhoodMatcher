@@ -26,6 +26,7 @@ interface ResultsViewProps {
 
 function formatDuration(ms: number): string {
   const s = ms / 1000;
+  if (s < 0.1) return "<0.1 s";
   if (s < 60) return `${s.toFixed(1)} s`;
   const m = Math.floor(s / 60);
   const rest = Math.round(s - m * 60);

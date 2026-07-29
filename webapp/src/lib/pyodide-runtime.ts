@@ -111,16 +111,39 @@ export function poolSizeFor(nRows: number, mRows: number): number {
   return Math.max(1, Math.min(byCpu, byMemory, byWork, nRows));
 }
 
+let prefetchStarted = false;
+
 export function prefetchPyodide(onStatus?: StatusCallback): void {
+  // Re-entering the link step must not stack another permanent listener on
+  // worker 0 — stale closures would resurrect old statuses after resets.
+  if (prefetchStarted && pool.length > 0) return;
+  prefetchStarted = true;
   const w = getWorker(0);
   const handler = (e: MessageEvent<WorkerResponse>) => {
     const msg = e.data;
-    if (msg.type === "status") onStatus?.(statusFromPhase(msg.phase));
-    else if (msg.type === "error")
+    if (msg.type === "status") {
+      onStatus?.(statusFromPhase(msg.phase));
+      if (msg.phase === "ready") w.removeEventListener("message", handler);
+    } else if (msg.type === "error") {
       onStatus?.({ phase: "error", message: msg.message });
+      w.removeEventListener("message", handler);
+    }
   };
   w.addEventListener("message", handler);
   w.postMessage({ type: "init" } satisfies WorkerRequest);
+}
+
+/**
+ * Kill every pool worker and drop the pool. Called when a run fails or is
+ * abandoned (leaving the match page): in-flight Pyodide work cannot be
+ * cancelled, and a busy worker would otherwise feed its STALE results to
+ * the next run's listeners — silently wrong output. The cost is a cold
+ * (re-)init on the next run; correctness wins.
+ */
+export function terminatePool(): void {
+  for (const w of pool) w.terminate();
+  pool.length = 0;
+  prefetchStarted = false;
 }
 
 function statusFromPhase(phase: StatusPhase): PyodideStatus {
@@ -261,8 +284,15 @@ export async function runMatching(
   const nWorkers = poolSizeFor(nRows, supplemental.rows.length);
 
   if (nWorkers <= 1) {
-    const output = await runSingle(payloads, onStatus, onProgress);
-    return { output, workersUsed: 1 };
+    try {
+      const output = await runSingle(payloads, onStatus, onProgress);
+      return { output, workersUsed: 1 };
+    } catch (err) {
+      // The worker may still be executing the failed run's Python; a busy
+      // worker would feed stale results to the next run. Kill and rebuild.
+      terminatePool();
+      throw err;
+    }
   }
 
   // Even, contiguous shards; weights drive the aggregate progress bar.
@@ -301,13 +331,18 @@ export async function runMatching(
       )
     );
 
-    shards.sort((a, b) => a.row_lo - b.row_lo);
+    // (row_lo, row_hi): row_lo alone is not a total order when the pool is
+    // larger than the row count and an empty shard shares its row_lo.
+    shards.sort((a, b) => a.row_lo - b.row_lo || a.row_hi - b.row_hi);
     const result = await runAssembleOn(getWorker(0), payloads, shards);
     onProgress?.(1);
     return { output: result, workersUsed: nWorkers };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     onStatus?.({ phase: "error", message });
+    // One failed shard leaves the others mid-compute with listeners gone;
+    // their eventual results would poison the next run. Kill everything.
+    terminatePool();
     throw err;
   }
 }

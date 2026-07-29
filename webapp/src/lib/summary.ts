@@ -223,7 +223,7 @@ Folder layout:
 
   results/
     match_detail.csv        Per-row diagnostics: distance, NNDR, MNN
-                            confirmation, flags, repeats, near-miss count.
+                            confirmation, flags, near-miss count, missing-feature counts.
 
   diagnostics/
     data_stats.csv          Per-column summary stats for both inputs.

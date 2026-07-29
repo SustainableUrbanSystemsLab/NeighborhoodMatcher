@@ -4,7 +4,7 @@
 #
 # Real columns used:
 #   Total population, Median age in years, pctUnits1Detached, Family households
-# Source rows: census tracts from dataseta.csv (version-3/data/acs-test/real-data/)
+# Source rows: census tracts from dataseta.csv (matcher/data/acs-test/real-data/)
 #
 # TARGET  — census tract 4013082019
 # SUPP_BASE — 19 additional tracts; each scenario fills in a 20th row to create

@@ -25,7 +25,7 @@ export function FileUpload({
   const handleFile = useCallback(
     async (file: File) => {
       setError(null);
-      if (!file.name.endsWith(".csv")) {
+      if (!file.name.toLowerCase().endsWith(".csv")) {
         setError("Please upload a CSV file.");
         return;
       }

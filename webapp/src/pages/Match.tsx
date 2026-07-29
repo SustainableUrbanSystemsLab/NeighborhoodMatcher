@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import type {
   AppStep,
@@ -8,6 +8,7 @@ import type {
   ParsedDataset,
 } from "@/types";
 import {
+  findAmbiguousHeaders,
   findCommonHeaders,
   getSavedWorkerCount,
   poolSizeFor,
@@ -15,6 +16,7 @@ import {
   reportedCores,
   runMatching,
   saveWorkerCount,
+  terminatePool,
   type PyodideStatus,
 } from "@/lib/matching";
 import { detectPII } from "@/lib/pii-detector";
@@ -86,6 +88,31 @@ export default function Match() {
     if (step === "link") prefetchPyodide(setPyStatus);
   }, [step]);
 
+  // Leaving the page mid-run (header logo, browser back) cannot cancel
+  // in-flight Python — kill the pool so a busy worker never feeds stale
+  // results to a later run.
+  useEffect(() => () => terminatePool(), []);
+
+  // Auto-links and PII warnings derive from the DATASETS, not from step
+  // transitions: recomputing on every entry to the link step would wipe the
+  // user's manual links/exclusions after Back→Next or agreement review.
+  useEffect(() => {
+    if (!target || !supplemental) return;
+    setLinks(findCommonHeaders(target.headers, supplemental.headers));
+    setPiiWarnings([
+      ...detectPII(target.headers, "target"),
+      ...detectPII(supplemental.headers, "supplemental"),
+    ]);
+  }, [target, supplemental]);
+
+  const ambiguousHeaders = useMemo(
+    () =>
+      target && supplemental
+        ? findAmbiguousHeaders(target.headers, supplemental.headers)
+        : [],
+    [target, supplemental]
+  );
+
   // Elapsed timer while the matching step is active. Because Pyodide now runs
   // in a worker, the main thread keeps rendering and the counter updates.
   useEffect(() => {
@@ -109,15 +136,6 @@ export default function Match() {
 
   const proceedToLink = useCallback(() => {
     if (!target || !supplemental) return;
-
-    const autoLinks = findCommonHeaders(target.headers, supplemental.headers);
-    const warnings = [
-      ...detectPII(target.headers, "target"),
-      ...detectPII(supplemental.headers, "supplemental"),
-    ];
-
-    setLinks(autoLinks);
-    setPiiWarnings(warnings);
     setStep("link");
   }, [target, supplemental]);
 
@@ -196,6 +214,8 @@ export default function Match() {
     setRunError(null);
     setRunDurationMs(null);
     setWorkersUsed(null);
+    setPyStatus({ phase: "idle" });
+    terminatePool();
   }, []);
 
   return (
@@ -263,6 +283,15 @@ export default function Match() {
                     Review or revoke
                   </button>
                 </p>
+              )}
+              {ambiguousHeaders.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  These column names appear more than once in a file and were
+                  not auto-linked (linking them by name would be ambiguous):{" "}
+                  <span className="font-mono">{ambiguousHeaders.join(", ")}</span>.
+                  Rename them in the source files if they should participate
+                  in matching.
+                </div>
               )}
               <ColumnLinker
                 target={target}

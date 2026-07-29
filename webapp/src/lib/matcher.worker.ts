@@ -210,6 +210,9 @@ _result
     pyodide.globals.set("target_csv", "");
     pyodide.globals.set("supp_csv", "");
     pyodide.globals.set("links_json", "");
+    // Drop the module-level result so dataset contents don't stay pinned
+    // in this worker's Python heap between runs.
+    pyodide.runPython("_result = None");
   }
 }
 
@@ -252,6 +255,7 @@ _shard
     pyodide.globals.set("target_csv", "");
     pyodide.globals.set("supp_csv", "");
     pyodide.globals.set("links_json", "");
+    pyodide.runPython("_shard = None");
   }
 }
 
@@ -288,6 +292,7 @@ _result
     pyodide.globals.set("supp_csv", "");
     pyodide.globals.set("links_json", "");
     pyodide.globals.set("shards_js", null);
+    pyodide.runPython("_result = None; _shards = None");
   }
 }
 

@@ -5,11 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "matcher"
 version = "0.1.0"
+description = "Match participant-level rows to neighborhood-scale records with per-match quality signals"
 requires-python = ">=3.9"
-dependencies = ["numpy", "matplotlib", "jinja2"]
+# The matching core needs only numpy. matplotlib/jinja2 belong to the
+# explanatory-PDF pipeline (explanatory/build.py) — see the group below.
+dependencies = ["numpy"]
 
 [dependency-groups]
 dev = ["pytest"]
+explanatory = ["matplotlib", "jinja2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

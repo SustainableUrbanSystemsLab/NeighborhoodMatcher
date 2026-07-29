@@ -64,7 +64,7 @@ match's distance?" — useful when investigating a flagged row.
 {
     "feature_names":  [...],          # shared column names, in match order
     "smd":            [...],          # dataset-level SMD per feature
-    "threshold":      0.8,            # NNDR threshold used in this run
+    "threshold":      0.8,            # NNDR threshold used in this run — must be in (0, 1]
     "warnings":       [...],          # dataset-level warnings (e.g. scale mismatch)
     "linked_headers": [...],          # list[str]
     "linked_rows":    [[str, ...]],   # CSV-ready
@@ -76,7 +76,7 @@ match's distance?" — useful when investigating a flagged row.
             "match_idx":        int,     # None for a no-match row
             "no_match":         bool,
             "best_distance":    float,   # None for a no-match row
-            "second_distance":  float,
+            "second_distance":  float,   # None when no second candidate exists
             "nndr":             float,   # None for a no-match row
             "near_miss":        int,
             "mnn_confirmed":    bool,

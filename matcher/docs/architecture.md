@@ -11,11 +11,12 @@ returns the next.
 load_csv ──► find_common_headers ──► clean_val ──► dual_standardize
                                                           │
                                                           ▼
-                                                compute_sorted_distances
+                                                      match_all
+                                       (chunked distances + ties + NNDR
+                                        counts + fused MNN, per target)
                                                           │
-                                                          ▼
                                   ┌───── per-row signals ─┴───── dataset_smd ─┐
-                                  │                                            │
+                                  │  (contributions, flags)                    │
                                   ▼                                            ▼
                               build_flags ◄────────────────────────────────────┘
                                   │
@@ -25,30 +26,31 @@ load_csv ──► find_common_headers ──► clean_val ──► dual_standa
 
 | Module | Role |
 |--------|------|
-| `io.py` | CSV parsing/writing, value cleanup. |
-| `align.py` | Find columns shared between the two header lists. |
-| `standardize.py` | Joint z-score across both datasets so the same raw value maps to the same standardized value in both. |
-| `distance.py` | Standardized Euclidean distance and the brute-force nearest-neighbor search (returns the full sorted distance vector). |
-| `signals.py` | Match-quality signals computed from the distance vector and matched pairs. See [signals/](signals/). |
+| `io.py` | CSV parsing/writing, value cleanup (missing tokens, magnitude cap). |
+| `align.py` | Find columns shared between the two header lists (Unicode-normalized names, duplicate/case/delimiter diagnostics). |
+| `standardize.py` | Joint z-score across both datasets so the same raw value maps to the same standardized value in both; scale-compatibility warnings. |
+| `distance.py` | Standardized Euclidean distance; `match_all`, the chunked vectorized brute-force engine; per-row reference functions kept as the executable spec. |
+| `signals.py` | Match-quality signals. See [signals/](signals/). |
 | `merge.py` | Append non-shared supplemental columns onto the target row; build the merged header. |
 | `pipeline.py` | File-based entry point (`coordinator`). |
-| `web_api.py` | In-memory entry point for the browser/Pyodide frontend. Same logic; returns structured data plus per-target diagnostics. |
+| `web_api.py` | In-memory entry point for the browser/Pyodide frontend. Same logic; returns structured data plus per-target diagnostics, and exposes `match_shard`/`assemble_results` for the worker pool. |
 
 ## Two passes
 
-`coordinator` and `coordinate_in_memory` both do two passes over the target
-rows:
+`coordinator` and `coordinate_in_memory` both split the work in two:
 
-1. **Pass 1 — distances.** For each target row, compute the full sorted
-   distance vector against every supplemental row. Cache `(i, j, repeats,
-   sorted_dists)`.
-2. **Compute dataset-level SMD** across all matched pairs.
-3. **Pass 2 — per-row signals and output.** For each cached match, compute
-   `cascading_nndr`, `mnn_confirmed`, `per_row_feature_contribution`, and
-   `build_flags`, then write the linked + detail rows.
+1. **Pass 1 — matching.** `match_all` compares every target row to every
+   supplemental row in chunked numpy blocks and keeps per-target statistics
+   only: best/second distance, best index, exact-tie count, near-miss count,
+   NNDR, and the fused MNN confirmation (a running per-supplemental-row
+   minimum). Full sorted distance vectors are never materialized.
+2. **Dataset-level SMD** across all validly matched pairs.
+3. **Pass 2 — output assembly.** For each match, compute
+   `per_row_feature_contribution`, assemble `build_flags` (which needs the
+   run-wide SMD), and write the linked + detail rows.
 
-The two-pass split exists because dataset-level SMD needs the full set of
-matched indices before per-row flags can be assembled (a feature flagged as
+The split exists because dataset-level SMD needs the full set of matched
+indices before per-row flags can be assembled (a feature flagged as
 imbalanced shows up in every row's `flags` column).
 
 ## Missing data

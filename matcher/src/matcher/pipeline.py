@@ -4,9 +4,9 @@ import sys
 import numpy as np
 
 from .io import load_csv, clean_val, dump_csv
-from .align import find_common_headers
+from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
-from .distance import match_all
+from .distance import match_all, validate_threshold
 from .merge import row_merge, new_header
 from .signals import (
     per_row_feature_contribution,
@@ -15,13 +15,15 @@ from .signals import (
 )
 
 
-def extract_features(rows, common, index_key, file_label):
+def extract_features(rows, common, index_key, file_label, line_numbers=None):
     """
     Pulls the shared columns out of raw CSV rows and parses each cell via
     clean_val (float, or None when missing).
 
     Re-raises parse failures with the file, 1-based CSV line, and column
-    name so a researcher can find the offending cell.
+    name so a researcher can find the offending cell. line_numbers maps
+    each row back to its line in the ORIGINAL file (blank lines are
+    skipped at load time); without it, row position + 2 is assumed.
     """
     extracted = []
     for r, row in enumerate(rows):
@@ -30,8 +32,14 @@ def extract_features(rows, common, index_key, file_label):
             try:
                 values.append(clean_val(row[c[index_key]]))
             except ValueError as exc:
+                line = line_numbers[r] if line_numbers else r + 2
                 raise ValueError(
-                    f"{file_label}: line {r + 2}, column '{c['headerName']}': {exc}"
+                    f"{file_label}: line {line}, column '{c['headerName']}': {exc}"
+                ) from None
+            except IndexError:
+                raise ValueError(
+                    f"{file_label}: column index {c[index_key]} for "
+                    f"'{c['headerName']}' is out of range for this file's rows"
                 ) from None
         extracted.append(values)
     return extracted
@@ -60,17 +68,37 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     """
     if exclude is None:
         exclude = []
+    validate_threshold(threshold)
 
-    # Load
-    h1, rs1 = load_csv(target)
-    h2, rs2 = load_csv(supplemental)
+    # Refuse to clobber an input, and fail on a bad output location BEFORE
+    # minutes of matching compute (a raw FileNotFoundError used to surface
+    # only at write time).
+    base, ext = os.path.splitext(output)
+    detail_output = f"{base}_detail{ext}"
+    for out_path in (output, detail_output):
+        if os.path.realpath(out_path) in (
+            os.path.realpath(target), os.path.realpath(supplemental)
+        ):
+            raise ValueError(
+                f"output path {out_path!r} would overwrite an input file"
+            )
+        out_dir = os.path.dirname(out_path) or "."
+        if not os.path.isdir(out_dir):
+            raise ValueError(
+                f"output directory {out_dir!r} does not exist"
+            )
+
+    # Load (line numbers kept so parse errors can cite the original file
+    # even after blank lines are skipped)
+    h1, rs1, lines1 = load_csv(target, with_line_numbers=True)
+    h2, rs2, lines2 = load_csv(supplemental, with_line_numbers=True)
 
     # Align columns
     common = find_common_headers(h1, h2, exclude)
     feature_names = [c["headerName"] for c in common]
 
     if not common:
-        raise ValueError("No shared columns to match on.")
+        raise no_shared_columns_error(h1, h2)
     if not rs1:
         raise ValueError(f"{target}: target dataset has no rows.")
     if not rs2:
@@ -78,14 +106,15 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
 
     # Extract and clean shared columns (missing cells -> None -> NaN;
     # never imputed — distances mask missing dimensions instead)
-    filtered_rs1 = extract_features(rs1, common, "header1Index", target)
-    filtered_rs2 = extract_features(rs2, common, "header2Index", supplemental)
+    filtered_rs1 = extract_features(rs1, common, "header1Index", target, lines1)
+    filtered_rs2 = extract_features(rs2, common, "header2Index", supplemental, lines2)
 
     target_missing = missing_counts(filtered_rs1)
     supp_missing = missing_counts(filtered_rs2)
 
-    # Dataset-level sanity check before pooling the two files
+    # Dataset-level sanity checks before pooling the two files
     warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
+    warnings += header_warnings(h1, h2, feature_names)
     for w in warnings:
         print(f"WARNING: {w}", file=sys.stderr)
 

@@ -114,9 +114,13 @@ def dataset_smd(std_rows_1, matched_indices, std_rows_2):
     """
     Per-feature standardized mean difference across all matched pairs.
 
-    std_rows_1      : 2-D array, shape (N, d) — standardized target rows.
+    std_rows_1      : 2-D array, shape (N, d) — standardized target rows,
+                      restricted to rows that HAVE a valid match.
     matched_indices : 1-D int array, length N — index into std_rows_2 for
-                      each target row's best match.
+                      each of those rows' best match. Must contain only
+                      valid non-negative indices (callers filter out
+                      no-match rows before calling; -1 would silently
+                      index from the end).
     std_rows_2      : 2-D array, shape (M, d) — standardized supplemental rows.
 
     Rows may contain NaN (missing); statistics are computed over observed
