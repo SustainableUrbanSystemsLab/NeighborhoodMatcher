@@ -18,6 +18,13 @@ function headerRowsToCsv(headers: string[], rows: string[][]): string {
   return Papa.unparse({ fields: headers, data: rows });
 }
 
+// Flag strings contain em-dashes; without a BOM, Excel on Windows opens
+// UTF-8 CSVs as ANSI and renders them as mojibake. Both import paths
+// (PapaParse and the matcher's utf-8-sig reader) strip the BOM on re-feed.
+function withBom(text: string): string {
+  return "\uFEFF" + text;
+}
+
 export async function buildResultsZip(
   output: MatchOutput,
   target: ParsedDataset,
@@ -25,28 +32,29 @@ export async function buildResultsZip(
 ): Promise<Blob> {
   const zip = new JSZip();
 
-  zip.file("README.txt", README_TEXT);
+  zip.file("README.txt", withBom(README_TEXT));
 
   zip.file(
     "linked_dataset.csv",
-    headerRowsToCsv(output.linked_headers, output.linked_rows)
+    withBom(headerRowsToCsv(output.linked_headers, output.linked_rows))
   );
 
   zip.file(
     "results/match_detail.csv",
-    headerRowsToCsv(output.detail_headers, output.detail_rows)
+    withBom(headerRowsToCsv(output.detail_headers, output.detail_rows))
   );
 
-  zip.file("diagnostics/data_stats.csv", buildDataStatsCsv(target, supplemental));
-  zip.file("diagnostics/match_stats.csv", buildMatchStatsCsv(output));
-  zip.file("diagnostics/feature_smd.csv", buildFeatureSmdCsv(output));
+  zip.file("diagnostics/data_stats.csv", withBom(buildDataStatsCsv(target, supplemental)));
+  zip.file("diagnostics/match_stats.csv", withBom(buildMatchStatsCsv(output)));
+  zip.file("diagnostics/feature_smd.csv", withBom(buildFeatureSmdCsv(output)));
 
-  // Preserve the exact bytes of the original uploads for reproducibility.
+  // Preserve the exact bytes of the original uploads for reproducibility —
+  // deliberately no BOM added here.
   zip.file("inputs/original_target.csv", target.file);
   zip.file("inputs/original_supplemental.csv", supplemental.file);
 
-  zip.file("agreements/agreement.txt", AGREEMENT_TEXT);
-  zip.file("agreements/contact.txt", CONTACT_TEXT);
+  zip.file("agreements/agreement.txt", withBom(AGREEMENT_TEXT));
+  zip.file("agreements/contact.txt", withBom(CONTACT_TEXT));
 
   return zip.generateAsync({
     type: "blob",

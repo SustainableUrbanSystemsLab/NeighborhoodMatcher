@@ -34,6 +34,8 @@ export interface MatchRequest {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** optional match-rejection cutoff in per-feature z-units; null = off */
+  maxDistance: number | null;
 }
 
 // One slice of target rows, matched against the full supplemental set.
@@ -45,6 +47,9 @@ export interface MatchShardRequest {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** carried by the shared payload spread but ignored here — the cutoff is
+   *  applied at assembly, so shards stay cutoff-agnostic */
+  maxDistance?: number | null;
   rowLo: number;
   rowHi: number;
 }
@@ -57,6 +62,8 @@ export interface AssembleRequest {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** optional match-rejection cutoff in per-feature z-units; null = off */
+  maxDistance: number | null;
   shards: ShardPayload[];
 }
 
@@ -182,6 +189,9 @@ async function runMatch(req: MatchRequest): Promise<void> {
   pyodide.globals.set("supp_csv", req.supplementalCsv);
   pyodide.globals.set("links_json", JSON.stringify(req.links));
   pyodide.globals.set("threshold", req.threshold);
+  // Numeric sentinel: -1 = disabled. Avoids JS null → Python conversion
+  // ambiguity across Pyodide versions.
+  pyodide.globals.set("max_distance", req.maxDistance ?? -1);
   pyodide.globals.set("progress_cb", (pct: number) => {
     send({ type: "progress", pct });
   });
@@ -194,6 +204,7 @@ _result = coordinate_in_memory(
     target_csv, supp_csv,
     links=_links, threshold=threshold,
     progress_cb=progress_cb,
+    max_distance=(max_distance if max_distance > 0 else None),
 )
 _result
 `);
@@ -267,6 +278,7 @@ async function runAssemble(req: AssembleRequest): Promise<void> {
   pyodide.globals.set("supp_csv", req.supplementalCsv);
   pyodide.globals.set("links_json", JSON.stringify(req.links));
   pyodide.globals.set("threshold", req.threshold);
+  pyodide.globals.set("max_distance", req.maxDistance ?? -1);
   pyodide.globals.set("shards_js", req.shards);
 
   try {
@@ -277,6 +289,7 @@ _shards = shards_js.to_py()
 _result = assemble_results(
     target_csv, supp_csv, _shards,
     links=_links, threshold=threshold,
+    max_distance=(max_distance if max_distance > 0 else None),
 )
 _result
 `);

@@ -22,7 +22,9 @@ export default function Home() {
           <div className="rounded-lg bg-white p-4 shadow-sm">
             <h3 className="font-medium text-gray-900">1. Upload two datasets</h3>
             <p className="text-sm text-gray-500">
-              A target dataset and a supplemental dataset in CSV format
+              A target dataset (the one you want to add information to) and a
+              supplemental dataset (the source of that information, e.g. a
+              census extract), both CSV
             </p>
           </div>
           <div className="rounded-lg bg-white p-4 shadow-sm">

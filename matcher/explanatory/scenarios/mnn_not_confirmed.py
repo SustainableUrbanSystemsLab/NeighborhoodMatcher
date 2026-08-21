@@ -33,23 +33,20 @@ from matcher.signals import (
 from explanatory.base_pool import TARGET, SUPP_BASE, COLUMNS, DISPLAY_NAMES, SILLY_NAMES
 
 SCENARIO_TITLE    = "Scenario 5: MNN Not Confirmed"
-SCENARIO_SUBTITLE = "What happens when the matched row 'belongs' to a different target record"
+SCENARIO_SUBTITLE = "What happens when the matched row is even closer to a different target record"
 SCENARIO_LABEL    = "mnn_not_confirmed"
 
 DESCRIPTION = (
     "In a real research run the target dataset contains many records, not just one. "
-    "Mutual Nearest Neighbor (MNN) confirmation guards against a specific failure: "
-    "the forward search assigns a supplemental row to Target A, but from that "
-    "supplemental row's perspective, Target B is actually closer. "
-    "The match is asymmetric --- the supplemental row would prefer a different target. "
-    "This scenario reproduces that condition with two target records. "
-    "Target A is the record shown in the table below; Target B is an adjacent record "
-    "with values \\textbf{[2{,}467, 40.6, 99.5\\%, 649]} --- almost identical but "
-    "shifted 0.4 years upward on Avg.\\ Wizard Age. "
-    "The inserted supplemental row (Rank~1 in the candidate table) sits between "
-    "the two targets on that feature, closer to Target B. "
-    "The forward match assigns it to Target A because it is still the nearest "
-    "supplemental row available. The reverse search exposes the asymmetry."
+    "Mutual Nearest Neighbor (MNN) confirmation checks each match in both "
+    "directions: the supplemental row matched to Target A is also compared against "
+    "every other target, and if it sits even closer to some Target B, the pairing "
+    "is one-sided. Note the algorithm has no way of knowing which pairing is "
+    "\\emph{truly} correct --- asymmetry is evidence for review, not proof of error. "
+    "This scenario reproduces that condition with two nearly identical target "
+    "records: the matched supplemental row sits between them on one feature, "
+    "slightly closer to Target B, so the forward match to Target A is not "
+    "confirmed in reverse."
 )
 
 ADJACENT_NOTE = (
@@ -188,15 +185,19 @@ def build_scenario():
              "back across all target rows --- the nearest target is \\textbf{Target B}, "
              "not Target A. "
              "The supplemental row was assigned to Target A by the forward search, "
-             "but from its own perspective it is closer to a different record. "
-             "This asymmetry suggests Target A's match may have been 'stolen' from "
-             "Target B, and the researcher should review both assignments before use.")
+             "but it sits even closer to Target B. "
+             "The asymmetry does not prove which assignment is correct --- it "
+             "flags that two targets are competing for the same supplemental row, "
+             "so the researcher should review both assignments before use.")
         ),
         "repeats": (
-            f"\\textbf{{{repeats}}} row(s) tied at the minimum distance. "
-            + ("No exact tie in the supplemental pool."
-               if repeats == 1 else
-               "An exact tie exists in the supplemental pool.")
+            ("No exact tie --- a single row sits alone at the minimum distance "
+             "(the count includes the chosen match itself, so 1 means a unique "
+             "winner)."
+             if repeats == 1 else
+             f"\\textbf{{{repeats}}} rows tied at the minimum distance in the "
+             f"supplemental pool (count includes the chosen match); the first "
+             f"in file order is chosen.")
         ),
         "smd": (
             "SMD is computed across all matched target--supplemental pairs in a full run. "
@@ -210,7 +211,8 @@ def build_scenario():
                "The researcher should inspect both Target A and Target B alongside "
                "the Rank~1 supplemental row and decide which assignment is correct "
                "for their analysis. In many cases the right action is to leave "
-               "Target A unmatched rather than assign it a row that belongs elsewhere."
+               "Target A unmatched rather than keep a pairing the reverse "
+               "search does not support."
                if flags else
                "No flags raised.")
         ),

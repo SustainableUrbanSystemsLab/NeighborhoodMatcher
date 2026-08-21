@@ -7,12 +7,16 @@ const SCENARIOS = scenariosJson as unknown as ScenarioData[];
 
 const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
   {
-    title: "Align shared columns.",
+    title: "Identify shared columns.",
     body: (
       <>
-        Exact name matches are detected automatically; mismatched names can be
-        linked manually on the matching page. Columns can be excluded without
-        un-linking them.
+        Columns with exactly matching names are detected automatically;
+        columns whose names differ can be linked manually on the matching
+        page. A column can also be excluded from matching without un-linking
+        it — for example, an ID column that appears in both files but is not
+        a real geographic characteristic, or a variable you know is measured
+        on incompatible scales. Excluded columns stay in the output but are
+        not used to find the match.
       </>
     ),
   },
@@ -20,19 +24,25 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
     title: "Standardize jointly.",
     body: (
       <>
-        Both datasets are z-score normalized using combined per-column mean and
-        standard deviation, so the same raw value maps to the same standardized
-        value in each.
+        Different variables live on different scales — population counts in
+        the tens of thousands, percentages under 100. Each variable is
+        converted to a standardized scale (z-scores) so variables with larger
+        numbers don&apos;t automatically dominate the match. The mean and
+        standard deviation are computed across both datasets together, so the
+        same value means the same thing in each.
       </>
     ),
   },
   {
-    title: "Compute distances.",
+    title: "Measure similarity.",
     body: (
       <>
-        For every target row, Euclidean distance is computed against every
-        supplemental row. Distances are kept in full so quality signals can be
-        derived.
+        For every target row, the tool measures how similar it is to each
+        supplemental row across the standardized characteristics (Euclidean
+        distance: square each difference, add them up, take the square root).
+        Similar rows get small distances (e.g., 0.03); substantially different
+        rows get large ones (e.g., 0.99). All distances are kept so quality
+        signals can be derived.
       </>
     ),
   },
@@ -41,7 +51,9 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
     body: (
       <>
         The closest supplemental row by standardized Euclidean distance is
-        chosen. Ties are recorded in the <code>repeats</code> column.
+        chosen. When several rows are exactly tied at the minimum, the first
+        in file order wins (deterministic, not random) and the tie is
+        recorded in the <code>repeats</code> column.
       </>
     ),
   },
@@ -86,7 +98,7 @@ export default function About() {
           </ol>
         </section>
 
-        <details className="group mb-8 rounded-lg border border-gray-200 bg-white">
+        <details open className="group mb-8 rounded-lg border border-gray-200 bg-white">
           <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
             <span className="text-gray-400 transition-transform group-open:rotate-90">
               ▸
@@ -96,68 +108,153 @@ export default function About() {
                 Quality signals
               </span>
               <span className="block text-xs text-gray-500">
-                What NNDR, MNN, per-feature contribution, SMD, and the flags
-                column mean
+                What the confidence tier, NNDR, MNN, per-feature contribution,
+                SMD, and the flags column mean
               </span>
             </span>
           </summary>
-          <dl className="space-y-4 px-5 pb-5 text-sm text-gray-700">
-            <div>
-              <dt className="font-semibold text-gray-900">
-                Cascading NNDR + near-miss count
-              </dt>
-              <dd className="mt-1">
-                The Nearest Neighbor Distance Ratio (d₁/d₂,{" "}
-                <a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>)
-                measures how much better the best match is than the second-best.
-                Values near 0 = confident; values near 1 = ambiguous. The
-                cascading extension counts how many supplemental rows sit within
-                the user-configurable threshold of the best match — that's the
-                near-miss count.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-gray-900">
-                Mutual Nearest Neighbor (MNN) confirmation
-              </dt>
-              <dd className="mt-1">
-                After picking the best supplemental row for a target, we run
-                the search in reverse: is the target the closest target of that
-                supplemental row? If not, the pairing is asymmetric and likely
-                belongs to another record (<a href="https://doi.org/10.5220/0001787803310340" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Muja &amp; Lowe 2009</a>).
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-gray-900">
-                Per-feature contribution
-              </dt>
-              <dd className="mt-1">
-                Breaks the squared distance into a proportion per feature.
-                If 80% of the distance comes from one column, that's a strong
-                signal of a scale or unit issue rather than broad mismatch.
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-gray-900">
-                Standardized Mean Difference (SMD)
-              </dt>
-              <dd className="mt-1">
-                A dataset-level balance check: for each feature, how different
-                are the means of the target and the matched-supplemental
-                subset? |SMD| &gt; 0.10 indicates imbalance; &gt; 0.25 is poor
-                (<a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Austin, PMC3472075</a>).
-              </dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-gray-900">Plain-English flags</dt>
-              <dd className="mt-1">
-                For each matched row we assemble a human-readable flag string
-                combining the signals above. Empty = no concerns; otherwise
-                issues are listed with the specific features or thresholds
-                involved.
-              </dd>
-            </div>
-          </dl>
+          <div className="px-5 pb-5">
+            <p className="mb-4 rounded border border-blue-100 bg-blue-50 p-3 text-sm text-gray-700">
+              <strong>How the signals fit together:</strong> for a single
+              match, start with the confidence tier and the flags, then look
+              at NNDR, MNN, and the near-miss count. Per-feature contribution
+              helps explain <em>why</em> a match looks questionable — it is a
+              diagnostic, not a verdict. SMD is a dataset-level check of the
+              whole run, not a measure of whether any one match is correct.
+            </p>
+            <dl className="space-y-4 text-sm text-gray-700">
+              <div>
+                <dt className="font-semibold text-gray-900">Confidence tier</dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    One plain verdict per row: how much should you trust this
+                    match?
+                  </span>{" "}
+                  High = one row is clearly closest, confirmed in both
+                  directions, all matching variables compared. Medium = the
+                  match is plausible but something reduces certainty (close
+                  competitors, or missing variables). Low = a concrete reason
+                  to doubt it (an exact tie, a one-sided pairing, a
+                  near-ambiguous ratio, or only one variable available). No
+                  match = nothing could be assigned. The drill-down explains
+                  each row&apos;s tier in a sentence.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">
+                  Cascading NNDR + near-miss count
+                </dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    How clearly was one supplemental row the best match? Lower
+                    NNDR = clearer; fewer near misses = clearer.
+                  </span>{" "}
+                  The Nearest Neighbor Distance Ratio (d₁/d₂,{" "}
+                  <a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>)
+                  measures how much better the best match is than the
+                  second-best. Values near 0 = confident; values near 1 =
+                  ambiguous. The cascading extension counts how many
+                  supplemental rows sit within the user-configurable threshold
+                  of the best match — that&apos;s the near-miss count.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">
+                  Mutual Nearest Neighbor (MNN) confirmation
+                </dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    Does the match hold in both directions? (Confirmed / Not
+                    confirmed.)
+                  </span>{" "}
+                  After picking the best supplemental row for a target, we run
+                  the search in reverse: is the target also the closest target
+                  of that supplemental row? If not, the pairing is one-sided —
+                  the supplemental row is even closer to a different target —
+                  and the match deserves review before use
+                  (<a href="https://doi.org/10.5220/0001787803310340" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Muja &amp; Lowe 2009</a>).
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">Features used</dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    How many matching variables actually informed this match?
+                  </span>{" "}
+                  Counts the variables observed on <em>both</em> sides of the
+                  matched pair. Missing variables never contribute a real
+                  comparison — they add a fixed penalty to the distance
+                  instead — so a match that used 1 of 4 variables rests on far
+                  less information than one that used all 4. The results view
+                  also reports whether the pair agrees exactly on every
+                  variable that was available.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">
+                  Ties (<code>repeats</code>)
+                </dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    Did several supplemental rows sit at exactly the same
+                    minimum distance?
+                  </span>{" "}
+                  The <code>repeats</code> column counts the rows sharing the
+                  minimum <em>including the match itself</em>, so 1 means a
+                  unique winner and 2+ means a genuine tie. When rows tie, the
+                  first in file order is chosen — deterministically, not
+                  randomly — and the row is flagged for review.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">
+                  Per-feature contribution
+                </dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    Which variables drove the distance? Primarily a diagnostic
+                    tool.
+                  </span>{" "}
+                  Breaks the squared distance into a proportion per feature.
+                  If 80% of the distance comes from one column <em>and</em>{" "}
+                  the distance itself is large, that suggests a scale or unit
+                  issue in that column. Concentration alone is not a warning —
+                  when only one variable differs, it will naturally carry
+                  ~100% of a small distance.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">
+                  Standardized Mean Difference (SMD)
+                </dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    Does the matching work well across the dataset as a whole?
+                  </span>{" "}
+                  A dataset-level balance check: for each feature, how
+                  different are the means of the target and the
+                  matched-supplemental subset? |SMD| &lt; 0.10 indicates good
+                  balance; larger values indicate increasing differences
+                  between the two groups (&gt; 0.25 is poor;{" "}
+                  <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Austin, PMC3472075</a>).
+                  It is not a verdict on any individual match.
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-gray-900">Plain-English flags</dt>
+                <dd className="mt-1">
+                  <span className="text-gray-500">
+                    The specific reasons a row was flagged, in one string.
+                  </span>{" "}
+                  For each matched row we assemble a human-readable flag string
+                  combining the signals above. Empty = no concerns; otherwise
+                  issues are listed with the specific features or thresholds
+                  involved. The confidence tier summarizes them into one
+                  verdict.
+                </dd>
+              </div>
+            </dl>
+          </div>
         </details>
 
         <section className="mb-4">

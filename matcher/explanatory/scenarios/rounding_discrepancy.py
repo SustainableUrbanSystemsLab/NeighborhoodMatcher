@@ -124,9 +124,15 @@ def build_scenario():
     signal_explanations = {
         "per_feature_contribution": (
             "Shows how much of the best-match distance each feature is responsible for. "
-            "In a rounding scenario the contribution is spread across whichever features "
-            "were rounded --- no single feature should dominate unless one was rounded "
-            "far more aggressively than the others."
+            "In a rounding scenario the contribution concentrates in whichever features "
+            "were rounded most aggressively relative to their spread --- here a large "
+            "share can land on a single percentage column simply because rounding "
+            "99.5\\% to 100\\% is a big move in standardized units. "
+            "\\textbf{Why is a high share not flagged?} No flag rule fires on "
+            "contribution alone --- it is a diagnostic, not a verdict. Concentration "
+            "only signals trouble when it is paired with a \\textbf{large} absolute "
+            "distance (see Scenario 3); here the total distance is tiny, so a "
+            "concentrated share just means the other features agree almost perfectly."
         ),
         "euc_distance": (
             f"The best match distance is \\textbf{{{best_dist:.4f}}} --- non-zero despite "
@@ -176,11 +182,13 @@ def build_scenario():
              "row's perspective, a different target row appears closer.")
         ),
         "repeats": (
-            f"\\textbf{{{repeats}}} row(s) tied at the minimum distance. "
-            + ("No tie." if repeats == 1 else
-               "A tie exists --- two or more supplemental rows are equidistant "
-               "from the rounded target. This can happen when rounding collapses "
-               "distinct values to the same rounded level.")
+            ("No exact tie --- a single row sits alone at the minimum distance "
+             "(the count includes the chosen match itself, so 1 means a unique "
+             "winner)."
+             if repeats == 1 else
+             f"\\textbf{{{repeats}}} rows tied at the minimum distance (count "
+             f"includes the chosen match). Rounding can collapse distinct values "
+             f"to the same rounded level; the first row in file order is chosen.")
         ),
         "smd": (
             "With only one target row, the SMD cannot be computed and is reported "

@@ -159,13 +159,17 @@ interface RunPayloads {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** optional match-rejection cutoff in per-feature z-units; null = off.
+   *  Applied at assembly only, so shard requests ignore it. */
+  maxDistance: number | null;
 }
 
 function buildPayloads(
   target: ParsedDataset,
   supplemental: ParsedDataset,
   links: ColumnLink[],
-  threshold: number
+  threshold: number,
+  maxDistance: number | null
 ): RunPayloads {
   const activeLinks = links.filter((l) => !l.excluded);
   if (activeLinks.length === 0) {
@@ -180,6 +184,7 @@ function buildPayloads(
       header2Index: l.supplementalIndex,
     })),
     threshold,
+    maxDistance,
   };
 }
 
@@ -276,10 +281,11 @@ export async function runMatching(
   supplemental: ParsedDataset,
   links: ColumnLink[],
   threshold: number,
+  maxDistance: number | null = null,
   onStatus?: StatusCallback,
   onProgress?: ProgressCallback
 ): Promise<RunResult> {
-  const payloads = buildPayloads(target, supplemental, links, threshold);
+  const payloads = buildPayloads(target, supplemental, links, threshold, maxDistance);
   const nRows = target.rows.length;
   const nWorkers = poolSizeFor(nRows, supplemental.rows.length);
 

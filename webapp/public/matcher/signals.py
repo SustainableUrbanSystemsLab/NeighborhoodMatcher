@@ -169,11 +169,15 @@ def dataset_smd(std_rows_1, matched_indices, std_rows_2):
 # passed explicitly so the flag reflects the same threshold used during matching.
 _FLAG_RULES = {
     "no_match":      {"message": "WARNING: no valid match — target shares no observed features with any supplemental row"},
+    "no_match_cutoff": {"message": "WARNING: no match — nearest supplemental row exceeded the distance cutoff ({d:.2f} per-feature vs cutoff {c:.2f})"},
     "nndr":          {"message": "ambiguous match — NNDR {nndr:.2f} (>= {threshold:.2f})"},
     "near_miss":     {"message": "{n} near-miss row(s) within distance ratio threshold"},
     "repeat":        {"message": "{n} exact-distance tie(s)"},
     "mnn":           {"message": "MNN not confirmed — supplemental row is closer to a different target; this record may have no valid match"},
     "target_missing": {"message": "target row missing {k} of {n} shared feature(s); match uses observed features only"},
+    # No-match variant: the "match uses observed features only" tail would be
+    # contradictory when no match was assigned at all.
+    "target_missing_no_match": {"message": "target row missing {k} of {n} shared feature(s)"},
     "match_missing": {"message": "matched supplemental row missing {k} of {n} shared feature(s)"},
     "smd_poor":      {"threshold": 0.25, "message": "poor feature balance — {features} (|SMD| > 0.25)"},
     "smd_warn":      {"threshold": 0.10, "message": "feature imbalance — {features} (|SMD| > 0.10)"},
@@ -181,7 +185,8 @@ _FLAG_RULES = {
 
 
 def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature, feature_names,
-                mnn_confirmed=True, target_missing=0, match_missing=0, no_match=False):
+                mnn_confirmed=True, target_missing=0, match_missing=0, no_match=False,
+                rejected=False, rejected_distance=None, cutoff=None):
     """
     Assembles a plain-English flag string for one matched row.
 
@@ -197,6 +202,13 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
     no_match        : bool     — True when no valid match exists (all distances inf);
                                  suppresses the per-match flags, which would be
                                  meaningless without a match.
+    rejected        : bool     — True when the nearest row was discarded by the
+                                 user's max-distance cutoff; like no_match it
+                                 suppresses the per-match flags, but reports the
+                                 per-feature distance that tripped the cutoff.
+    rejected_distance : float  — per-feature distance (d1/sqrt(features_used))
+                                 of the rejected nearest row; required with rejected.
+    cutoff          : float    — the max-distance cutoff in force; required with rejected.
 
     Returns: str. Empty string if no flags raised; " | "-joined messages otherwise.
     """
@@ -206,7 +218,13 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
     if no_match:
         flags.append(_FLAG_RULES["no_match"]["message"])
         if target_missing > 0:
-            flags.append(_FLAG_RULES["target_missing"]["message"].format(k=target_missing, n=n_features))
+            flags.append(_FLAG_RULES["target_missing_no_match"]["message"].format(k=target_missing, n=n_features))
+        return " | ".join(flags)
+
+    if rejected:
+        flags.append(_FLAG_RULES["no_match_cutoff"]["message"].format(d=rejected_distance, c=cutoff))
+        if target_missing > 0:
+            flags.append(_FLAG_RULES["target_missing_no_match"]["message"].format(k=target_missing, n=n_features))
         return " | ".join(flags)
 
     if nndr >= threshold:
@@ -242,3 +260,37 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
         flags.append(_FLAG_RULES["smd_warn"]["message"].format(features=", ".join(warn_features)))
 
     return " | ".join(flags)
+
+
+def confidence_tier(no_match, rejected, nndr, threshold, repeat_count,
+                    mnn_confirmed, near_miss_count, features_used, n_features):
+    """
+    Synthesizes the per-row signals into one plain verdict. Rule table
+    (first matching row wins, top to bottom):
+
+        No match — no_match (zero shared observed features) OR rejected
+                   (nearest row discarded by the max-distance cutoff).
+        Low      — exact-distance tie at the minimum (repeat_count > 1), OR
+                   MNN not confirmed, OR nndr >= threshold, OR the match
+                   rests on a single feature when more were linked
+                   (features_used == 1 and n_features > 1).
+        Medium   — competitors within the near-miss cutoff, OR at least one
+                   linked feature was missing on either side of the winning
+                   pair (features_used < n_features — the missing-data
+                   penalty contributed to this distance).
+        High     — otherwise: unique minimum, MNN confirmed, no near
+                   misses, nndr below threshold, all linked features
+                   observed on both sides.
+
+    exact_on_observed is deliberately not an input: a full-coverage exact
+    match is already High, and an exact match on 1 of 4 features must stay
+    Low — the presentation layer uses it for explanation, not the verdict.
+    """
+    if no_match or rejected:
+        return "No match"
+    if (repeat_count > 1 or not mnn_confirmed or nndr >= threshold
+            or (features_used == 1 and n_features > 1)):
+        return "Low"
+    if near_miss_count > 0 or features_used < n_features:
+        return "Medium"
+    return "High"

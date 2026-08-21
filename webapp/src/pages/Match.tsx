@@ -68,6 +68,7 @@ export default function Match() {
   const [piiWarnings, setPiiWarnings] = useState<PIIWarning[]>([]);
   const [matchOutput, setMatchOutput] = useState<MatchOutput | null>(null);
   const [threshold, setThreshold] = useState<number>(DEFAULT_THRESHOLD);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
   const [pyStatus, setPyStatus] = useState<PyodideStatus>({ phase: "idle" });
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -186,6 +187,7 @@ export default function Match() {
         supplemental,
         links,
         threshold,
+        maxDistance,
         setPyStatus,
         setProgressPct
       );
@@ -201,7 +203,7 @@ export default function Match() {
       setRunError(err instanceof Error ? err.message : String(err));
       setStep("link");
     }
-  }, [target, supplemental, links, threshold]);
+  }, [target, supplemental, links, threshold, maxDistance]);
 
   const handleStartOver = useCallback(() => {
     setStep("upload");
@@ -211,6 +213,7 @@ export default function Match() {
     setPiiWarnings([]);
     setMatchOutput(null);
     setThreshold(DEFAULT_THRESHOLD);
+    setMaxDistance(null);
     setRunError(null);
     setRunDurationMs(null);
     setWorkersUsed(null);
@@ -236,22 +239,59 @@ export default function Match() {
         <div className="mt-6">
           {step === "upload" && (
             <div className="space-y-6">
+              <p className="text-sm leading-relaxed text-gray-600">
+                For each row in your <strong>target</strong> dataset, the tool
+                finds the most similar row in the <strong>supplemental</strong>{" "}
+                dataset based on the shared characteristics you choose —
+                linking new information without matching on ZIP code or any
+                other identifier.
+              </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <FileUpload
                   label="Target Dataset"
-                  description="Your primary dataset with rows to match"
+                  description="The dataset you want to add information to (e.g., your study dataset)"
                   onFileLoaded={setTarget}
                   onClear={() => setTarget(null)}
                   dataset={target}
                 />
                 <FileUpload
                   label="Supplemental Dataset"
-                  description="Reference dataset to match against"
+                  description="The dataset containing the information you want to link in (e.g., a public census extract)"
                   onFileLoaded={setSupplemental}
                   onClear={() => setSupplemental(null)}
                   dataset={supplemental}
                 />
               </div>
+              <details className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
+                <summary className="cursor-pointer font-medium text-gray-800">
+                  File format &amp; pre-upload checklist
+                </summary>
+                <div className="mt-2 space-y-2 text-xs leading-relaxed">
+                  <p>
+                    <strong>Format:</strong> CSV files with one header row,
+                    then one row per geographic unit. Column names should
+                    match between the two files; columns whose names differ
+                    can be linked manually in the Link Columns step. Matching
+                    variables must be numeric.
+                  </p>
+                  <p>
+                    <strong>Before uploading, check that:</strong>
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>
+                      Every variable you plan to match on uses the{" "}
+                      <strong>same units and scale</strong> in both files
+                      (e.g., not a proportion 0.72 in one file and a
+                      percentage 72 in the other).
+                    </li>
+                    <li>
+                      Missing values are <strong>blank or NA</strong> — not
+                      sentinel codes like 9999, which would be treated as
+                      real values and distort the match.
+                    </li>
+                  </ul>
+                </div>
+              </details>
               <div className="flex justify-end">
                 <button
                   onClick={handleNext}
@@ -302,6 +342,8 @@ export default function Match() {
               />
 
               <ThresholdControl threshold={threshold} onChange={setThreshold} />
+
+              <MaxDistanceControl value={maxDistance} onChange={setMaxDistance} />
 
               <WorkerControl
                 value={workerOverride}
@@ -452,7 +494,11 @@ function WorkerControl({
             Your browser reports {reported} CPU core
             {reported === 1 ? "" : "s"}. Privacy protections in some browsers
             (Brave, Firefox strict mode, Safari) deliberately under-report the
-            real count — if your machine has more cores, set the number here.
+            real count — if your machine has more cores, set the number here.{" "}
+            <span className="font-medium">
+              If you&apos;re not sure, leave this on Auto
+            </span>{" "}
+            — it only affects speed, never the results.
           </p>
         </div>
         <select
@@ -505,7 +551,55 @@ function ThresholdControl({
       />
       <p className="mt-2 text-xs text-gray-500">
         A match is flagged when the ratio of the best distance to the i-th
-        distance is ≥ threshold. Lower = stricter. Default 0.80 (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>).
+        distance is ≥ threshold. Lower = stricter. The 0.80 default comes
+        from image matching (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>)
+        and has not been calibrated for tabular data — treat flags as
+        guidance, not verdicts.
+      </p>
+    </div>
+  );
+}
+
+function MaxDistanceControl({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  const enabled = value != null;
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="mb-2 flex items-baseline justify-between">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onChange(e.target.checked ? 1.0 : null)}
+          />
+          Reject matches beyond a distance cutoff
+        </label>
+        {enabled && (
+          <span className="font-mono text-sm text-gray-700">
+            {value.toFixed(2)}
+          </span>
+        )}
+      </div>
+      {enabled && (
+        <input
+          type="range"
+          min={0.25}
+          max={3.0}
+          step={0.05}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="w-full"
+        />
+      )}
+      <p className="mt-2 text-xs text-gray-500">
+        {enabled
+          ? "A row is reported as “no match” instead of being assigned its nearest supplemental row when the match’s distance, averaged per matching variable used (distance ÷ √features used), exceeds this cutoff. Roughly: 1.0 ≈ the rows differ by about one standard deviation on every variable compared. Missing variables add a fixed penalty to the distance, so rows with many missing values are rejected more readily."
+          : "Off (default): every target row is assigned its nearest supplemental row, however far away, and the quality signals flag doubtful ones. Enable to report “no match” instead when nothing genuinely similar exists."}
       </p>
     </div>
   );

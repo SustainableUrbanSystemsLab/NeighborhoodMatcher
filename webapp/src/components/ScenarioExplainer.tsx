@@ -215,7 +215,7 @@ const SIGNAL_ORDER: Array<{ key: string; label: string }> = [
   { key: "nndr", label: "NNDR" },
   { key: "near_miss_count", label: "Near misses" },
   { key: "mnn_confirmed", label: "MNN" },
-  { key: "repeats", label: "Ties" },
+  { key: "repeats", label: "Tied at min" },
   { key: "per_feature_contribution", label: "Feature contributions" },
   { key: "smd", label: "SMD" },
   { key: "flags", label: "Flags" },
@@ -287,7 +287,12 @@ export function ScenarioExplainer({
           value={s.mnn_confirmed ? "confirmed" : "not confirmed"}
           good={s.mnn_confirmed}
         />
-        <SignalChip label="Ties" value={String(s.repeats)} good={s.repeats <= 1} />
+        {/* repeats counts the winner itself; ≤1 means a unique minimum */}
+        <SignalChip
+          label="Tied at min"
+          value={s.repeats > 1 ? `${s.repeats} rows` : "none"}
+          good={s.repeats <= 1}
+        />
         <SignalChip
           label="Flags"
           value={s.flags ? `${s.flags.split(" | ").length}` : "none"}

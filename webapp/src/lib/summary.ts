@@ -2,29 +2,11 @@
 // All work is client-side; no dataset contents leave the browser.
 
 import Papa from "papaparse";
+import { isMissingCell, parseNumeric } from "@/lib/missing";
 import type { MatchOutput, ParsedDataset } from "@/types";
 
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
-
-// Must agree with matcher.io.MISSING_TOKENS — the data_stats.csv this file
-// produces sits next to the match flags in the same zip, and a cell the
-// matcher treats as missing must not be counted as observed here.
-const MISSING_TOKENS = new Set([
-  "", "na", "n/a", "null", "none", "-", ".", "nan", "#n/a",
-]);
-
-function isMissingCell(cell: string | undefined): boolean {
-  if (cell === undefined) return true;
-  return MISSING_TOKENS.has(cell.replace(/,/g, "").replace(/\$/g, "").trim().toLowerCase());
-}
-
-function parseNumeric(cell: string): number | null {
-  if (isMissingCell(cell)) return null;
-  const cleaned = cell.replace(/,/g, "").replace(/\$/g, "").trim();
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
 
 function columnStats(rows: string[][], colIdx: number) {
   let count = 0;
@@ -131,9 +113,19 @@ export function buildMatchStatsCsv(output: MatchOutput): string {
 
   const pct = (n: number) => (total ? ((n / total) * 100).toFixed(2) : "0.00");
 
+  const tiers = summary.tiers ?? {};
   const metrics: [string, string | number][] = [
     ["total_rows", total],
     ["no_match_count", summary.no_match],
+    ["rejected_by_cutoff_count", summary.rejected ?? 0],
+    [
+      "max_distance_cutoff",
+      summary.max_distance != null ? summary.max_distance.toFixed(4) : "off",
+    ],
+    ["confidence_high", tiers["High"] ?? 0],
+    ["confidence_medium", tiers["Medium"] ?? 0],
+    ["confidence_low", tiers["Low"] ?? 0],
+    ["confidence_no_match", tiers["No match"] ?? 0],
     ["flagged_count", summary.flagged],
     ["flagged_pct", pct(summary.flagged)],
     ["mnn_confirmed_count", summary.mnn_confirmed],
@@ -219,11 +211,17 @@ export const README_TEXT = `Dataset Matcher — Results Package
 Folder layout:
 
   linked_dataset.csv        Primary output. Target rows with matched
-                            supplemental columns appended.
+                            supplemental columns appended, plus per-row
+                            quality columns: confidence (High / Medium /
+                            Low / No match), features_used,
+                            exact_on_observed, filled_from_match (shared
+                            columns whose missing target value was filled
+                            from the matched row), and flags.
 
   results/
     match_detail.csv        Per-row diagnostics: distance, NNDR, MNN
-                            confirmation, flags, near-miss count, missing-feature counts.
+                            confirmation, confidence, features used,
+                            flags, near-miss count, missing-feature counts.
 
   diagnostics/
     data_stats.csv          Per-column summary stats for both inputs.

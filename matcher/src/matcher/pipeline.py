@@ -6,12 +6,13 @@ import numpy as np
 from .io import load_csv, clean_val, dump_csv
 from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
-from .distance import match_all, validate_threshold
+from .distance import match_all, validate_threshold, validate_max_distance, winner_observed_stats
 from .merge import row_merge, new_header
 from .signals import (
     per_row_feature_contribution,
     dataset_smd,
     build_flags,
+    confidence_tier,
 )
 
 
@@ -51,7 +52,7 @@ def missing_counts(extracted_rows):
 
 
 def coordinator(target, supplemental, output="data/output.csv", exclude=None, threshold=0.8,
-                fast=False):
+                fast=False, max_distance=None):
     """
     Full matching pipeline.
 
@@ -62,6 +63,10 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     threshold    : NNDR threshold used for near-miss flagging (default 0.8, Lowe 2004)
     fast         : opt into the faster distance engine (~25%) at the cost of
                    bitwise tie reproducibility — see distance.match_all
+    max_distance : optional cutoff in per-feature z-units; a match whose
+                   best_distance / sqrt(features_used) exceeds it is rejected
+                   ("no match" with diagnostics preserved in the detail file).
+                   None (default) disables rejection — unchanged behaviour.
 
     Returns the list of dataset-level warnings emitted for this run
     (currently: scale-compatibility warnings, also printed to stderr).
@@ -69,6 +74,7 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     if exclude is None:
         exclude = []
     validate_threshold(threshold)
+    validate_max_distance(max_distance)
 
     # Refuse to clobber an input, and fail on a bad output location BEFORE
     # minutes of matching compute (a raw FileNotFoundError used to surface
@@ -125,18 +131,37 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     # brute force is a privacy decision, only the arithmetic is vectorized)
     res = match_all(std_rows_1, std_rows_2, threshold=threshold, fast=fast)
 
-    # Dataset-level SMD — one computation across all validly matched pairs
+    # Winner-pair observed-feature stats (features actually compared, and
+    # whether the pair agrees exactly on all of them)
+    features_used, exact_on_observed = winner_observed_stats(
+        std_rows_1, std_rows_2, res["best_index"]
+    )
+
+    # Optional max-distance cutoff (per-feature z-units) — same rule as
+    # web_api._assemble_prepared; rejected rows take the no-match path with
+    # diagnostics preserved in the detail file.
     matched_mask = res["best_index"] >= 0
-    if matched_mask.any():
+    rejected = np.zeros(len(std_rows_1), dtype=bool)
+    if max_distance is not None:
+        with np.errstate(invalid="ignore"):
+            per_feature_dist = res["best_distance"] / np.sqrt(
+                np.maximum(features_used.astype(float), 1.0)
+            )
+        rejected = matched_mask & (per_feature_dist > max_distance)
+    accepted_mask = matched_mask & ~rejected
+
+    # Dataset-level SMD — one computation across accepted matched pairs
+    if accepted_mask.any():
         smd = dataset_smd(
-            np.asarray(std_rows_1)[matched_mask],
-            res["best_index"][matched_mask],
+            np.asarray(std_rows_1)[accepted_mask],
+            res["best_index"][accepted_mask],
             std_rows_2,
         )
     else:
         smd = np.zeros(len(feature_names))
 
     # Pass 2: per-row signals and output assembly
+    n_features = len(feature_names)
     blank_supp_row = [""] * len(h2)
     linked_rows = []
     detail_rows = []
@@ -146,14 +171,15 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
                 1.0, 0, threshold, 0, smd, feature_names,
                 target_missing=target_missing[i], no_match=True,
             )
+            tier = "No match"
             linked_rows.append(
                 row_merge(rs1[i], blank_supp_row, common)
-                + ["", 0, "", 0, 0, flags]
+                + ["", 0, "", 0, 0, 0, "", "", tier, flags]
             )
             detail_rows.append(
-                [i, "", "", 0, 0, target_missing[i], ""]
+                [i, "", "", 0, 0, target_missing[i], "", 0, ""]
                 + ["" for _ in feature_names]
-                + [flags]
+                + [tier, flags]
             )
             continue
 
@@ -162,30 +188,70 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
         nndr_val = float(res["nndr"][i])
         near_miss = int(res["near_miss"][i])
         confirmed = bool(res["mnn_confirmed"][i])
+        row_features_used = int(features_used[i])
+        row_exact = bool(exact_on_observed[i])
+        dist = float(res["best_distance"][i])
         contributions = per_row_feature_contribution(std_rows_1[i], std_rows_2[j])
+
+        if rejected[i]:
+            per_feat_dist = dist / np.sqrt(max(row_features_used, 1))
+            flags = build_flags(
+                nndr_val, near_miss, threshold, repeats, smd, feature_names,
+                target_missing=target_missing[i],
+                rejected=True, rejected_distance=per_feat_dist, cutoff=max_distance,
+            )
+            tier = "No match"
+            linked_rows.append(
+                row_merge(rs1[i], blank_supp_row, common)
+                + ["", 0, "", 0, 0, 0, "", "", tier, flags]
+            )
+            detail_rows.append(
+                [i, dist, round(nndr_val, 4), near_miss, int(confirmed),
+                 target_missing[i], supp_missing[j], row_features_used, int(row_exact)]
+                + [round(float(c), 6) for c in contributions]
+                + [tier, flags]
+            )
+            continue
+
         flags = build_flags(
             nndr_val, near_miss, threshold, repeats, smd, feature_names,
             mnn_confirmed=confirmed,
             target_missing=target_missing[i],
             match_missing=supp_missing[j],
         )
+        tier = confidence_tier(
+            False, False, nndr_val, threshold, repeats,
+            confirmed, near_miss, row_features_used, n_features,
+        )
 
-        dist = float(res["best_distance"][i])
+        # Fill missing target cells in shared columns from the matched row
+        # (raw value verbatim) and record which columns were filled. Output
+        # completion only — matching itself never imputes.
+        merged = row_merge(rs1[i], rs2[j], common)
+        filled = []
+        for k, c in enumerate(common):
+            if filtered_rs1[i][k] is None and filtered_rs2[j][k] is not None:
+                merged[c["header1Index"]] = rs2[j][c["header2Index"]]
+                filled.append(c["headerName"])
+
         linked_rows.append(
-            row_merge(rs1[i], rs2[j], common)
-            + [dist, repeats, round(nndr_val, 4), near_miss, int(confirmed), flags]
+            merged
+            + [dist, repeats, round(nndr_val, 4), near_miss, int(confirmed),
+               row_features_used, int(row_exact), "; ".join(filled), tier, flags]
         )
         detail_rows.append(
             [i, dist, round(nndr_val, 4), near_miss, int(confirmed),
-             target_missing[i], supp_missing[j]]
+             target_missing[i], supp_missing[j], row_features_used, int(row_exact)]
             + [round(float(c), 6) for c in contributions]
-            + [flags]
+            + [tier, flags]
         )
 
     # Write linked dataset
     linked_headers = (
         new_header(h1, h2, common)
-        + ["euc_distance", "repeats", "nndr", "near_miss_count", "mnn_confirmed", "flags"]
+        + ["euc_distance", "repeats", "nndr", "near_miss_count", "mnn_confirmed",
+           "features_used", "exact_on_observed", "filled_from_match",
+           "confidence", "flags"]
     )
     dump_csv(output, linked_headers, linked_rows)
 
@@ -193,9 +259,9 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     base, ext = os.path.splitext(output)
     detail_headers = (
         ["target_index", "euc_distance", "nndr", "near_miss_count", "mnn_confirmed",
-         "target_missing", "match_missing"]
+         "target_missing", "match_missing", "features_used", "exact_on_observed"]
         + [f"contrib_{name}" for name in feature_names]
-        + ["flags"]
+        + ["confidence", "flags"]
     )
     dump_csv(f"{base}_detail{ext}", detail_headers, detail_rows)
 

@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { buildResultsZip, triggerDownload } from "@/lib/zip-builder";
+import { tierChipClasses, tierRank, tierSentence } from "@/lib/confidence-text";
 import type {
   ColumnLink,
   MatchOutput,
@@ -33,7 +34,13 @@ function formatDuration(ms: number): string {
   return `${m}m ${rest.toString().padStart(2, "0")}s`;
 }
 
-type SortKey = "target_idx" | "best_distance" | "nndr" | "near_miss" | "flags";
+type SortKey =
+  | "target_idx"
+  | "best_distance"
+  | "nndr"
+  | "near_miss"
+  | "confidence"
+  | "flags";
 
 export function ResultsView({
   output,
@@ -91,6 +98,9 @@ export function ResultsView({
         case "near_miss":
           cmp = a.near_miss - b.near_miss;
           break;
+        case "confidence":
+          cmp = tierRank(a.confidence) - tierRank(b.confidence);
+          break;
         case "flags":
           cmp = (a.flags ? 1 : 0) - (b.flags ? 1 : 0);
           break;
@@ -113,11 +123,20 @@ export function ResultsView({
     setPage(0);
   }
 
+  const tiers = summary.tiers ?? { High: 0, Medium: 0, Low: 0, "No match": 0 };
+  const highPct = summary.total ? (tiers.High / summary.total) * 100 : 0;
+  const zeroOverlapCount = summary.no_match - (summary.rejected ?? 0);
+
   return (
     <div className="space-y-4">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <SummaryCard label="Rows matched" value={summary.total.toString()} tone="blue" />
+        <SummaryCard
+          label="High confidence"
+          value={`${tiers.High} (${highPct.toFixed(1)}%)`}
+          tone={highPct > 80 ? "green" : highPct > 50 ? "amber" : "red"}
+        />
         <SummaryCard
           label="Flagged"
           value={`${summary.flagged} (${flaggedPct.toFixed(1)}%)`}
@@ -160,12 +179,21 @@ export function ResultsView({
             Dataset warnings
           </p>
           <ul className="list-disc pl-4 text-xs text-red-800">
-            {summary.no_match > 0 && (
+            {zeroOverlapCount > 0 && (
               <li>
-                {summary.no_match} target row(s) have no valid match — they
+                {zeroOverlapCount} target row(s) have no valid match — they
                 share no observed features with any supplemental row (all
                 shared columns missing). They appear with blank match cells
                 in the output.
+              </li>
+            )}
+            {(summary.rejected ?? 0) > 0 && (
+              <li>
+                {summary.rejected} target row(s) were reported as no match
+                because their nearest supplemental row exceeded the distance
+                cutoff ({summary.max_distance?.toFixed(2)} per feature).
+                Their diagnostics are preserved in the detail file and
+                drill-down.
               </li>
             )}
             {(output.warnings ?? []).map((w, i) => (
@@ -204,7 +232,7 @@ export function ResultsView({
             Per-row diagnostics
           </h3>
           <span className="text-xs text-gray-500">
-            Click a row to drill down
+            Click a row to expand match details
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -239,8 +267,14 @@ export function ResultsView({
                   MNN
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Repeats
+                  Tied at min
                 </th>
+                <SortableHead
+                  label="Confidence"
+                  active={sortKey === "confidence"}
+                  desc={sortDesc}
+                  onClick={() => toggleSort("confidence")}
+                />
                 <SortableHead
                   label="Flags"
                   active={sortKey === "flags"}
@@ -289,7 +323,15 @@ export function ResultsView({
                         )}
                       </td>
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
-                        {row.repeats}
+                        {/* repeats counts the winner itself; ≤1 means a unique minimum */}
+                        {row.repeats > 1 ? `${row.repeats} rows` : "—"}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs">
+                        <span
+                          className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${tierChipClasses(row.confidence)}`}
+                        >
+                          {row.confidence}
+                        </span>
                       </td>
                       <td className="px-3 py-1.5 text-xs text-amber-800">
                         {row.flags ? (
@@ -304,7 +346,7 @@ export function ResultsView({
                     </tr>
                     {isSelected && (
                       <tr className="bg-blue-50/40">
-                        <td colSpan={7} className="px-3 py-3">
+                        <td colSpan={8} className="px-3 py-3">
                           <DrilldownPanel
                             detail={row}
                             features={feature_names}
@@ -669,12 +711,14 @@ function DrilldownPanel({
   // MATCHED SUPPLEMENTAL ROW, using the column links the run was made with.
   // (Reading the shared columns out of linked_rows shows the target's own
   // values — row_merge keeps the target copy — which fabricates agreement.)
+  // For cutoff-rejected rows, show the rejected nearest row for review.
+  const pairIdx = detail.match_idx ?? detail.nearest_idx;
   const featurePairs = links.map((link) => ({
     name: link.headerName,
     targetVal: target.rows[detail.target_idx]?.[link.targetIndex] ?? "",
     matchedVal:
-      detail.match_idx != null
-        ? supplemental.rows[detail.match_idx]?.[link.supplementalIndex] ?? ""
+      pairIdx != null
+        ? supplemental.rows[pairIdx]?.[link.supplementalIndex] ?? ""
         : "",
   }));
 
@@ -684,17 +728,40 @@ function DrilldownPanel({
     <div className="rounded-lg border-2 border-blue-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <h3 className="text-base font-semibold text-gray-900">
-            {detail.no_match
-              ? `Target row ${detail.target_idx} — no valid match`
-              : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
+          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <span>
+              {detail.no_match
+                ? detail.rejected
+                  ? `Target row ${detail.target_idx} — nearest row ${detail.nearest_idx} rejected by cutoff`
+                  : `Target row ${detail.target_idx} — no valid match`
+                : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
+            </span>
+            <span
+              className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${tierChipClasses(detail.confidence)}`}
+            >
+              {detail.confidence}
+            </span>
           </h3>
           <p className="mt-0.5 text-xs text-gray-500">
             Distance {detail.best_distance != null ? detail.best_distance.toFixed(4) : "—"} · NNDR{" "}
             {detail.nndr != null ? detail.nndr.toFixed(3) : "—"} · MNN{" "}
             {detail.mnn_confirmed ? "✓ confirmed" : "✗ not confirmed"} ·{" "}
-            repeats {detail.repeats} · near-miss {detail.near_miss}
+            tied at min {detail.repeats > 1 ? `${detail.repeats} rows` : "none"} ·
+            near-miss {detail.near_miss} ·
+            features used {detail.features_used}/{features.length}
+            {detail.exact_on_observed ? " (exact on all observed)" : ""}
           </p>
+          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-gray-700">
+            {tierSentence(detail, features.length, threshold)}
+          </p>
+          {detail.filled_from_match.length > 0 && (
+            <p className="mt-1 max-w-2xl text-xs text-gray-500">
+              Filled from the matched row (target value was missing):{" "}
+              <span className="font-mono">
+                {detail.filled_from_match.join(", ")}
+              </span>
+            </p>
+          )}
         </div>
         <button
           onClick={onClose}

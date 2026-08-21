@@ -32,6 +32,51 @@ def validate_threshold(threshold):
         )
 
 
+def validate_max_distance(max_distance):
+    """
+    Optional match-rejection cutoff, in per-feature z-units
+    (best_distance / sqrt(features_used)). None = disabled. When set it
+    must be a finite positive number — zero would reject even exact
+    matches, and NaN would silently disable rejection.
+    """
+    import math
+    if max_distance is None:
+        return
+    if not (isinstance(max_distance, (int, float)) and not isinstance(max_distance, bool)
+            and math.isfinite(max_distance) and max_distance > 0):
+        raise ValueError(
+            f"max_distance must be None or a finite number > 0, got {max_distance!r}"
+        )
+
+
+def winner_observed_stats(targets, refs, best_index):
+    """
+    Observed-feature stats for each target's winning pair, vectorized:
+    features_used  — dims observed on BOTH sides of the winning pair
+                     (the dims that actually contributed squared differences;
+                     every other dim contributed the flat missing penalty);
+    exact_on_observed — True when every jointly-observed dim matches exactly.
+    Distinguishes "NNDR near 1 because of missing-dim penalties" from genuine
+    ambiguity: under heavy missingness the penalty term dominates both d1 and
+    d2, so even a perfect match on the observed dims cannot reach NNDR 0.
+    No-match rows (best_index < 0) report 0 / False.
+    """
+    targets = np.asarray(targets, dtype=float)
+    refs = np.asarray(refs, dtype=float)
+    best_index = np.asarray(best_index)
+    t = len(targets)
+    features_used = np.zeros(t, dtype=np.int64)
+    exact = np.zeros(t, dtype=bool)
+    matched = best_index >= 0
+    if matched.any():
+        diff = targets[matched] - refs[best_index[matched]]
+        obs = ~np.isnan(diff)
+        features_used[matched] = obs.sum(axis=1)
+        obs_sq = np.where(obs, diff * diff, 0.0).sum(axis=1)
+        exact[matched] = obs_sq == 0.0
+    return features_used, exact
+
+
 def euclidean_distance(row_a, row_b):
     """
     Euclidean distance between two standardized numpy rows, tolerating

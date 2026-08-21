@@ -27,9 +27,13 @@ A specific failure mode that distance and NNDR both miss:
 > is actually closer to a different target row `B`. `S` was assigned to `A`
 > only because no closer supplemental row exists for `A`.
 
-In other words: the supplemental row "belongs" elsewhere. The forward best
-match is a least-bad option, not a real correspondence. This is the
-condition demonstrated by the `mnn_not_confirmed` explanatory scenario.
+In other words: the pairing is one-sided — the supplemental row is even
+closer to a different target, so the forward best match is a least-bad
+option rather than a confirmed correspondence. (Avoid saying the row
+"belongs" to the other target: the algorithm has no ground truth about
+which pairing is really correct; asymmetry is evidence for review, not
+proof.) This is the condition demonstrated by the `mnn_not_confirmed`
+explanatory scenario.
 
 ## Tie handling — permissive
 
