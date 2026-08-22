@@ -3,6 +3,7 @@ import sys
 
 import numpy as np
 
+from .ablation import ablation_sample_indices, ablation_suite
 from .io import load_csv, clean_val, dump_csv
 from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
@@ -13,6 +14,10 @@ from .signals import (
     dataset_smd,
     build_flags,
     confidence_tier,
+    variable_report,
+    variable_warnings,
+    validate_min_confidence,
+    _TIERS_WITHHELD,
 )
 
 
@@ -52,7 +57,7 @@ def missing_counts(extracted_rows):
 
 
 def coordinator(target, supplemental, output="data/output.csv", exclude=None, threshold=0.8,
-                fast=False, max_distance=None):
+                fast=False, max_distance=None, min_confidence=None, ablation=False):
     """
     Full matching pipeline.
 
@@ -67,21 +72,39 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
                    best_distance / sqrt(features_used) exceeds it is rejected
                    ("no match" with diagnostics preserved in the detail file).
                    None (default) disables rejection — unchanged behaviour.
+    min_confidence : optional reporting filter ("medium" or "high"). A row
+                   whose confidence tier falls below the minimum keeps its
+                   diagnostics in the detail file, but the linked row is
+                   written unlinked (blank supplemental cells, no fill) with
+                   a "link withheld" flag. Purely a reporting filter: it
+                   never changes which matches are found, the SMD, or any
+                   other row. None (default) reports everything — unchanged
+                   behaviour.
+    ablation     : when True, additionally re-matches with each linked
+                   variable left out (deterministically subsampling targets
+                   above a compute budget), prints a per-variable quality
+                   table, and writes <output_base>_ablation.csv — flags
+                   variables whose removal IMPROVES linkage quality as
+                   candidates for exclusion. Needs at least two linked
+                   variables. See matcher.ablation / docs/signals/ablation.md.
 
     Returns the list of dataset-level warnings emitted for this run
-    (currently: scale-compatibility warnings, also printed to stderr).
+    (scale/definition/header warnings, also printed to stderr).
     """
     if exclude is None:
         exclude = []
     validate_threshold(threshold)
     validate_max_distance(max_distance)
+    min_confidence = validate_min_confidence(min_confidence)
 
     # Refuse to clobber an input, and fail on a bad output location BEFORE
     # minutes of matching compute (a raw FileNotFoundError used to surface
     # only at write time).
     base, ext = os.path.splitext(output)
     detail_output = f"{base}_detail{ext}"
-    for out_path in (output, detail_output):
+    variables_output = f"{base}_variables{ext}"
+    ablation_output = f"{base}_ablation{ext}"
+    for out_path in (output, detail_output, variables_output, ablation_output):
         if os.path.realpath(out_path) in (
             os.path.realpath(target), os.path.realpath(supplemental)
         ):
@@ -121,6 +144,13 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     # Dataset-level sanity checks before pooling the two files
     warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
     warnings += header_warnings(h1, h2, feature_names)
+
+    # Per-variable input diagnostics (missingness, definition-shift check) —
+    # computed on raw parsed values, before standardization can absorb a
+    # systematic between-file offset. Written to <base>_variables.csv below.
+    variable_rows = variable_report(filtered_rs1, filtered_rs2, feature_names)
+    warnings += variable_warnings(variable_rows)
+
     for w in warnings:
         print(f"WARNING: {w}", file=sys.stderr)
 
@@ -165,6 +195,11 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     blank_supp_row = [""] * len(h2)
     linked_rows = []
     detail_rows = []
+    # Per-variable share of the run's total match distance, accumulated over
+    # accepted rows (contributions are proportions of d1², so contrib · d1²
+    # recovers absolute squared contributions exactly).
+    share_num = np.zeros(n_features)
+    share_total_sq = 0.0
     for i in range(len(std_rows_1)):
         if not matched_mask[i]:
             flags = build_flags(
@@ -213,16 +248,40 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
             )
             continue
 
+        tier = confidence_tier(
+            False, False, nndr_val, threshold, repeats,
+            confirmed, near_miss, row_features_used, n_features,
+        )
+        withheld = (min_confidence is not None
+                    and tier in _TIERS_WITHHELD[min_confidence])
         flags = build_flags(
             nndr_val, near_miss, threshold, repeats, smd, feature_names,
             mnn_confirmed=confirmed,
             target_missing=target_missing[i],
             match_missing=supp_missing[j],
+            withheld=withheld, tier=tier, min_tier=min_confidence,
         )
-        tier = confidence_tier(
-            False, False, nndr_val, threshold, repeats,
-            confirmed, near_miss, row_features_used, n_features,
-        )
+
+        # The reporting filter must not feed back into run-level statistics:
+        # withheld rows still count toward distance_share exactly as they
+        # would with the filter off.
+        share_num += contributions * (dist * dist)
+        share_total_sq += dist * dist
+
+        if withheld:
+            # Linked row goes out unlinked (no supplemental cells, no fill);
+            # the detail row keeps the full diagnostics of the nearest row.
+            linked_rows.append(
+                row_merge(rs1[i], blank_supp_row, common)
+                + ["", 0, "", 0, 0, 0, "", "", f"{tier} (withheld)", flags]
+            )
+            detail_rows.append(
+                [i, dist, round(nndr_val, 4), near_miss, int(confirmed),
+                 target_missing[i], supp_missing[j], row_features_used, int(row_exact)]
+                + [round(float(c), 6) for c in contributions]
+                + [f"{tier} (withheld)", flags]
+            )
+            continue
 
         # Fill missing target cells in shared columns from the matched row
         # (raw value verbatim) and record which columns were filled. Output
@@ -265,4 +324,103 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     )
     dump_csv(f"{base}_detail{ext}", detail_headers, detail_rows)
 
+    # Write per-variable diagnostics
+    if share_total_sq > 0:
+        distance_share = share_num / share_total_sq
+    else:
+        distance_share = np.zeros(n_features)
+    for v, s in zip(variable_rows, distance_share):
+        v["distance_share"] = float(s)
+
+    def _fmt(value):
+        return "" if value is None else round(float(value), 6)
+
+    dump_csv(
+        variables_output,
+        ["feature", "target_missing_pct", "supp_missing_pct", "offset_smd",
+         "spread_ratio", "distance_share", "notes"],
+        [
+            [v["feature"], _fmt(v["target_missing_pct"]), _fmt(v["supp_missing_pct"]),
+             _fmt(v["offset_smd"]), _fmt(v["spread_ratio"]),
+             _fmt(v["distance_share"]), v["notes"]]
+            for v in variable_rows
+        ],
+    )
+
+    if ablation:
+        if n_features < 2:
+            print(
+                "WARNING: ablation skipped — needs at least two linked "
+                "variables (removing the only one would leave nothing to "
+                "match on)",
+                file=sys.stderr,
+            )
+        else:
+            _run_ablation(std_rows_1, std_rows_2, feature_names, threshold,
+                          ablation_output)
+
     return warnings
+
+
+def _run_ablation(std_rows_1, std_rows_2, feature_names, threshold, out_path):
+    """
+    Leave-one-variable-out pass for the CLI: reuses the already-standardized
+    arrays (column re-slicing == fresh run with the link excluded), prints a
+    per-variable quality table to stdout, writes <base>_ablation.csv.
+    """
+    sample_indices, sampled = ablation_sample_indices(
+        len(std_rows_1), len(std_rows_2), len(feature_names)
+    )
+    report = ablation_suite(
+        std_rows_1, std_rows_2, feature_names, threshold,
+        sample_indices=sample_indices,
+    )
+
+    baseline = report["baseline"]
+    scope = (
+        f"sampled {report['sample_size']} of {report['n_targets']} target rows"
+        if report["sampled"] else f"all {report['n_targets']} target rows"
+    )
+    print(f"\nVariable ablation ({scope}; baseline "
+          f"MNN-confirmed {baseline['mnn_confirmed_pct']:.1f}%, "
+          f"High confidence {baseline['high_pct']:.1f}%):")
+
+    name_width = max(len("feature"), *(len(n) for n in feature_names))
+    header = (f"  {'feature'.ljust(name_width)}  {'ΔMNN pts':>9}  "
+              f"{'ΔHigh pts':>9}  {'NNDR w/o':>9}  verdict")
+    print(header)
+    csv_rows = []
+    for var in report["variables"]:
+        m = var["metrics"]
+        median_nndr = m["median_nndr"]
+        print(f"  {var['feature'].ljust(name_width)}  "
+              f"{var['delta_mnn_pct']:>+9.1f}  {var['delta_high_pct']:>+9.1f}  "
+              f"{(f'{median_nndr:.3f}' if median_nndr is not None else '—'):>9}  "
+              f"{var['verdict']}")
+        csv_rows.append([
+            var["feature"], report["sample_size"], int(report["sampled"]),
+            round(baseline["mnn_confirmed_pct"], 2),
+            round(m["mnn_confirmed_pct"], 2), round(var["delta_mnn_pct"], 2),
+            round(baseline["high_pct"], 2),
+            round(m["high_pct"], 2), round(var["delta_high_pct"], 2),
+            ("" if median_nndr is None else round(median_nndr, 4)),
+            m["no_match"], var["verdict"],
+        ])
+
+    flagged = [v["feature"] for v in report["variables"]
+               if v["verdict"] == "consider_excluding"]
+    if flagged:
+        print(
+            f"  → linkage quality improves without: {', '.join(flagged)} — "
+            f"consider excluding (exclude=[...]) and re-running"
+        )
+
+    dump_csv(
+        out_path,
+        ["feature", "sample_size", "sampled", "baseline_mnn_pct",
+         "mnn_pct_without", "delta_mnn_pct", "baseline_high_pct",
+         "high_pct_without", "delta_high_pct", "median_nndr_without",
+         "no_match_without", "verdict"],
+        csv_rows,
+    )
+    return report

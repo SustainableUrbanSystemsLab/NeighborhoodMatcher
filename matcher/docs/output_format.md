@@ -1,9 +1,16 @@
 # Output Format
 
-`coordinator(...)` writes two CSVs per run:
+`coordinator(...)` writes three CSVs per run:
 
 1. The **linked dataset** at `output`.
 2. A **per-row detail file** at `<output_basename>_detail.csv`.
+3. A **per-variable diagnostics file** at `<output_basename>_variables.csv`
+   (missingness per side, definition-shift check, share of match distance —
+   see [signals/variable_report.md](signals/variable_report.md)).
+
+With `ablation=True` it additionally writes
+`<output_basename>_ablation.csv` — the leave-one-variable-out quality
+report ([signals/ablation.md](signals/ablation.md)).
 
 `coordinate_in_memory(...)` returns the same data as a Python dict; the browser
 frontend serializes it to JS via Pyodide.
@@ -24,7 +31,7 @@ Each row corresponds to one target row, joined to its best supplemental match.
 | `features_used` | int — shared features observed on **both** sides of the matched pair (the dims that actually contributed comparisons; 0 for no-match rows) |
 | `exact_on_observed` | int (0/1) — 1 when the matched pair agrees exactly on every jointly-observed feature (blank for no-match rows) |
 | `filled_from_match` | string — `; `-joined names of shared columns whose missing target value was filled from the matched row (empty when nothing was filled) |
-| `confidence` | string — `High` / `Medium` / `Low` / `No match` (see rule table below) |
+| `confidence` | string — `High` / `Medium` / `Low` / `No match` (see rule table below); a row withheld by the minimum-confidence filter shows its true tier annotated, e.g. `Low (withheld)` |
 | `flags` | string — pipe-separated plain-English warnings (empty if clean) |
 
 Shared columns appear once. The target's value is kept verbatim — **unless it
@@ -55,6 +62,22 @@ the numerator still carries the missing-dim penalty, so rows with many
 missing features are rejected more aggressively — deliberate and
 conservative. Default: off (`None`), which is byte-identical to the previous
 behavior.
+
+**Optional minimum-confidence filter.** When `min_confidence` is set
+(`"medium"` or `"high"`; CLI `coordinator(..., min_confidence=...)`, web UI
+"Minimum confidence to report a link"), a row whose tier falls below the
+minimum is **withheld**: the linked row is written unlinked (blank
+supplemental cells, no fill) with the flag
+`link withheld — confidence {tier} is below your minimum ({min_tier})`
+*prepended* to its normal flags, and its confidence cell annotated
+(`Low (withheld)`). The detail file and `per_target` keep the nearest row's
+full diagnostics. This is **purely a reporting filter**: it never changes
+which matches are found, the SMD, tier counts, or any other row — a
+withheld row's diagnostics are byte-identical to the same row with the
+filter off. Precedence: zero-overlap no-match → cutoff rejection →
+withholding (a cutoff-rejected row is `No match`, never also withheld).
+`"low"` is rejected as a value — it would withhold nothing. Default: off
+(`None`), which is byte-identical to the previous behavior.
 
 ## Confidence tier (`confidence` column)
 
@@ -108,7 +131,9 @@ match's distance?" — useful when investigating a flagged row.
     "feature_names":  [...],          # shared column names, in match order
     "smd":            [...],          # dataset-level SMD per feature
     "threshold":      0.8,            # NNDR threshold used in this run — must be in (0, 1]
-    "warnings":       [...],          # dataset-level warnings (e.g. scale mismatch)
+    "warnings":       [...],          # dataset-level warnings (scale mismatch, definition shift, ...)
+    "variables":      [...],          # per-variable report incl. distance_share
+                                      # (see signals/variable_report.md), feature order
     "linked_headers": [...],          # list[str]
     "linked_rows":    [[str, ...]],   # CSV-ready
     "detail_headers": [...],
@@ -120,6 +145,7 @@ match's distance?" — useful when investigating a flagged row.
             "nearest_idx":       int,     # nearest row even when rejected; None for zero-overlap no-match
             "no_match":          bool,    # True for zero-overlap AND cutoff-rejected rows
             "rejected":          bool,    # True only for cutoff-rejected rows
+            "withheld":          bool,    # True only for rows below the minimum-confidence filter
             "best_distance":     float,   # None for a zero-overlap no-match row (kept for rejected)
             "second_distance":   float,   # None when no second candidate exists
             "nndr":              float,   # None for a zero-overlap no-match row (kept for rejected)
@@ -131,7 +157,9 @@ match's distance?" — useful when investigating a flagged row.
             "features_used":     int,     # shared features observed on both sides of the pair
             "exact_on_observed": bool,    # exact agreement on every jointly-observed feature
             "filled_from_match": [str, ...],  # shared columns filled from the matched row
-            "confidence":        str,     # "High" | "Medium" | "Low" | "No match"
+            "confidence":        str,     # "High" | "Medium" | "Low" | "No match" —
+                                          # always the TRUE tier, even when withheld
+                                          # (the CSV cell carries the "(withheld)" suffix)
             "contributions":     [float, ...],
             "flags":             str,
             "hist_counts":       [int, ...],   # distance histogram
@@ -146,8 +174,11 @@ match's distance?" — useful when investigating a flagged row.
         "mnn_confirmed":      int,
         "no_match":           int,     # rows without an ACCEPTED match (incl. rejected)
         "rejected":           int,     # subset of no_match discarded by the cutoff
+        "withheld":           int,     # rows below the minimum-confidence filter (NOT part of no_match)
         "max_distance":       float,   # None when the cutoff is off
+        "min_confidence":     str,     # "Medium" | "High" | None when the filter is off
         "tiers":              {"High": int, "Medium": int, "Low": int, "No match": int},
+                                       # tier counts always reflect TRUE tiers — withholding never moves them
         "mean_nndr":          float,   # over accepted matched rows only
         "mean_best_distance": float,
         "threshold":          float,

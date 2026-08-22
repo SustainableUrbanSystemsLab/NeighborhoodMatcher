@@ -98,6 +98,50 @@ export default function About() {
           </ol>
         </section>
 
+        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5">
+          <h2 className="mb-2 text-lg font-semibold text-gray-900">
+            Preparing your data
+          </h2>
+          <p className="mb-3 text-sm text-gray-700">
+            Standardization corrects for <em>scale</em> (dollars vs thousands
+            of dollars), never for <em>meaning</em>. The tool cannot tell that
+            two same-named columns were computed differently — that check is
+            yours to make before uploading.
+          </p>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-gray-700">
+            <li>
+              <strong>Same definition and coding in both files.</strong> A
+              poverty rate computed against 100% of the federal poverty line
+              in one file and 180% in the other shifts every value
+              systematically: matches still get made, but they quietly get
+              worse. The results page reports a per-variable{" "}
+              <em>offset SMD</em> check that flags this pattern after a run.
+            </li>
+            <li>
+              <strong>Raw values only.</strong> Never mix an
+              already-standardized (z-scored) column with raw data — pooled
+              statistics collapse the narrow side onto a point. Wildly
+              different spreads trigger a scale warning, but a same-scale
+              definition difference does not.
+            </li>
+            <li>
+              <strong>Mark missing data as missing.</strong> Blank, NA, N/A,
+              null, none, -, ., NaN, and #N/A are recognized as missing.
+              Convert sentinel codes like 9999 or -99 to blanks first; left
+              in place they count as real extreme values.
+            </li>
+            <li>
+              <strong>More variables is not automatically better.</strong>{" "}
+              Missing values are never imputed — each missing dimension adds a
+              fixed distance penalty instead, so a mostly-missing variable
+              contributes mostly noise and can degrade every match. After a
+              run, the variable check on the results page re-matches with each
+              variable left out and recommends excluding any that hurt the
+              linkage.
+            </li>
+          </ul>
+        </section>
+
         <details open className="group mb-8 rounded-lg border border-gray-200 bg-white">
           <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
             <span className="text-gray-400 transition-transform group-open:rotate-90">

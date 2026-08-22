@@ -4,7 +4,7 @@
 
 import JSZip from "jszip";
 import Papa from "papaparse";
-import type { MatchOutput, ParsedDataset } from "@/types";
+import type { AblationReport, MatchOutput, ParsedDataset } from "@/types";
 import {
   AGREEMENT_TEXT,
   CONTACT_TEXT,
@@ -12,6 +12,7 @@ import {
   buildDataStatsCsv,
   buildFeatureSmdCsv,
   buildMatchStatsCsv,
+  buildVariableDiagnosticsCsv,
 } from "./summary";
 
 function headerRowsToCsv(headers: string[], rows: string[][]): string {
@@ -28,7 +29,8 @@ function withBom(text: string): string {
 export async function buildResultsZip(
   output: MatchOutput,
   target: ParsedDataset,
-  supplemental: ParsedDataset
+  supplemental: ParsedDataset,
+  ablation: AblationReport | null = null
 ): Promise<Blob> {
   const zip = new JSZip();
 
@@ -47,6 +49,20 @@ export async function buildResultsZip(
   zip.file("diagnostics/data_stats.csv", withBom(buildDataStatsCsv(target, supplemental)));
   zip.file("diagnostics/match_stats.csv", withBom(buildMatchStatsCsv(output)));
   zip.file("diagnostics/feature_smd.csv", withBom(buildFeatureSmdCsv(output)));
+  zip.file(
+    "diagnostics/variable_diagnostics.csv",
+    withBom(buildVariableDiagnosticsCsv(output, ablation))
+  );
+  // Dataset-level warnings previously lived only in the UI — a researcher
+  // reading the zip alone should see them too.
+  zip.file(
+    "diagnostics/warnings.txt",
+    withBom(
+      output.warnings.length > 0
+        ? output.warnings.map((w) => `WARNING: ${w}`).join("\n") + "\n"
+        : "No dataset-level warnings were raised for this run.\n"
+    )
+  );
 
   // Preserve the exact bytes of the original uploads for reproducibility —
   // deliberately no BOM added here.

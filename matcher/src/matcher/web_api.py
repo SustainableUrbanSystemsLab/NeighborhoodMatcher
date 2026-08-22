@@ -19,6 +19,12 @@ import io as _io
 
 import numpy as np
 
+from .ablation import (
+    ABLATION_VERSION,
+    ablation_sample_indices,
+    build_recommendations,
+    variant_metrics,
+)
 from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
 from .distance import (
@@ -34,6 +40,10 @@ from .signals import (
     dataset_smd,
     build_flags,
     confidence_tier,
+    variable_report,
+    variable_warnings,
+    validate_min_confidence,
+    _TIERS_WITHHELD,
 )
 
 
@@ -155,6 +165,12 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
     warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
     warnings += header_warnings(h1, h2, feature_names)
 
+    # Per-variable input diagnostics (missingness, definition-shift check).
+    # Computed on the raw parsed values, before standardization can absorb a
+    # systematic between-file offset.
+    variables = variable_report(filtered_rs1, filtered_rs2, feature_names)
+    warnings += variable_warnings(variables)
+
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
     return {
@@ -162,6 +178,7 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
         "common": common, "feature_names": feature_names,
         "target_missing": target_missing, "supp_missing": supp_missing,
         "warnings": warnings,
+        "variable_report": variables,
         "std_rows_1": std_rows_1, "std_rows_2": std_rows_2,
         # Parsed per-feature values (None = missing) — the emit loop needs
         # them to decide which target cells to fill from the matched row.
@@ -277,6 +294,7 @@ def assemble_results(
     exclude=None,
     threshold=0.8,
     max_distance=None,
+    min_confidence=None,
 ):
     """
     Merges shard outputs (any order; ranges must tile [0, N) exactly) and
@@ -288,14 +306,20 @@ def assemble_results(
     best_distance / sqrt(features_used) exceeds it is rejected (routed to
     the no-match path, diagnostics preserved). Applied here, at assembly —
     shards are cutoff-agnostic, so no per-shard consistency field is needed.
+
+    min_confidence: optional reporting filter ("medium" or "high"). Rows
+    whose confidence tier falls below it are written unlinked with a
+    "link withheld" flag while keeping full diagnostics; nothing else in
+    the run changes. Also assembly-stage — shards are filter-agnostic.
     """
     validate_threshold(threshold)
     validate_max_distance(max_distance)
+    min_confidence = validate_min_confidence(min_confidence)
     prep = _prepare(target_csv, supplemental_csv, links, exclude)
-    return _assemble_prepared(prep, shards, threshold, max_distance)
+    return _assemble_prepared(prep, shards, threshold, max_distance, min_confidence)
 
 
-def _assemble_prepared(prep, shards, threshold, max_distance=None):
+def _assemble_prepared(prep, shards, threshold, max_distance=None, min_confidence=None):
     h1, rs1, h2, rs2 = prep["h1"], prep["rs1"], prep["h2"], prep["rs2"]
     common, feature_names = prep["common"], prep["feature_names"]
     target_missing, supp_missing = prep["target_missing"], prep["supp_missing"]
@@ -406,6 +430,26 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
     else:
         smd = np.zeros(len(feature_names))
 
+    # Per-variable share of the run's total match distance. Contributions
+    # are proportions of each row's squared distance, so contrib * d1²
+    # recovers absolute squared contributions exactly; summing over accepted
+    # rows answers "which variable drove the matching overall?". Copies the
+    # prep report so shard/assembly reuse of prep stays side-effect free.
+    variables = [dict(v) for v in prep["variable_report"]]
+    n_feat = len(feature_names)
+    if accepted_mask.any():
+        contrib_arr = np.asarray(contributions, dtype=float)[accepted_mask]
+        d1_sq = best_distance[accepted_mask] ** 2
+        total_sq = float(d1_sq.sum())
+        shares = (
+            (contrib_arr * d1_sq[:, None]).sum(axis=0) / total_sq
+            if total_sq > 0 else np.zeros(n_feat)
+        )
+    else:
+        shares = np.zeros(n_feat)
+    for v, s in zip(variables, shares):
+        v["distance_share"] = float(s)
+
     linked_headers = (
         new_header(h1, h2, common)
         + ["euc_distance", "repeats", "nndr", "near_miss_count", "mnn_confirmed",
@@ -428,6 +472,7 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
     mnn_confirmed_count = 0
     no_match_count = 0
     rejected_count = 0
+    withheld_count = 0
     tier_counts = {"High": 0, "Medium": 0, "Low": 0, "No match": 0}
     nndr_sum = 0.0
     best_distance_sum = 0.0
@@ -454,6 +499,7 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
                 "nearest_idx": None,
                 "no_match": True,
                 "rejected": False,
+                "withheld": False,
                 "best_distance": None,
                 "second_distance": None,
                 "nndr": None,
@@ -520,6 +566,7 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
                 "nearest_idx": j,
                 "no_match": True,
                 "rejected": True,
+                "withheld": False,
                 "best_distance": row_best,
                 "second_distance": row_second,
                 "nndr": nndr_val,
@@ -544,16 +591,69 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
             tier_counts[tier] += 1
             continue
 
+        tier = confidence_tier(
+            False, False, nndr_val, threshold, row_repeats,
+            row_confirmed, row_near_miss, row_features_used, n_features,
+        )
+        withheld = (min_confidence is not None
+                    and tier in _TIERS_WITHHELD[min_confidence])
         flags = build_flags(
             nndr_val, row_near_miss, threshold, row_repeats, smd, feature_names,
             mnn_confirmed=row_confirmed,
             target_missing=target_missing[i],
             match_missing=supp_missing[j],
+            withheld=withheld, tier=tier, min_tier=min_confidence,
         )
-        tier = confidence_tier(
-            False, False, nndr_val, threshold, row_repeats,
-            row_confirmed, row_near_miss, row_features_used, n_features,
-        )
+
+        if withheld:
+            # Reporting filter only: the linked row goes out unlinked (blank
+            # supplemental cells, no fill), while the detail row and
+            # per_target keep the nearest row's full diagnostics. Every
+            # run-level statistic below is incremented exactly as it would
+            # be with the filter off.
+            linked_rows.append(
+                row_merge(rs1[i], blank_supp_row, common)
+                + ["", 0, "", 0, 0, 0, "", "", f"{tier} (withheld)", flags]
+            )
+            detail_rows.append(
+                [i, row_best, round(nndr_val, 4), row_near_miss, int(row_confirmed),
+                 target_missing[i], supp_missing[j], row_features_used, int(row_exact)]
+                + [round(float(c), 6) for c in row_contributions]
+                + [f"{tier} (withheld)", flags]
+            )
+            per_target.append({
+                "target_idx": int(i),
+                "match_idx": None,
+                "nearest_idx": j,
+                "no_match": False,
+                "rejected": False,
+                "withheld": True,
+                "best_distance": row_best,
+                "second_distance": row_second,
+                "nndr": nndr_val,
+                "near_miss": row_near_miss,
+                "mnn_confirmed": row_confirmed,
+                "repeats": row_repeats,
+                "target_missing": int(target_missing[i]),
+                "match_missing": int(supp_missing[j]),
+                "features_used": row_features_used,
+                "exact_on_observed": row_exact,
+                "filled_from_match": [],
+                "confidence": tier,
+                "contributions": [float(c) for c in row_contributions],
+                "flags": flags,
+                "hist_counts": list(hist_counts),
+                "hist_edges": list(hist_edges),
+                "top_k_distances": list(top_k_lists[i]),
+            })
+            flagged_count += 1
+            withheld_count += 1
+            if row_confirmed:
+                mnn_confirmed_count += 1
+            nndr_sum += nndr_val
+            best_distance_sum += row_best
+            tier_counts[tier] += 1
+            continue
 
         # Fill missing target cells in shared columns from the matched row
         # (raw value verbatim) and record which columns were filled. This is
@@ -584,6 +684,7 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
             "nearest_idx": j,
             "no_match": False,
             "rejected": False,
+            "withheld": False,
             "best_distance": row_best,
             "second_distance": row_second,
             "nndr": nndr_val,
@@ -618,7 +719,9 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
         "mnn_confirmed": mnn_confirmed_count,
         "no_match": no_match_count,
         "rejected": rejected_count,
+        "withheld": withheld_count,
         "max_distance": (float(max_distance) if max_distance is not None else None),
+        "min_confidence": min_confidence,
         "tiers": tier_counts,
         "mean_nndr": (nndr_sum / n_matched) if n_matched else 0.0,
         "mean_best_distance": (best_distance_sum / n_matched) if n_matched else 0.0,
@@ -635,6 +738,7 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None):
         "smd": [float(s) for s in smd],
         "threshold": float(threshold),
         "warnings": list(warnings),
+        "variables": variables,
         "linked_headers": linked_headers,
         "linked_rows": linked_rows_str,
         "detail_headers": detail_headers,
@@ -654,6 +758,7 @@ def coordinate_in_memory(
     top_k=50,
     progress_cb=None,
     max_distance=None,
+    min_confidence=None,
 ):
     """
     Browser-facing single-worker entry point: one full-range shard plus
@@ -663,6 +768,7 @@ def coordinate_in_memory(
     """
     validate_threshold(threshold)
     validate_max_distance(max_distance)
+    min_confidence = validate_min_confidence(min_confidence)
 
     def _match_progress(frac):
         if progress_cb is None:
@@ -676,10 +782,130 @@ def coordinate_in_memory(
     shard = _match_shard_prepared(
         prep, threshold, 0, None, top_k, hist_bins, _match_progress,
     )
-    result = _assemble_prepared(prep, [shard], threshold, max_distance)
+    result = _assemble_prepared(prep, [shard], threshold, max_distance, min_confidence)
     if progress_cb is not None:
         try:
             progress_cb(1.0)
         except Exception:
             pass
     return result
+
+
+def ablation_variant(
+    target_csv,
+    supplemental_csv,
+    links=None,
+    exclude=None,
+    threshold=0.8,
+    drop_index=None,
+    progress_cb=None,
+):
+    """
+    One leave-one-variable-out matching variant, for the worker pool: the
+    frontend runs d+1 of these concurrently (drop_index None = baseline,
+    then one per linked feature) and merges them with assemble_ablation.
+
+    Every worker derives the SAME deterministic target sample from the
+    dataset shape, so variant metrics are comparable without coordination.
+    Returns a JSON-safe payload (round-trips through postMessage).
+    """
+    validate_threshold(threshold)
+    prep = _prepare(target_csv, supplemental_csv, links, exclude)
+    feature_names = prep["feature_names"]
+    d = len(feature_names)
+    if d < 2:
+        raise ValueError(
+            "ablation needs at least two linked variables — removing the "
+            "only one would leave nothing to match on"
+        )
+    if drop_index is not None and not 0 <= int(drop_index) < d:
+        raise ValueError(
+            f"drop_index {drop_index} out of range for {d} linked features"
+        )
+
+    n_targets = len(prep["std_rows_1"])
+    sample_indices, sampled = ablation_sample_indices(
+        n_targets, len(prep["std_rows_2"]), d
+    )
+    metrics = variant_metrics(
+        prep["std_rows_1"], prep["std_rows_2"], threshold,
+        drop_index=(None if drop_index is None else int(drop_index)),
+        sample_indices=sample_indices, progress_cb=progress_cb,
+    )
+    return {
+        "ablation_version": ABLATION_VERSION,
+        "drop_index": (None if drop_index is None else int(drop_index)),
+        "drop_feature": (None if drop_index is None else feature_names[int(drop_index)]),
+        "threshold": float(threshold),
+        "sample_size": len(sample_indices),
+        "sampled": bool(sampled),
+        "n_targets": int(n_targets),
+        "metrics": metrics,
+    }
+
+
+def assemble_ablation(variants, feature_names, threshold=0.8):
+    """
+    Merges ablation_variant payloads (any order) into the ablation report —
+    same shape as ablation.ablation_suite returns. Pure function: no CSVs,
+    no matching; safe to run on any worker.
+
+    Validates that every payload came from the same engine version, the
+    same threshold, and the same target sample, and that exactly one
+    baseline plus one variant per feature is present.
+    """
+    validate_threshold(threshold)
+    feature_names = list(feature_names)
+    d = len(feature_names)
+    variants = [dict(v) for v in variants]
+
+    for v in variants:
+        version = v.get("ablation_version")
+        if version != ABLATION_VERSION:
+            raise ValueError(
+                f"ablation variant (drop_index {v.get('drop_index')!r}) was "
+                f"produced by engine version {version!r}, expected "
+                f"{ABLATION_VERSION} — recompute the variants"
+            )
+        if v.get("threshold") != threshold:
+            raise ValueError(
+                f"ablation variant (drop_index {v.get('drop_index')!r}) was "
+                f"computed at threshold {v.get('threshold')}, but assembly "
+                f"requested {threshold} — recompute the variants"
+            )
+
+    sizes = {(v["sample_size"], v["n_targets"]) for v in variants}
+    if len(sizes) > 1:
+        raise ValueError(
+            f"ablation variants disagree on the target sample: {sorted(sizes)}"
+        )
+
+    baselines = [v for v in variants if v["drop_index"] is None]
+    if len(baselines) != 1:
+        raise ValueError(
+            f"expected exactly one baseline variant, got {len(baselines)}"
+        )
+    [baseline] = baselines
+
+    by_drop = {v["drop_index"]: v for v in variants if v["drop_index"] is not None}
+    missing = [i for i in range(d) if i not in by_drop]
+    extra = sorted(i for i in by_drop if not 0 <= i < d)
+    if missing or extra or len(by_drop) != d:
+        raise ValueError(
+            f"ablation variants do not cover the {d} linked features exactly "
+            f"(missing {missing}, unexpected {extra})"
+        )
+
+    return {
+        "ablation_version": ABLATION_VERSION,
+        "threshold": float(threshold),
+        "sampled": bool(baseline["sampled"]),
+        "sample_size": int(baseline["sample_size"]),
+        "n_targets": int(baseline["n_targets"]),
+        "baseline": baseline["metrics"],
+        "variables": build_recommendations(
+            baseline["metrics"],
+            [by_drop[i]["metrics"] for i in range(d)],
+            feature_names,
+        ),
+    }

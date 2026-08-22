@@ -1,7 +1,9 @@
 import { Fragment, useMemo, useState } from "react";
 import { buildResultsZip, triggerDownload } from "@/lib/zip-builder";
 import { tierChipClasses, tierRank, tierSentence } from "@/lib/confidence-text";
+import { VariableDiagnosticsPanel } from "@/components/VariableDiagnosticsPanel";
 import type {
+  AblationState,
   ColumnLink,
   MatchOutput,
   ParsedDataset,
@@ -22,6 +24,12 @@ interface ResultsViewProps {
   runDurationMs: number | null;
   /** Pyodide workers (≈ CPU cores) the run used (null if unknown) */
   workersUsed: number | null;
+  /** leave-one-variable-out check, running in the background after results */
+  ablation: AblationState;
+  /** flips the link's exclude toggle and returns to the Link step */
+  onExcludeFeature: (featureName: string) => void;
+  /** starts the (gated) variable check on demand */
+  onRunAblation: () => void;
   onStartOver: () => void;
 }
 
@@ -49,6 +57,9 @@ export function ResultsView({
   links,
   runDurationMs,
   workersUsed,
+  ablation,
+  onExcludeFeature,
+  onRunAblation,
   onStartOver,
 }: ResultsViewProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -63,7 +74,12 @@ export function ResultsView({
     setDownloading(true);
     setDownloadError(null);
     try {
-      const blob = await buildResultsZip(output, target, supplemental);
+      const blob = await buildResultsZip(
+        output,
+        target,
+        supplemental,
+        ablation.status === "done" ? ablation.report : null
+      );
       triggerDownload(blob, "matcher_results.zip");
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : String(err));
@@ -173,7 +189,9 @@ export function ResultsView({
       </div>
 
       {/* Dataset-level warnings (e.g. scale mismatch, no-match rows) */}
-      {(output.warnings?.length > 0 || summary.no_match > 0) && (
+      {(output.warnings?.length > 0 ||
+        summary.no_match > 0 ||
+        (summary.withheld ?? 0) > 0) && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3">
           <p className="mb-1 text-xs font-semibold text-red-800">
             Dataset warnings
@@ -196,12 +214,28 @@ export function ResultsView({
                 drill-down.
               </li>
             )}
+            {(summary.withheld ?? 0) > 0 && (
+              <li>
+                {summary.withheld} link(s) were withheld below your minimum
+                confidence ({summary.min_confidence}) — those rows appear
+                unlinked in the linked dataset; the nearest row and full
+                diagnostics are kept in the detail file and drill-down.
+              </li>
+            )}
             {(output.warnings ?? []).map((w, i) => (
               <li key={i}>{w}</li>
             ))}
           </ul>
         </div>
       )}
+
+      {/* Per-variable quality check (input report + leave-one-out ablation) */}
+      <VariableDiagnosticsPanel
+        variables={output.variables ?? []}
+        ablation={ablation}
+        onExcludeFeature={onExcludeFeature}
+        onRunAblation={onRunAblation}
+      />
 
       {/* SMD bar chart */}
       <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -329,8 +363,14 @@ export function ResultsView({
                       <td className="px-3 py-1.5 text-xs">
                         <span
                           className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${tierChipClasses(row.confidence)}`}
+                          title={
+                            row.withheld
+                              ? "Link withheld below your minimum confidence — reported unlinked; diagnostics kept."
+                              : undefined
+                          }
                         >
                           {row.confidence}
+                          {row.withheld ? " · withheld" : ""}
                         </span>
                       </td>
                       <td className="px-3 py-1.5 text-xs text-amber-800">
@@ -734,12 +774,15 @@ function DrilldownPanel({
                 ? detail.rejected
                   ? `Target row ${detail.target_idx} — nearest row ${detail.nearest_idx} rejected by cutoff`
                   : `Target row ${detail.target_idx} — no valid match`
-                : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
+                : detail.withheld
+                  ? `Target row ${detail.target_idx} — link to supplemental row ${detail.nearest_idx} withheld`
+                  : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
             </span>
             <span
               className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${tierChipClasses(detail.confidence)}`}
             >
               {detail.confidence}
+              {detail.withheld ? " · withheld" : ""}
             </span>
           </h3>
           <p className="mt-0.5 text-xs text-gray-500">

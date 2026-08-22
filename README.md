@@ -33,9 +33,11 @@ never leaves your machine, even on the hosted site.
 
 1. Open **[nbhdmatch.netlify.app](https://nbhdmatch.netlify.app/)** (or run locally, below).
 2. Upload a target CSV and a supplemental CSV. Columns with identical names
-   are auto-linked; every linked column must be numeric and in the same units
-   in both files. Missing cells (`NA`, blank, `-`, …) are fine — never fed
-   raw or z-scored data.
+   are auto-linked; every linked column must be numeric and measure the same
+   thing the same way in both files (see
+   [Preparing your data](#preparing-your-data)). Missing cells (`NA`, blank,
+   `-`, …) are fine. Upload raw values — never pre-standardized (z-scored)
+   columns.
 3. Review the per-row diagnostics and download the results zip.
 
 No data handy? Grab the benchmark pair from this repo:
@@ -100,6 +102,35 @@ The benchmark runs the matcher against the simulated ACS datasets and fails
 if any accuracy/flagging floor regresses; CI runs it on every push.
 
 </details>
+
+## Preparing your data
+
+The matcher standardizes both files together (joint z-scoring), which
+corrects for *scale* — dollars vs thousands of dollars — but never for
+*meaning*. Before uploading:
+
+- **Same definition and coding in both files.** A column must measure the
+  same quantity computed the same way. Example failure: "poverty rate" as
+  % below 100% of the federal poverty line in one file but below 180% in
+  the other — every value shifts systematically, distances inflate, and
+  matches degrade. The results page reports a per-variable check
+  (`offset SMD`) that flags this pattern.
+- **Raw values only.** Don't mix a pre-z-scored column with raw data — the
+  pooled statistics collapse the narrow side onto a point. The scale check
+  warns when spreads differ wildly, but same-scale definition differences
+  are on you to verify.
+- **Mark missing data as missing.** Recognized missing tokens: blank, `NA`,
+  `N/A`, `null`, `none`, `-`, `.`, `NaN`, `#N/A` (case-insensitive). Convert
+  sentinel codes like `9999` or `-99` to blanks first — left in place they
+  are treated as real extreme values (the upload step tries to spot repeated
+  extremes, but only as a heuristic).
+- **Missing values are never imputed.** Each missing dimension of a pair
+  contributes a fixed distance penalty instead. A variable that is mostly
+  missing therefore adds mostly penalty — noise that can drown the signal
+  from complete variables and *worsen* every match. Quality beats quantity:
+  fewer well-measured shared variables usually out-match many spotty ones.
+  The results page runs a leave-one-variable-out check and recommends
+  excluding variables that hurt the linkage.
 
 ## Repository layout
 

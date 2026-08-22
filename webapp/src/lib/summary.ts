@@ -3,7 +3,7 @@
 
 import Papa from "papaparse";
 import { isMissingCell, parseNumeric } from "@/lib/missing";
-import type { MatchOutput, ParsedDataset } from "@/types";
+import type { AblationReport, MatchOutput, ParsedDataset } from "@/types";
 
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
@@ -122,6 +122,8 @@ export function buildMatchStatsCsv(output: MatchOutput): string {
       "max_distance_cutoff",
       summary.max_distance != null ? summary.max_distance.toFixed(4) : "off",
     ],
+    ["withheld_below_min_confidence", summary.withheld ?? 0],
+    ["min_confidence_filter", summary.min_confidence ?? "off"],
     ["confidence_high", tiers["High"] ?? 0],
     ["confidence_medium", tiers["Medium"] ?? 0],
     ["confidence_low", tiers["Low"] ?? 0],
@@ -157,6 +159,67 @@ export function buildMatchStatsCsv(output: MatchOutput): string {
   return Papa.unparse({
     fields: ["metric", "value"],
     data: metrics,
+  });
+}
+
+const fmt = (v: number | null | undefined, digits = 6): string =>
+  v == null ? "" : v.toFixed(digits);
+
+/**
+ * Per-variable diagnostics: the always-on input report (missingness,
+ * definition-shift check, distance share) plus — when the variable check
+ * has run — the leave-one-variable-out columns and verdict.
+ */
+export function buildVariableDiagnosticsCsv(
+  output: MatchOutput,
+  ablation: AblationReport | null
+): string {
+  const byFeature = new Map(
+    (ablation?.variables ?? []).map((v) => [v.feature, v])
+  );
+  const rows = (output.variables ?? []).map((v) => {
+    const abl = byFeature.get(v.feature);
+    return [
+      v.feature,
+      fmt(v.target_missing_pct, 2),
+      fmt(v.supp_missing_pct, 2),
+      fmt(v.offset_smd),
+      fmt(v.spread_ratio),
+      fmt(v.distance_share),
+      ablation ? ablation.sample_size : "",
+      ablation ? (ablation.sampled ? 1 : 0) : "",
+      abl ? fmt(ablation!.baseline.mnn_confirmed_pct, 2) : "",
+      abl ? fmt(abl.metrics.mnn_confirmed_pct, 2) : "",
+      abl ? fmt(abl.delta_mnn_pct, 2) : "",
+      abl ? fmt(ablation!.baseline.high_pct, 2) : "",
+      abl ? fmt(abl.metrics.high_pct, 2) : "",
+      abl ? fmt(abl.delta_high_pct, 2) : "",
+      abl ? fmt(abl.metrics.median_nndr, 4) : "",
+      abl ? abl.verdict : "",
+      v.notes,
+    ];
+  });
+  return Papa.unparse({
+    fields: [
+      "feature",
+      "target_missing_pct",
+      "supp_missing_pct",
+      "offset_smd",
+      "spread_ratio",
+      "distance_share",
+      "ablation_sample_size",
+      "ablation_sampled",
+      "baseline_mnn_pct",
+      "mnn_pct_without",
+      "delta_mnn_pct",
+      "baseline_high_pct",
+      "high_pct_without",
+      "delta_high_pct",
+      "median_nndr_without",
+      "ablation_verdict",
+      "notes",
+    ],
+    data: rows,
   });
 }
 
@@ -228,6 +291,17 @@ Folder layout:
     match_stats.csv         Dataset-level match quality metrics.
     feature_smd.csv         Standardized mean difference per feature,
                             with balance flag (ok / warning / poor).
+    variable_diagnostics.csv  Per matching variable: missingness on each
+                            side, offset SMD (definition/coding-shift
+                            check), share of total match distance, and —
+                            when the variable check ran — the
+                            leave-one-variable-out columns: how MNN
+                            confirmation and High-confidence rates change
+                            without the variable, plus a verdict
+                            (consider_excluding / load_bearing / neutral).
+    warnings.txt            Dataset-level warnings raised for this run
+                            (scale mismatch, definition shift, header
+                            near-misses), one per line.
 
   inputs/
     original_target.csv         Unmodified bytes of the uploaded target.

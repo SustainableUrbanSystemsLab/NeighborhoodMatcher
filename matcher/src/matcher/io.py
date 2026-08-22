@@ -75,8 +75,14 @@ def clean_val(v):
 
 
 def dump_csv(filepath, headers, rows):
-    """Writes headers and rows to a CSV file (utf-8, matching load_csv)."""
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
+    """
+    Writes headers and rows to a CSV file as UTF-8 with a BOM.
+
+    The BOM is for Excel: without it, Windows Excel decodes the file as
+    ANSI and the em dashes in the flags column render as mojibake ("â€”").
+    load_csv reads utf-8-sig, so the round trip is unaffected.
+    """
+    with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
         writer.writerows(rows)

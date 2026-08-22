@@ -6,6 +6,8 @@ import type { ColumnLink } from "@/types";
 
 export {
   runMatching,
+  runAblation,
+  ablationAutoRunAllowed,
   prefetchPyodide,
   poolSizeFor,
   getSavedWorkerCount,

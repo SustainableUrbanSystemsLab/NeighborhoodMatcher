@@ -11,6 +11,8 @@ shape: definition, what it catches, edge cases, and how it appears in
 | [Mutual nearest neighbor](mnn_confirmed.md) | `mnn_confirmed` | Asymmetric matches — best match "belongs" to a different target row. |
 | [Per-row feature contribution](per_row_feature_contribution.md) | `per_row_feature_contribution` | Which features drove this specific match's distance. |
 | [Dataset SMD](dataset_smd.md) | `dataset_smd` | Run-wide imbalance on each feature across all matched pairs. |
+| [Per-variable report](variable_report.md) | `variable_report` | Input problems per linked variable: definition/coding shifts between the files (offset SMD), high missingness, scale mismatch. |
+| [Ablation](ablation.md) | `matcher.ablation` | Each variable's actual effect on linkage quality — re-matches with the variable left out and recommends excluding variables that hurt. |
 | [Flags](flags.md) | `build_flags` | The plain-English summary written to the `flags` column. |
 
 The signals are independent — each measures a different aspect of confidence.

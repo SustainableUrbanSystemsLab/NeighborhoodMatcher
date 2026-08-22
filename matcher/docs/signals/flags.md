@@ -21,6 +21,7 @@ Order shown matches the order they appear in the joined string.
 |---------|----------------|
 | no valid match (all distances inf) | `WARNING: no valid match — target shares no observed features with any supplemental row` |
 | nearest row rejected by the max-distance cutoff | `WARNING: no match — nearest supplemental row exceeded the distance cutoff ({d:.2f} per-feature vs cutoff {c:.2f})` |
+| tier below the minimum-confidence filter | `link withheld — confidence {tier} is below your minimum ({min_tier}); nearest row kept in the detail file` |
 | `nndr ≥ threshold` | `ambiguous match — NNDR {nndr:.2f} (>= {threshold:.2f})` |
 | `near_miss_count > 0` | `{n} near-miss row(s) within distance ratio threshold` |
 | `repeat_count > 1` | `{n} exact-distance tie(s)` |
@@ -39,6 +40,12 @@ no-match causes carry distinct messages: zero shared observed features
 vs. rejection by the user's optional max-distance cutoff (the latter keeps
 its diagnostics in the detail file so the rejected nearest row can be
 reviewed).
+
+A **withheld** row (minimum-confidence filter) is different from both: a
+match WAS found, so the withheld notice is only *prepended* and the normal
+per-match flags still follow — they are the reasons the row fell below the
+minimum. Precedence: zero-overlap no-match, then cutoff rejection, then
+withholding; a cutoff-rejected row is `No match`, never also withheld.
 
 Tie semantics: `repeat_count` counts the rows sharing the minimum distance
 **including the chosen match itself**, so 1 = unique winner (never flagged)

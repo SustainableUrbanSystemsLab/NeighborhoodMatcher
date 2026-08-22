@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import type {
+  AblationState,
   AppStep,
   ColumnLink,
   MatchOutput,
@@ -8,12 +9,14 @@ import type {
   ParsedDataset,
 } from "@/types";
 import {
+  ablationAutoRunAllowed,
   findAmbiguousHeaders,
   findCommonHeaders,
   getSavedWorkerCount,
   poolSizeFor,
   prefetchPyodide,
   reportedCores,
+  runAblation,
   runMatching,
   saveWorkerCount,
   terminatePool,
@@ -69,6 +72,13 @@ export default function Match() {
   const [matchOutput, setMatchOutput] = useState<MatchOutput | null>(null);
   const [threshold, setThreshold] = useState<number>(DEFAULT_THRESHOLD);
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
+  const [minConfidence, setMinConfidence] = useState<"medium" | "high" | null>(
+    null
+  );
+  const [ablation, setAblation] = useState<AblationState>({ status: "idle" });
+  // Invalidates in-flight ablation updates after a re-run / start-over — a
+  // late resolve or reject from a killed run must not clobber fresh state.
+  const ablationRunRef = useRef(0);
   const [pyStatus, setPyStatus] = useState<PyodideStatus>({ phase: "idle" });
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -168,6 +178,34 @@ export default function Match() {
     setStep("agreement");
   }, []);
 
+  // Fires the leave-one-variable-out check in the background (the results
+  // page is already interactive while it runs). Guarded by a run token so a
+  // stale resolve/reject after start-over or a re-run cannot clobber state.
+  const startAblation = useCallback(() => {
+    if (!target || !supplemental) return;
+    const token = ++ablationRunRef.current;
+    setAblation({ status: "running", progress: 0 });
+    runAblation(target, supplemental, links, threshold, (pct) => {
+      if (ablationRunRef.current === token) {
+        setAblation({ status: "running", progress: pct });
+      }
+    })
+      .then((report) => {
+        if (ablationRunRef.current === token) {
+          setAblation({ status: "done", report });
+        }
+      })
+      .catch((err) => {
+        console.error("runAblation failed:", err);
+        if (ablationRunRef.current === token) {
+          setAblation({
+            status: "error",
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+  }, [target, supplemental, links, threshold]);
+
   const handleRunMatching = useCallback(async () => {
     if (!target || !supplemental) return;
 
@@ -176,6 +214,8 @@ export default function Match() {
 
     setStep("matching");
     setRunError(null);
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
     // Planned pool size — deterministic, same computation the runner makes —
     // so the run screen can show core usage while the job is in flight.
     setWorkersUsed(poolSizeFor(target.rows.length, supplemental.rows.length));
@@ -188,6 +228,7 @@ export default function Match() {
         links,
         threshold,
         maxDistance,
+        minConfidence,
         setPyStatus,
         setProgressPct
       );
@@ -198,12 +239,37 @@ export default function Match() {
       // link step shows a phantom "Running matcher…" forever after a run.
       setPyStatus({ phase: "ready" });
       setStep("results");
+
+      // Variable check: automatic when even the minimum target sample fits
+      // the compute budget; otherwise offered as a button on the panel.
+      const d = activeLinks.length;
+      if (d < 2) {
+        setAblation({ status: "unavailable" });
+      } else if (ablationAutoRunAllowed(supplemental.rows.length, d)) {
+        startAblation();
+      } else {
+        setAblation({ status: "gated" });
+      }
     } catch (err) {
       console.error("runMatching failed:", err);
       setRunError(err instanceof Error ? err.message : String(err));
       setStep("link");
     }
-  }, [target, supplemental, links, threshold, maxDistance]);
+  }, [target, supplemental, links, threshold, maxDistance, minConfidence, startAblation]);
+
+  // "Exclude and adjust" from the variable panel: flip the link's exclude
+  // toggle and return to the Link step for review — the user re-runs
+  // explicitly (never silently re-matching under them).
+  const handleExcludeFeature = useCallback((featureName: string) => {
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
+    setLinks((prev) =>
+      prev.map((l) =>
+        l.headerName === featureName ? { ...l, excluded: true } : l
+      )
+    );
+    setStep("link");
+  }, []);
 
   const handleStartOver = useCallback(() => {
     setStep("upload");
@@ -214,6 +280,9 @@ export default function Match() {
     setMatchOutput(null);
     setThreshold(DEFAULT_THRESHOLD);
     setMaxDistance(null);
+    setMinConfidence(null);
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
     setRunError(null);
     setRunDurationMs(null);
     setWorkersUsed(null);
@@ -282,12 +351,31 @@ export default function Match() {
                       Every variable you plan to match on uses the{" "}
                       <strong>same units and scale</strong> in both files
                       (e.g., not a proportion 0.72 in one file and a
-                      percentage 72 in the other).
+                      percentage 72 in the other), and contains{" "}
+                      <strong>raw values</strong>, never already-standardized
+                      (z-scored) columns.
+                    </li>
+                    <li>
+                      Every variable also uses the{" "}
+                      <strong>same definition and coding</strong> in both
+                      files — e.g., a poverty rate computed against 100% of
+                      the federal poverty line in one file and 180% in the
+                      other will look like a valid match but systematically
+                      disagree and degrade every link. The results page
+                      reports a per-variable check for this pattern.
                     </li>
                     <li>
                       Missing values are <strong>blank or NA</strong> — not
                       sentinel codes like 9999, which would be treated as
                       real values and distort the match.
+                    </li>
+                    <li>
+                      <strong>Fewer well-measured shared variables usually
+                      beat many spotty ones.</strong> A variable with heavy
+                      missingness or an inconsistent definition can make
+                      every match worse, not better. You can exclude
+                      variables at the Link Columns step, and the results
+                      page will tell you if one is hurting the linkage.
                     </li>
                   </ul>
                 </div>
@@ -344,6 +432,11 @@ export default function Match() {
               <ThresholdControl threshold={threshold} onChange={setThreshold} />
 
               <MaxDistanceControl value={maxDistance} onChange={setMaxDistance} />
+
+              <MinConfidenceControl
+                value={minConfidence}
+                onChange={setMinConfidence}
+              />
 
               <WorkerControl
                 value={workerOverride}
@@ -465,6 +558,9 @@ export default function Match() {
                 links={links.filter((l) => !l.excluded)}
                 runDurationMs={runDurationMs}
                 workersUsed={workersUsed}
+                ablation={ablation}
+                onExcludeFeature={handleExcludeFeature}
+                onRunAblation={startAblation}
                 onStartOver={handleStartOver}
               />
             </ErrorBoundary>
@@ -601,6 +697,44 @@ function MaxDistanceControl({
           ? "A row is reported as “no match” instead of being assigned its nearest supplemental row when the match’s distance, averaged per matching variable used (distance ÷ √features used), exceeds this cutoff. Roughly: 1.0 ≈ the rows differ by about one standard deviation on every variable compared. Missing variables add a fixed penalty to the distance, so rows with many missing values are rejected more readily."
           : "Off (default): every target row is assigned its nearest supplemental row, however far away, and the quality signals flag doubtful ones. Enable to report “no match” instead when nothing genuinely similar exists."}
       </p>
+    </div>
+  );
+}
+
+function MinConfidenceControl({
+  value,
+  onChange,
+}: {
+  value: "medium" | "high" | null;
+  onChange: (v: "medium" | "high" | null) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            Minimum confidence to report a link
+          </h3>
+          <p className="mt-0.5 max-w-md text-xs text-gray-500">
+            {value == null
+              ? "Off (default): every link is reported and the quality signals flag doubtful ones. Set a minimum for large runs where you only want links that meet a standard — rows below it are written unlinked instead of flagged."
+              : `Links below ${value === "high" ? "High" : "Medium"} confidence are withheld: those rows appear unlinked in the linked dataset, with the nearest row and full diagnostics kept in the detail file for review. Nothing else about the run changes.`}
+          </p>
+        </div>
+        <select
+          value={value ?? ""}
+          onChange={(e) =>
+            onChange(
+              e.target.value === "" ? null : (e.target.value as "medium" | "high")
+            )
+          }
+          className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+        >
+          <option value="">Off — report all links</option>
+          <option value="medium">Medium or better</option>
+          <option value="high">High only</option>
+        </select>
+      </div>
     </div>
   );
 }

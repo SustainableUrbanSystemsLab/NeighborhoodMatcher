@@ -15,6 +15,7 @@ export function tierSentence(
     confidence,
     no_match,
     rejected,
+    withheld,
     features_used,
     exact_on_observed,
     near_miss,
@@ -22,6 +23,15 @@ export function tierSentence(
     mnn_confirmed,
     nndr,
   } = detail;
+
+  // Withheld by the minimum-confidence filter: a match WAS found; explain
+  // the withholding first, then the row's actual quality story.
+  const withheldLead = withheld
+    ? "This link was withheld from the linked dataset because its " +
+      `confidence (${confidence}) is below the minimum you set — the ` +
+      "nearest row and its diagnostics are shown here and kept in the " +
+      "detail file. "
+    : "";
 
   if (no_match) {
     if (rejected) {
@@ -84,6 +94,7 @@ export function tierSentence(
 
   if (confidence === "High") {
     return (
+      withheldLead +
       "High-confidence match: one supplemental row is clearly closest, the " +
       "pairing holds in both directions, and every matching variable was " +
       "compared." + exactNote
@@ -95,13 +106,13 @@ export function tierSentence(
   const tail =
     confidence === "Low" ? " This match may be incorrect — review it before use." : "";
   if (reasons.length === 0) {
-    return `${label}.${exactNote}${tail}`;
+    return `${withheldLead}${label}.${exactNote}${tail}`;
   }
   const joined =
     reasons.length === 1
       ? reasons[0]
       : reasons.slice(0, -1).join("; ") + "; and " + reasons[reasons.length - 1];
-  return `${label}: ${joined}.${exactNote}${tail}`;
+  return `${withheldLead}${label}: ${joined}.${exactNote}${tail}`;
 }
 
 /** Colors for the tier chip (Tailwind utility classes). */
