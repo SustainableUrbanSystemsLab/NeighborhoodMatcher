@@ -12,6 +12,7 @@ const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/
 
 const MATCHER_MODULES = [
   "__init__",
+  "about",
   "io",
   "align",
   "standardize",

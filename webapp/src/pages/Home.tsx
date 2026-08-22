@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -62,6 +63,8 @@ export default function Home() {
             client-side.
           </p>
         </div>
+
+        <SiteFooter />
       </div>
     </div>
   );

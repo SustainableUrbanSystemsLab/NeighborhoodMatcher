@@ -4,6 +4,7 @@ import sys
 import numpy as np
 
 from .ablation import ablation_sample_indices, ablation_suite
+from .about import TOOL_NAME, VERSION, authors_line, provenance_rows
 from .io import load_csv, clean_val, dump_csv
 from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
@@ -104,7 +105,9 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     detail_output = f"{base}_detail{ext}"
     variables_output = f"{base}_variables{ext}"
     ablation_output = f"{base}_ablation{ext}"
-    for out_path in (output, detail_output, variables_output, ablation_output):
+    run_info_output = f"{base}_run_info{ext}"
+    for out_path in (output, detail_output, variables_output, ablation_output,
+                     run_info_output):
         if os.path.realpath(out_path) in (
             os.path.realpath(target), os.path.realpath(supplemental)
         ):
@@ -116,6 +119,8 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
             raise ValueError(
                 f"output directory {out_dir!r} does not exist"
             )
+
+    print(f"{TOOL_NAME} {VERSION} — {authors_line()}", file=sys.stderr)
 
     # Load (line numbers kept so parse errors can cite the original file
     # even after blank lines are skipped)
@@ -345,6 +350,26 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
              _fmt(v["distance_share"]), v["notes"]]
             for v in variable_rows
         ],
+    )
+
+    # Write run provenance — who made the tool, which version processed this
+    # data, when, and the settings in force, so a results folder is still
+    # self-describing months later.
+    dump_csv(
+        run_info_output,
+        ["key", "value"],
+        [list(row) for row in provenance_rows(extra=[
+            ("target_file", os.path.basename(target)),
+            ("supplemental_file", os.path.basename(supplemental)),
+            ("target_rows", len(rs1)),
+            ("supplemental_rows", len(rs2)),
+            ("matching_variables", "; ".join(feature_names)),
+            ("nndr_threshold", threshold),
+            ("max_distance_cutoff", "off" if max_distance is None else max_distance),
+            ("min_confidence_filter", min_confidence or "off"),
+            ("variable_ablation", "on" if ablation else "off"),
+            ("fast_engine", "on" if fast else "off"),
+        ])],
     )
 
     if ablation:

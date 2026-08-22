@@ -108,8 +108,21 @@ export interface VariableReportRow {
   notes: string;
 }
 
+/** Engine identity travelling with a run (matcher.about.provenance). */
+export interface RunProvenance {
+  tool: string;
+  version: string;
+  authors: string[];
+  authors_line: string;
+  organization: string;
+  repo_url: string;
+  site_url: string;
+}
+
 export interface MatchOutput {
   feature_names: string[];
+  /** which engine version produced this result, and who wrote it */
+  provenance: RunProvenance;
   smd: number[];
   threshold: number;
   /** dataset-level warnings (e.g. scale mismatch between the two files) */

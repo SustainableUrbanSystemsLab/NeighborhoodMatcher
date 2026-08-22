@@ -19,6 +19,7 @@ import io as _io
 
 import numpy as np
 
+from .about import provenance
 from .ablation import (
     ABLATION_VERSION,
     ablation_sample_indices,
@@ -735,6 +736,11 @@ def _assemble_prepared(prep, shards, threshold, max_distance=None, min_confidenc
 
     return {
         "feature_names": feature_names,
+        # Identity of the engine that produced this result. Static: the
+        # caller stamps the run time, because Pyodide's clock has no
+        # timezone of its own and the browser's local time is the one a
+        # researcher recognizes.
+        "provenance": provenance(moment=False),
         "smd": [float(s) for s in smd],
         "threshold": float(threshold),
         "warnings": list(warnings),

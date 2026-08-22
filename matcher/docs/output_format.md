@@ -1,12 +1,20 @@
 # Output Format
 
-`coordinator(...)` writes three CSVs per run:
+`coordinator(...)` writes four CSVs per run:
 
 1. The **linked dataset** at `output`.
 2. A **per-row detail file** at `<output_basename>_detail.csv`.
 3. A **per-variable diagnostics file** at `<output_basename>_variables.csv`
    (missingness per side, definition-shift check, share of match distance —
    see [signals/variable_report.md](signals/variable_report.md)).
+4. A **run-provenance file** at `<output_basename>_run_info.csv` — `key,value`
+   rows naming the tool, its version, the authors, the repository, the run
+   timestamp (UTC and local), and the settings this run used (linked
+   variables, NNDR threshold, distance cutoff, minimum-confidence filter).
+   Input files are recorded by name only, never by path, so a results folder
+   can be shared without leaking a directory tree. Written on every run —
+   provenance is not optional: months later it is the only thing that says
+   which version produced these numbers.
 
 With `ablation=True` it additionally writes
 `<output_basename>_ablation.csv` — the leave-one-variable-out quality
@@ -132,6 +140,11 @@ match's distance?" — useful when investigating a flagged row.
     "smd":            [...],          # dataset-level SMD per feature
     "threshold":      0.8,            # NNDR threshold used in this run — must be in (0, 1]
     "warnings":       [...],          # dataset-level warnings (scale mismatch, definition shift, ...)
+    "provenance":     {...},          # engine identity: tool, version, authors,
+                                      # authors_line, organization, repo_url,
+                                      # site_url (matcher.about.provenance).
+                                      # No timestamp — the caller stamps the
+                                      # run time in its own timezone.
     "variables":      [...],          # per-variable report incl. distance_share
                                       # (see signals/variable_report.md), feature order
     "linked_headers": [...],          # list[str]

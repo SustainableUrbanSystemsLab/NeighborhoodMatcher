@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { ScenarioExplainer, type ScenarioData } from "@/components/ScenarioExplainer";
 import { STEP_VISUALS } from "@/components/AlgorithmSteps";
+import { SiteFooter } from "@/components/SiteFooter";
 import scenariosJson from "@/data/scenarios.json";
 
 const SCENARIOS = scenariosJson as unknown as ScenarioData[];
@@ -319,6 +320,8 @@ export default function About() {
             ))}
           </div>
         </section>
+
+        <SiteFooter />
       </div>
     </div>
   );

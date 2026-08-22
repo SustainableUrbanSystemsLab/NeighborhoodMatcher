@@ -4,6 +4,15 @@
 import Papa from "papaparse";
 import { isMissingCell, parseNumeric } from "@/lib/missing";
 import type { AblationReport, MatchOutput, ParsedDataset } from "@/types";
+import {
+  AUTHORS_LINE,
+  ORGANIZATION,
+  TOOL_NAME,
+  REPO_URL,
+  buildLabel,
+  localTimestamp,
+  utcTimestamp,
+} from "@/lib/about";
 
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
@@ -266,12 +275,95 @@ is pending.
 
 export const CONTACT_TEXT = `Contact information
 
-TBD — placeholder. Replace before distributing the tool externally.
+${TOOL_NAME} is developed by ${AUTHORS_LINE}
+(${ORGANIZATION}).
+
+Source code, issues, and releases:
+${REPO_URL}
+
+Direct contact details: TBD — placeholder. Add before distributing the
+tool externally.
 `;
 
-export const README_TEXT = `Dataset Matcher — Results Package
+/**
+ * Report metadata: who made the tool, which engine version processed this
+ * data, when the package was generated, and the settings in force. Written
+ * at the zip root (not diagnostics/) — it describes the report itself.
+ *
+ * The tool identity comes from `output.provenance`, i.e. the engine that
+ * actually ran, not the page build; the page build is recorded separately
+ * so a bug can be traced to either side.
+ */
+export function buildRunInfoCsv(
+  output: MatchOutput,
+  target: ParsedDataset,
+  supplemental: ParsedDataset,
+  generatedAt: Date,
+  ablation: AblationReport | null = null
+): string {
+  const p = output.provenance;
+  const { summary } = output;
+  const rows: [string, string | number][] = [
+    ["tool", p?.tool ?? "NeighborhoodMatcher"],
+    ["tool_version", p?.version ?? "unknown"],
+    ["authors", (p?.authors ?? []).join("; ") || AUTHORS_LINE],
+    ["organization", p?.organization ?? ORGANIZATION],
+    ["repository", p?.repo_url ?? REPO_URL],
+    ["generated_at_utc", utcTimestamp(generatedAt)],
+    ["generated_at_local", localTimestamp(generatedAt)],
+    ["run_environment", "browser (client-side; data never left this device)"],
+    ["webapp_build", buildLabel()],
+    ["target_file", target.fileName],
+    ["supplemental_file", supplemental.fileName],
+    ["target_rows", target.rows.length],
+    ["supplemental_rows", supplemental.rows.length],
+    ["matching_variables", output.feature_names.join("; ")],
+    ["nndr_threshold", summary.threshold],
+    [
+      "max_distance_cutoff",
+      summary.max_distance != null ? summary.max_distance : "off",
+    ],
+    ["min_confidence_filter", summary.min_confidence ?? "off"],
+    [
+      "variable_ablation",
+      ablation
+        ? ablation.sampled
+          ? `on (sampled ${ablation.sample_size} of ${ablation.n_targets} rows)`
+          : `on (all ${ablation.n_targets} rows)`
+        : "not run",
+    ],
+  ];
+  return Papa.unparse({ fields: ["key", "value"], data: rows });
+}
 
+/** README.txt: provenance header followed by the folder guide. */
+export function buildReadmeText(
+  output: MatchOutput,
+  generatedAt: Date
+): string {
+  const p = output.provenance;
+  const header = [
+    `${p?.tool ?? "NeighborhoodMatcher"} — Results Package`,
+    "",
+    `Tool version:  ${p?.version ?? "unknown"} (matching engine)`,
+    `Webapp build:  ${buildLabel()}`,
+    `Generated:     ${localTimestamp(generatedAt)}  /  ${utcTimestamp(generatedAt)}`,
+    `Authors:       ${p?.authors_line ?? AUTHORS_LINE}`,
+    `Organization:  ${p?.organization ?? ORGANIZATION}`,
+    `Source:        ${p?.repo_url ?? REPO_URL}`,
+    "",
+    "Machine-readable copy of the above, plus the settings this run used:",
+    "run_info.csv.",
+    "",
+  ].join("\n");
+  return header + README_LAYOUT;
+}
+
+const README_LAYOUT = `
 Folder layout:
+
+  run_info.csv              Tool version, authors, generation timestamp,
+                            and the settings this run used.
 
   linked_dataset.csv        Primary output. Target rows with matched
                             supplemental columns appended, plus per-row

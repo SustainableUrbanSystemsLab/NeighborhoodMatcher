@@ -8,10 +8,11 @@ import type { AblationReport, MatchOutput, ParsedDataset } from "@/types";
 import {
   AGREEMENT_TEXT,
   CONTACT_TEXT,
-  README_TEXT,
   buildDataStatsCsv,
   buildFeatureSmdCsv,
   buildMatchStatsCsv,
+  buildReadmeText,
+  buildRunInfoCsv,
   buildVariableDiagnosticsCsv,
 } from "./summary";
 
@@ -30,11 +31,19 @@ export async function buildResultsZip(
   output: MatchOutput,
   target: ParsedDataset,
   supplemental: ParsedDataset,
-  ablation: AblationReport | null = null
+  ablation: AblationReport | null = null,
+  /** when the package was generated; injected for deterministic tests */
+  generatedAt: Date = new Date()
 ): Promise<Blob> {
   const zip = new JSZip();
 
-  zip.file("README.txt", withBom(README_TEXT));
+  zip.file("README.txt", withBom(buildReadmeText(output, generatedAt)));
+  // Report metadata at the root: which tool version processed the data,
+  // when, by whom, and under which settings.
+  zip.file(
+    "run_info.csv",
+    withBom(buildRunInfoCsv(output, target, supplemental, generatedAt, ablation))
+  );
 
   zip.file(
     "linked_dataset.csv",

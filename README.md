@@ -13,13 +13,14 @@
 <p align="center">
   <a href="https://nbhdmatch.netlify.app/"><strong>▶ Use it in your browser — nbhdmatch.netlify.app</strong></a>
   <br /><br />
+  <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"><img src="https://img.shields.io/badge/GitHub-NeighborhoodMatcher-181717?logo=github" alt="Source on GitHub" /></a>
   <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml"><img src="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml/badge.svg" alt="Python tests" /></a>
   <a href="https://app.netlify.com/projects/nbhdmatch/deploys"><img src="https://api.netlify.com/api/v1/badges/f2fe942a-24a9-41d3-9ed6-29dac67da9b3/deploy-status" alt="Netlify Status" /></a>
 </p>
 
-Developed by the Sustainable Urban Systems Lab. Given a **target** CSV (e.g.
-study participants) and a **supplemental** CSV (e.g. census tracts), the
-matcher links every target row to its closest supplemental row by
+Developed by **Dr. Benson Ku** and **Dr. Patrick Kastner** (Sustainable Urban
+Systems Lab). Given a **target** CSV (e.g. study participants) and a
+**supplemental** CSV (e.g. census tracts), the matcher links every target row to its closest supplemental row by
 standardized Euclidean distance and reports how trustworthy each link is:
 nearest-neighbor distance ratio (NNDR), mutual-nearest-neighbor confirmation,
 exact-distance ties, per-feature contributions, dataset-level balance (SMD),
@@ -81,9 +82,11 @@ coordinator(
 )"
 ```
 
-Writes `linked.csv` (matched rows + distance, NNDR, MNN, flags) and
+Writes `linked.csv` (matched rows + distance, NNDR, MNN, flags),
 `linked_detail.csv` (per-row audit: missing counts, per-feature
-contributions). Dataset-level warnings (e.g. scale mismatch) print to stderr.
+contributions), `linked_variables.csv` (per-variable input diagnostics), and
+`linked_run_info.csv` (tool version, authors, run timestamp, and the settings
+used). Dataset-level warnings (e.g. scale mismatch) print to stderr.
 Input format, missing-value handling, and column-linking rules:
 [`matcher/docs/output_format.md`](matcher/docs/output_format.md).
 
@@ -94,7 +97,7 @@ Input format, missing-value handling, and column-linking rules:
 
 ```bash
 cd matcher
-uv run --project . pytest                                        # 167 tests
+uv run --project . pytest                                        # 340 tests
 uv run --project . python analysis/benchmark_simulated.py --check # scored vs ground truth
 ```
 

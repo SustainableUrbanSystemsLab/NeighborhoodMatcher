@@ -2,6 +2,13 @@ import { Fragment, useMemo, useState } from "react";
 import { buildResultsZip, triggerDownload } from "@/lib/zip-builder";
 import { tierChipClasses, tierRank, tierSentence } from "@/lib/confidence-text";
 import { VariableDiagnosticsPanel } from "@/components/VariableDiagnosticsPanel";
+import {
+  REPO_URL,
+  TOOL_NAME,
+  buildLabel,
+  localTimestamp,
+  utcTimestamp,
+} from "@/lib/about";
 import type {
   AblationState,
   ColumnLink,
@@ -24,6 +31,8 @@ interface ResultsViewProps {
   runDurationMs: number | null;
   /** Pyodide workers (≈ CPU cores) the run used (null if unknown) */
   workersUsed: number | null;
+  /** when this run finished — shown here and stamped into the package */
+  completedAt: Date;
   /** leave-one-variable-out check, running in the background after results */
   ablation: AblationState;
   /** flips the link's exclude toggle and returns to the Link step */
@@ -57,6 +66,7 @@ export function ResultsView({
   links,
   runDurationMs,
   workersUsed,
+  completedAt,
   ablation,
   onExcludeFeature,
   onRunAblation,
@@ -78,7 +88,8 @@ export function ResultsView({
         output,
         target,
         supplemental,
-        ablation.status === "done" ? ablation.report : null
+        ablation.status === "done" ? ablation.report : null,
+        completedAt
       );
       triggerDownload(blob, "matcher_results.zip");
     } catch (err) {
@@ -475,10 +486,34 @@ export function ResultsView({
             <span className="text-xs text-red-600">{downloadError}</span>
           )}
           <span className="text-[11px] text-gray-400">
-            Linked CSV, match detail, data + match stats, SMD, agreement,
-            contact, and original uploads.
+            Linked CSV, match detail, run info, data + match stats, SMD,
+            variable diagnostics, agreement, contact, and original uploads.
           </span>
         </div>
+      </div>
+
+      {/* Provenance: the same identity stamped into run_info.csv and the
+          package README, so what is on screen matches what is downloaded. */}
+      <div className="border-t border-gray-200 pt-3 text-[11px] leading-relaxed text-gray-500">
+        <p>
+          Processed by{" "}
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-gray-600 hover:text-blue-700"
+          >
+            {output.provenance?.tool ?? TOOL_NAME}
+          </a>{" "}
+          <span title={`Matching engine version · webapp ${buildLabel()}`}>
+            v{output.provenance?.version ?? "unknown"} · webapp {buildLabel()}
+          </span>
+        </p>
+        <p title={utcTimestamp(completedAt)}>
+          Generated {localTimestamp(completedAt)} — the downloaded package
+          carries this stamp, the tool version, and the authors in
+          run_info.csv.
+        </p>
       </div>
     </div>
   );

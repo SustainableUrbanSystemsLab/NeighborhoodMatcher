@@ -34,6 +34,7 @@ import { FileUpload } from "@/components/FileUpload";
 import { ColumnLinker } from "@/components/ColumnLinker";
 import { ResultsView } from "@/components/ResultsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SiteFooter } from "@/components/SiteFooter";
 
 const DEFAULT_THRESHOLD = 0.8;
 
@@ -83,6 +84,9 @@ export default function Match() {
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [runDurationMs, setRunDurationMs] = useState<number | null>(null);
+  // When the run finished: shown on the results page and stamped into the
+  // downloaded package, so screen and report never disagree.
+  const [completedAt, setCompletedAt] = useState<Date | null>(null);
   const [workersUsed, setWorkersUsed] = useState<number | null>(null);
   const [agreementSavedAt, setAgreementSavedAt] = useState<string | null>(
     () => loadSavedAgreement()?.acceptedAt ?? null
@@ -233,6 +237,7 @@ export default function Match() {
         setProgressPct
       );
       setRunDurationMs(performance.now() - t0);
+      setCompletedAt(new Date());
       setWorkersUsed(nWorkers);
       setMatchOutput(output);
       // The worker's last status message is "running"; without this the
@@ -285,6 +290,7 @@ export default function Match() {
     setAblation({ status: "idle" });
     setRunError(null);
     setRunDurationMs(null);
+    setCompletedAt(null);
     setWorkersUsed(null);
     setPyStatus({ phase: "idle" });
     terminatePool();
@@ -558,6 +564,7 @@ export default function Match() {
                 links={links.filter((l) => !l.excluded)}
                 runDurationMs={runDurationMs}
                 workersUsed={workersUsed}
+                completedAt={completedAt ?? new Date()}
                 ablation={ablation}
                 onExcludeFeature={handleExcludeFeature}
                 onRunAblation={startAblation}
@@ -566,6 +573,8 @@ export default function Match() {
             </ErrorBoundary>
           )}
         </div>
+
+        <SiteFooter />
       </div>
     </div>
   );
