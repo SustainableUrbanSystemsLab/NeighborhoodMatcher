@@ -162,6 +162,7 @@ export function ResultsView({
           label="MNN confirmed"
           value={`${summary.mnn_confirmed} (${mnnPct.toFixed(1)}%)`}
           tone={mnnPct > 80 ? "green" : mnnPct > 50 ? "amber" : "red"}
+          help="Mutual nearest neighbor: a match is confirmed when the pairing holds in both directions — the supplemental row this target matched is not closer to any other target row. Rows in this count are the mutually-agreed pairings; a low percentage means many matches are one-sided and the linkage as a whole is doubtful."
         />
         <SummaryCard
           label="Mean NNDR"
@@ -297,7 +298,10 @@ export function ResultsView({
                   desc={sortDesc}
                   onClick={() => toggleSort("near_miss")}
                 />
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <th
+                  className="cursor-help px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 underline decoration-dotted underline-offset-2"
+                  title="Mutual nearest neighbor. ✓ = the pairing holds in both directions: the matched supplemental row is not closer to any other target row. ✗ = one-sided — the supplemental row fits a different target even better, so this match may not be a real correspondence."
+                >
                   MNN
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -484,10 +488,13 @@ function SummaryCard({
   label,
   value,
   tone,
+  help,
 }: {
   label: string;
   value: string;
   tone: "blue" | "green" | "amber" | "red" | "gray";
+  /** plain-language explanation shown on hover */
+  help?: string;
 }) {
   const bg = {
     blue: "bg-blue-50 text-blue-900",
@@ -504,8 +511,10 @@ function SummaryCard({
     gray: "text-gray-600",
   }[tone];
   return (
-    <div className={`rounded-lg p-3 ${bg}`}>
-      <p className={`text-xs ${sub}`}>{label}</p>
+    <div className={`rounded-lg p-3 ${bg}`} title={help}>
+      <p className={`text-xs ${sub}${help ? " cursor-help underline decoration-dotted underline-offset-2" : ""}`}>
+        {label}
+      </p>
       <p className="text-xl font-bold">{value}</p>
     </div>
   );
@@ -787,8 +796,14 @@ function DrilldownPanel({
           </h3>
           <p className="mt-0.5 text-xs text-gray-500">
             Distance {detail.best_distance != null ? detail.best_distance.toFixed(4) : "—"} · NNDR{" "}
-            {detail.nndr != null ? detail.nndr.toFixed(3) : "—"} · MNN{" "}
-            {detail.mnn_confirmed ? "✓ confirmed" : "✗ not confirmed"} ·{" "}
+            {detail.nndr != null ? detail.nndr.toFixed(3) : "—"} ·{" "}
+            <span
+              className="cursor-help underline decoration-dotted underline-offset-2"
+              title="Mutual nearest neighbor: confirmed means the pairing holds in both directions — the matched supplemental row is not closer to any other target row. Not confirmed means the pairing is one-sided and may not be a real correspondence."
+            >
+              MNN {detail.mnn_confirmed ? "✓ confirmed" : "✗ not confirmed"}
+            </span>{" "}
+            ·{" "}
             tied at min {detail.repeats > 1 ? `${detail.repeats} rows` : "none"} ·
             near-miss {detail.near_miss} ·
             features used {detail.features_used}/{features.length}
