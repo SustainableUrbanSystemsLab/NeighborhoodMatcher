@@ -47,10 +47,14 @@ export function SiteFooter({ className = "" }: { className?: string }) {
         <GitHubMark />
         <span className="sr-only">Source code and issue tracker</span>
       </a>
-      <p className="mt-2">
-        <span className="font-medium text-gray-600">{TOOL_NAME}</span>{" "}
-        {buildLabel()} · Developed by {AUTHORS_LINE} · {ORGANIZATION}
-      </p>
+      <div className="mt-2 space-y-0.5 leading-relaxed">
+        <p>
+          <span className="font-medium text-gray-600">{TOOL_NAME}</span>{" "}
+          {buildLabel()}
+        </p>
+        <p>Developed by {AUTHORS_LINE}</p>
+        <p>{ORGANIZATION}</p>
+      </div>
     </footer>
   );
 }
