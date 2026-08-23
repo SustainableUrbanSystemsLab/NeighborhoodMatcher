@@ -45,7 +45,7 @@ export function AgreementModal({
 
   return (
     <div className="fixed inset-0 z-50 flex overflow-y-auto bg-black/50 backdrop-blur-sm">
-      <div className="m-auto w-full max-w-xl rounded-xl bg-white p-6 shadow-2xl">
+      <div className="m-auto w-full max-w-xl rounded-xl bg-surface p-6 shadow-2xl">
         <h2 className="mb-4 text-xl font-semibold text-gray-900">
           Data Use Agreement
         </h2>

@@ -62,7 +62,7 @@ export function SiteFooter({ className = "" }: { className?: string }) {
           href={REPO_URL}
           target="_blank"
           rel="noreferrer"
-          className="text-blue-600 hover:text-blue-800"
+          className="text-blue-600 dark:text-blue-400 hover:text-blue-800"
         >
           Source code and issue tracker
         </a>

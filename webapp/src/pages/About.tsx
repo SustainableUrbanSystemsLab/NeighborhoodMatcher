@@ -2,6 +2,8 @@ import { Link } from "react-router";
 import { ScenarioExplainer, type ScenarioData } from "@/components/ScenarioExplainer";
 import { STEP_VISUALS } from "@/components/AlgorithmSteps";
 import { SiteFooter } from "@/components/SiteFooter";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/lib/use-theme";
 import scenariosJson from "@/data/scenarios.json";
 
 const SCENARIOS = scenariosJson as unknown as ScenarioData[];
@@ -65,17 +67,21 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
 ];
 
 export default function About() {
+  const theme = useTheme();
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl p-4">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">How it works</h1>
-          <Link to="/" className="text-sm text-blue-600 hover:text-blue-800">
-            ← Home
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle theme={theme} />
+            <Link to="/" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800">
+              ← Home
+            </Link>
+          </div>
         </div>
 
-        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5">
+        <section className="mb-8 rounded-lg border border-gray-200 bg-surface p-5">
           <h2 className="mb-2 text-lg font-semibold text-gray-900">
             The matching algorithm
           </h2>
@@ -99,7 +105,7 @@ export default function About() {
           </ol>
         </section>
 
-        <section className="mb-8 rounded-lg border border-gray-200 bg-white p-5">
+        <section className="mb-8 rounded-lg border border-gray-200 bg-surface p-5">
           <h2 className="mb-2 text-lg font-semibold text-gray-900">
             Preparing your data
           </h2>
@@ -143,7 +149,7 @@ export default function About() {
           </ul>
         </section>
 
-        <details open className="group mb-8 rounded-lg border border-gray-200 bg-white">
+        <details open className="group mb-8 rounded-lg border border-gray-200 bg-surface">
           <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
             <span className="text-gray-400 transition-transform group-open:rotate-90">
               ▸
@@ -195,7 +201,7 @@ export default function About() {
                     NNDR = clearer; fewer near misses = clearer.
                   </span>{" "}
                   The Nearest Neighbor Distance Ratio (d₁/d₂,{" "}
-                  <a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>)
+                  <a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Lowe 2004</a>)
                   measures how much better the best match is than the
                   second-best. Values near 0 = confident; values near 1 =
                   ambiguous. The cascading extension counts how many
@@ -217,7 +223,7 @@ export default function About() {
                   of that supplemental row? If not, the pairing is one-sided —
                   the supplemental row is even closer to a different target —
                   and the match deserves review before use
-                  (<a href="https://doi.org/10.5220/0001787803310340" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Muja &amp; Lowe 2009</a>).
+                  (<a href="https://doi.org/10.5220/0001787803310340" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Muja &amp; Lowe 2009</a>).
                 </dd>
               </div>
               <div>
@@ -281,7 +287,7 @@ export default function About() {
                   matched-supplemental subset? |SMD| &lt; 0.10 indicates good
                   balance; larger values indicate increasing differences
                   between the two groups (&gt; 0.25 is poor;{" "}
-                  <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Austin, PMC3472075</a>).
+                  <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Austin, PMC3472075</a>).
                   It is not a verdict on any individual match.
                 </dd>
               </div>

@@ -250,7 +250,7 @@ export function ResultsView({
       />
 
       {/* SMD bar chart */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="rounded-lg border border-gray-200 bg-surface p-4">
         <div className="mb-2 flex items-baseline justify-between">
           <h3 className="text-sm font-semibold text-gray-900">
             Standardized Mean Difference per feature
@@ -266,13 +266,13 @@ export function ResultsView({
         </div>
         <p className="mt-3 text-xs text-gray-500">
           |SMD| &gt; 0.10 indicates feature imbalance; &gt; 0.25 is poor (
-          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Austin, PMC3472075</a>
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Austin, PMC3472075</a>
           ).
         </p>
       </div>
 
       {/* Per-row drill-down */}
-      <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="rounded-lg border border-gray-200 bg-surface">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
           <h3 className="text-sm font-semibold text-gray-900">
             Per-row diagnostics
@@ -435,7 +435,7 @@ export function ResultsView({
                   setPageSize(Number(e.target.value));
                   setPage(0);
                 }}
-                className="rounded border border-gray-300 bg-white px-1 py-0.5 text-xs"
+                className="rounded border border-gray-300 bg-surface px-1 py-0.5 text-xs"
               >
                 {PAGE_SIZE_OPTIONS.map((n) => (
                   <option key={n} value={n}>
@@ -449,7 +449,7 @@ export function ResultsView({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="rounded border border-gray-300 bg-white px-2 py-1 disabled:opacity-40"
+              className="rounded border border-gray-300 bg-surface px-2 py-1 disabled:opacity-40"
             >
               ← Prev
             </button>
@@ -459,7 +459,7 @@ export function ResultsView({
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="rounded border border-gray-300 bg-white px-2 py-1 disabled:opacity-40"
+              className="rounded border border-gray-300 bg-surface px-2 py-1 disabled:opacity-40"
             >
               Next →
             </button>
@@ -539,7 +539,7 @@ function SummaryCard({
     gray: "bg-gray-50 text-gray-900",
   }[tone];
   const sub = {
-    blue: "text-blue-600",
+    blue: "text-blue-600 dark:text-blue-400",
     green: "text-green-700",
     amber: "text-amber-700",
     red: "text-red-700",
@@ -659,7 +659,7 @@ function RankPlot({
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dMin + t * dRange);
 
   return (
-    <div className="rounded border border-gray-200 bg-white p-1">
+    <div className="rounded border border-gray-200 bg-surface p-1">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
@@ -676,7 +676,7 @@ function RankPlot({
                 x2={W - padR}
                 y1={yv}
                 y2={yv}
-                stroke="#f1f5f9"
+                stroke="var(--chart-grid)"
                 strokeWidth={1}
               />
               <text
@@ -684,7 +684,7 @@ function RankPlot({
                 y={yv + 3}
                 fontSize={8}
                 textAnchor="end"
-                fill="#64748b"
+                fill="var(--chart-label)"
                 fontFamily="ui-monospace, monospace"
               >
                 {fmt(t)}
@@ -699,7 +699,7 @@ function RankPlot({
           x2={W - padR}
           y1={y(cutoff)}
           y2={y(cutoff)}
-          stroke="#f43f5e"
+          stroke="var(--chart-cutoff)"
           strokeWidth={1}
           strokeDasharray="4,3"
         />
@@ -708,14 +708,14 @@ function RankPlot({
           y={cutoffLabelY}
           fontSize={8}
           textAnchor="end"
-          fill="#be123c"
+          fill="var(--chart-cutoff-text)"
           fontWeight={600}
         >
           near-miss cutoff (NNDR={threshold.toFixed(2)})
         </text>
 
         {/* Connecting curve */}
-        <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={1} />
+        <path d={linePath} fill="none" stroke="var(--chart-muted)" strokeWidth={1} />
 
         {/* Dots */}
         {distances.map((d, i) => {
@@ -729,7 +729,7 @@ function RankPlot({
               cx={cx}
               cy={cy}
               r={isBest ? 4 : isSecond ? 3 : 1.6}
-              fill={isBest ? "#2563eb" : isSecond ? "#f59e0b" : "#64748b"}
+              fill={isBest ? "var(--chart-best)" : isSecond ? "var(--chart-near)" : "var(--chart-label)"}
             >
               <title>{`Rank ${i + 1}: ${d.toFixed(4)}`}</title>
             </circle>
@@ -742,7 +742,7 @@ function RankPlot({
           x={x(0) + 6}
           y={Math.min(yBest + 3, padT + plotH - 2)}
           fontSize={8}
-          fill="#1d4ed8"
+          fill="var(--chart-best-text)"
           fontWeight={600}
         >
           best {fmt(best)}
@@ -753,7 +753,7 @@ function RankPlot({
           x={padL}
           y={H - 4}
           fontSize={8}
-          fill="#64748b"
+          fill="var(--chart-label)"
           textAnchor="start"
         >
           rank 1
@@ -762,7 +762,7 @@ function RankPlot({
           x={W - padR}
           y={H - 4}
           fontSize={8}
-          fill="#64748b"
+          fill="var(--chart-label)"
           textAnchor="end"
         >
           rank {n}
@@ -809,7 +809,7 @@ function DrilldownPanel({
   const flagList = detail.flags ? detail.flags.split(" | ") : [];
 
   return (
-    <div className="rounded-lg border-2 border-blue-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border-2 border-blue-200 bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-start justify-between">
         <div>
           <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900">

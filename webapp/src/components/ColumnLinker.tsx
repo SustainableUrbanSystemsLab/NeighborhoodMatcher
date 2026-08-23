@@ -213,7 +213,7 @@ export function ColumnLinker({
                 <div className="col-span-2 flex justify-end gap-2">
                   <button
                     onClick={() => toggleExclude(idx)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800"
                   >
                     {link.excluded ? "Include" : "Exclude"}
                   </button>

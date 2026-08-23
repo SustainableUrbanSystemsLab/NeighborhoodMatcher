@@ -1,1 +1,145 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Dark mode
+   ---------------------------------------------------------------------------
+   The app is written in literal palette utilities (bg-gray-50, text-gray-900,
+   …), and Tailwind v4 compiles those to `var(--color-<name>-<shade>)`. So a
+   theme is a variable layer: re-point the palette under [data-theme="dark"]
+   and every existing utility follows, with no per-component `dark:` churn.
+
+   The remap is by ROLE, not a mechanical inversion — in this codebase the
+   light shades (50–300) are only ever surfaces and borders, and the dark
+   shades (600–900) are only ever text (verified before writing this). Each
+   line below therefore says which shade's job it takes over.
+
+   Deliberately NOT remapped, because they carry both roles:
+     white          — `bg-white` surfaces AND `text-white` on colored buttons.
+                      Surfaces use the `surface` token below instead, so
+                      `white` keeps meaning white.
+     blue/red/green/amber 400–600 — chart fills, indicator dots, and the
+                      primary button background; they read correctly on either
+                      canvas. Link text at blue-600 is too dim on the dark
+                      canvas, so links carry an explicit `dark:` variant.
+
+   `dark:` is available for those exceptions and for new code.
+--------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   Chart colors
+   ---------------------------------------------------------------------------
+   The inline SVGs (rank plot, algorithm diagrams, scenario strips) paint with
+   explicit fills rather than utilities, so they get their own tokens. Grid
+   lines and axis labels have to flip with the theme — a slate-100 gridline is
+   invisible on a dark canvas — while the semantic marks (best / near-miss /
+   target) keep their meaning and only shift lightness where contrast needs it.
+--------------------------------------------------------------------------- */
+:root {
+  --chart-grid: #f1f5f9;        /* histogram gridlines */
+  --chart-rule: #e2e8f0;        /* axis rules, inert cells */
+  --chart-label: #64748b;       /* tick and axis labels */
+  --chart-muted: #94a3b8;       /* ordinary, unremarkable points */
+  --chart-muted-strong: #475569;
+  --chart-best: #2563eb;        /* the chosen match */
+  --chart-best-text: #1d4ed8;
+  --chart-best-soft: #bfdbfe;
+  --chart-near: #f59e0b;        /* near-miss / runner-up */
+  --chart-ok: #10b981;
+  --chart-cutoff: #f43f5e;      /* threshold marker */
+  --chart-cutoff-text: #be123c;
+  --chart-good-bg: #dcfce7;     /* small "pass" pills inside diagrams */
+  --chart-good-text: #166534;
+  --chart-warn-bg: #fef3c7;
+  --chart-warn-text: #92400e;
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  /* Card / panel background. A token rather than `white` so it can move with
+     the theme; sits one step above the page canvas in both. */
+  --color-surface: #ffffff;
+  --color-surface-muted: oklch(98.5% 0.002 247.839); /* gray-50 */
+}
+
+[data-theme="dark"] {
+  --color-surface: oklch(21% 0.034 264.665); /* gray-900 */
+  --color-surface-muted: oklch(17% 0.031 263); /* between gray-900 and -950 */
+
+  /* Neutrals: 50–300 become canvas/fills/borders, 400–900 become text. */
+  --color-gray-50: oklch(13% 0.028 261.692); /* was 950 — page canvas */
+  --color-gray-100: oklch(21% 0.034 264.665); /* 900 — recessed fills */
+  --color-gray-200: oklch(27.8% 0.033 256.848); /* 800 — hairline borders */
+  --color-gray-300: oklch(37.3% 0.034 259.733); /* 700 — stronger borders */
+  /* Muted text (step labels, placeholders, separators) lands on this shade,
+     so it has to clear 4.5:1 on the card as well as the canvas — 48% did
+     not. Verified by the contrast sweep in the dark-mode E2E. */
+  --color-gray-400: oklch(63% 0.024 259);
+  --color-gray-500: oklch(70.7% 0.022 261.325); /* 400 — muted text */
+  --color-gray-600: oklch(80% 0.016 260); /* secondary text */
+  --color-gray-700: oklch(87.2% 0.01 258.338); /* 300 — body text */
+  --color-gray-800: oklch(92.8% 0.006 264.531); /* 200 */
+  --color-gray-900: oklch(98.5% 0.002 247.839); /* 50 — headings */
+
+  /* Accents: tinted callouts (50–300) go dark; their text shades go light. */
+  --color-blue-50: oklch(25% 0.062 265); /* callout background */
+  --color-blue-100: oklch(30% 0.08 265);
+  --color-blue-200: oklch(38% 0.1 265); /* callout border */
+  --color-blue-300: oklch(45% 0.13 264);
+  --color-blue-700: oklch(80.9% 0.105 251.813); /* 300 — link hover */
+  --color-blue-800: oklch(85% 0.08 252); /* callout text */
+  --color-blue-900: oklch(90% 0.05 252);
+
+  --color-red-50: oklch(24% 0.07 26); /* warning background */
+  --color-red-100: oklch(29% 0.09 26);
+  --color-red-200: oklch(36% 0.11 27); /* warning border */
+  --color-red-300: oklch(43% 0.14 27);
+  --color-red-600: oklch(72% 0.16 22); /* verdict/error text */
+  --color-red-700: oklch(80.8% 0.114 19.571); /* 300 */
+  --color-red-800: oklch(85% 0.09 20);
+  --color-red-900: oklch(90% 0.06 20);
+
+  --color-green-50: oklch(24% 0.055 153);
+  --color-green-100: oklch(29% 0.07 153);
+  --color-green-200: oklch(36% 0.085 152);
+  --color-green-600: oklch(78% 0.16 152);
+  --color-green-700: oklch(84% 0.13 153);
+  --color-green-800: oklch(88% 0.1 153);
+  --color-green-900: oklch(92% 0.07 153);
+
+  --color-amber-50: oklch(25% 0.06 60);
+  --color-amber-100: oklch(30% 0.075 58);
+  --color-amber-200: oklch(37% 0.09 55); /* border on amber callouts */
+  --color-amber-300: oklch(44% 0.11 52);
+  --color-amber-600: oklch(80% 0.15 75);
+  --color-amber-700: oklch(85% 0.13 80);
+  --color-amber-800: oklch(89% 0.1 85);
+  --color-amber-900: oklch(93% 0.07 90);
+
+
+  /* Charts: lighten what carries meaning, darken what is only scaffolding. */
+  --chart-grid: oklch(27% 0.02 260);
+  --chart-rule: oklch(33% 0.022 260);
+  --chart-label: oklch(72% 0.02 260);
+  --chart-muted: oklch(65% 0.025 260);
+  --chart-muted-strong: oklch(80% 0.02 260);
+  --chart-best: oklch(70.7% 0.165 254.624); /* blue-400 */
+  --chart-best-text: oklch(80.9% 0.105 251.813); /* blue-300 */
+  --chart-best-soft: oklch(38% 0.1 265);
+  --chart-near: oklch(82.8% 0.189 84.429); /* amber-400 */
+  --chart-ok: oklch(79.2% 0.209 151.711); /* green-400 */
+  --chart-cutoff: oklch(71% 0.18 15);
+  --chart-cutoff-text: oklch(80% 0.13 15);
+  --chart-good-bg: oklch(30% 0.07 153);
+  --chart-good-text: oklch(87% 0.13 153);
+  --chart-warn-bg: oklch(30% 0.075 58);
+  --chart-warn-text: oklch(89% 0.11 85);
+
+  color-scheme: dark; /* native form controls, scrollbars, and caret */
+}
+
+/* The canvas itself, so overscroll and the area behind short pages match the
+   theme instead of flashing the browser default. */
+html {
+  background-color: var(--color-gray-50);
+}

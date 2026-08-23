@@ -26,6 +26,27 @@ copy drifts.
    contributions, plain-English flags) and download the results zip
    (linked CSV, match detail, data + match statistics, SMD, agreement)
 
+## Theming
+
+Light and dark, following the OS/browser (`prefers-color-scheme`) by default
+and overridable per device with the Auto / Light / Dark control in the header.
+The choice lives in `localStorage` (`nbhdmatch:theme`); "Auto" keeps following
+the system, including when it flips while the page is open.
+
+The palette is a variable layer, not a per-component `dark:` sweep: the app is
+written in literal Tailwind utilities, Tailwind v4 compiles those to
+`var(--color-*)`, and `src/main.css` re-points the palette (and the `--chart-*`
+tokens the inline SVGs paint with) under `[data-theme="dark"]`. Two rules keep
+that honest:
+
+- Card and panel backgrounds use the `surface` token, not `bg-white`, so
+  `white` still means white where it must (`text-white` on colored buttons).
+- New color choices that cannot be expressed as a palette re-point use the
+  `dark:` variant, which is wired to the same attribute.
+
+`index.html` applies the stored/system theme before the bundle loads, so
+dark-mode visitors never see a white flash.
+
 ## Key properties
 
 - **Client-side only** — all computation runs in the browser; data never

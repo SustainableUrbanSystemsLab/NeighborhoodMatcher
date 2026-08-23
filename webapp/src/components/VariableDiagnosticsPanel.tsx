@@ -95,7 +95,7 @@ export function VariableDiagnosticsPanel({
       : [];
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">
@@ -196,7 +196,7 @@ export function VariableDiagnosticsPanel({
                     )}
                   </td>
                   <td className="py-2 text-gray-600">
-                    {row.notes || <span className="text-gray-300">—</span>}
+                    {row.notes || <span className="text-gray-400">—</span>}
                   </td>
                 </tr>
               );

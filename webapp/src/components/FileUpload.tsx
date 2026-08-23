@@ -80,7 +80,7 @@ export function FileUpload({
           {dataset.headers.length > 5 && (
             <button
               onClick={() => setColumnsExpanded((v) => !v)}
-              className="rounded px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+              className="rounded px-1.5 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 hover:text-blue-800"
             >
               {columnsExpanded
                 ? "show fewer"

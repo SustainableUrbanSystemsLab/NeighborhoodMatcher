@@ -35,6 +35,8 @@ import { ColumnLinker } from "@/components/ColumnLinker";
 import { ResultsView } from "@/components/ResultsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteFooter } from "@/components/SiteFooter";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/lib/use-theme";
 
 const DEFAULT_THRESHOLD = 0.8;
 
@@ -65,6 +67,7 @@ function statusLabel(status: PyodideStatus): string {
 }
 
 export default function Match() {
+  const theme = useTheme();
   const [step, setStep] = useState<AppStep>("upload");
   const [target, setTarget] = useState<ParsedDataset | null>(null);
   const [supplemental, setSupplemental] = useState<ParsedDataset | null>(null);
@@ -304,9 +307,12 @@ export default function Match() {
             <img src="/logo.svg" alt="" className="h-8 w-8" />
             <h1 className="text-2xl font-bold text-gray-900">Dataset Matcher</h1>
           </Link>
-          <Link to="/about" className="text-sm text-blue-600 hover:text-blue-800">
-            How it works →
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle theme={theme} />
+            <Link to="/about" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800">
+              How it works →
+            </Link>
+          </div>
         </div>
 
         <StepIndicator currentStep={step} />
@@ -337,7 +343,7 @@ export default function Match() {
                   dataset={supplemental}
                 />
               </div>
-              <details className="rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600">
+              <details className="rounded-lg border border-gray-200 bg-surface p-4 text-sm text-gray-600">
                 <summary className="cursor-pointer font-medium text-gray-800">
                   File format &amp; pre-upload checklist
                 </summary>
@@ -412,7 +418,7 @@ export default function Match() {
                   {new Date(agreementSavedAt).toLocaleDateString()}).{" "}
                   <button
                     onClick={handleAgreementRevoke}
-                    className="text-blue-600 underline hover:text-blue-800"
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
                   >
                     Review or revoke
                   </button>
@@ -543,13 +549,13 @@ export default function Match() {
                   <div className="flex gap-2">
                     <button
                       onClick={reset}
-                      className="rounded border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                      className="rounded border border-red-300 bg-surface px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
                     >
                       Retry render
                     </button>
                     <button
                       onClick={handleStartOver}
-                      className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                      className="rounded border border-gray-300 bg-surface px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
                     >
                       Start Over
                     </button>
@@ -589,7 +595,7 @@ function WorkerControl({
 }) {
   const reported = reportedCores();
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">
@@ -635,7 +641,7 @@ function ThresholdControl({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="mb-2 flex items-baseline justify-between">
         <label htmlFor="nndr" className="text-sm font-medium text-gray-800">
           Near-miss threshold (NNDR)
@@ -657,7 +663,7 @@ function ThresholdControl({
       <p className="mt-2 text-xs text-gray-500">
         A match is flagged when the ratio of the best distance to the i-th
         distance is ≥ threshold. Lower = stricter. The 0.80 default comes
-        from image matching (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>)
+        from image matching (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Lowe 2004</a>)
         and has not been calibrated for tabular data — treat flags as
         guidance, not verdicts.
       </p>
@@ -674,7 +680,7 @@ function MaxDistanceControl({
 }) {
   const enabled = value != null;
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="mb-2 flex items-baseline justify-between">
         <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
           <input
@@ -718,7 +724,7 @@ function MinConfidenceControl({
   onChange: (v: "medium" | "high" | null) => void;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">
@@ -737,7 +743,7 @@ function MinConfidenceControl({
               e.target.value === "" ? null : (e.target.value as "medium" | "high")
             )
           }
-          className="rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+          className="rounded border border-gray-300 bg-surface px-2 py-1 text-sm"
         >
           <option value="">Off — report all links</option>
           <option value="medium">Medium or better</option>
