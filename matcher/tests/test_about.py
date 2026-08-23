@@ -140,6 +140,14 @@ def test_webapp_mirror_matches_python(ts_name, py_value):
 
 
 @pytest.mark.skipif(not TS_ABOUT.exists(), reason="webapp not present")
+def test_webapp_mirror_pins_the_engine_version():
+    # The restore banner compares a package's recorded engine version against
+    # this constant to warn that results may differ; a stale mirror would make
+    # it lie in both directions.
+    assert _ts_literal("MATCHER_VERSION") == about.VERSION
+
+
+@pytest.mark.skipif(not TS_ABOUT.exists(), reason="webapp not present")
 def test_webapp_mirror_lists_the_same_authors():
     block = re.search(r"export const AUTHORS = \[(.*?)\]", TS_ABOUT.read_text(), re.S)
     assert block

@@ -35,6 +35,10 @@ import { ColumnLinker } from "@/components/ColumnLinker";
 import { ResultsView } from "@/components/ResultsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteFooter } from "@/components/SiteFooter";
+import { RecentRuns } from "@/components/RecentRuns";
+import { recordAblation, recordRun } from "@/lib/run-history";
+import type { RestoredRun } from "@/lib/restore";
+import { MATCHER_VERSION } from "@/lib/about";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/use-theme";
 
@@ -83,6 +87,12 @@ export default function Match() {
   // Invalidates in-flight ablation updates after a re-run / start-over — a
   // late resolve or reject from a killed run must not clobber fresh state.
   const ablationRunRef = useRef(0);
+  // History entry for the current run, so the variable check can add its
+  // verdicts to the same record once it completes.
+  const runRecordIdRef = useRef<string | null>(null);
+  // Set while a restored pair is being installed, so the auto-link effect
+  // skips exactly one pass and leaves the restored exclusions alone.
+  const restoredRef = useRef(false);
   const [pyStatus, setPyStatus] = useState<PyodideStatus>({ phase: "idle" });
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -98,6 +108,8 @@ export default function Match() {
     getSavedWorkerCount()
   );
   const [progressPct, setProgressPct] = useState(0);
+  // Banner describing the run a results zip was reproduced from.
+  const [restored, setRestored] = useState<RestoredRun | null>(null);
   const tickRef = useRef<number | null>(null);
 
   // Warm up Pyodide in the background once the user accepts the agreement —
@@ -116,11 +128,18 @@ export default function Match() {
   // user's manual links/exclusions after Back→Next or agreement review.
   useEffect(() => {
     if (!target || !supplemental) return;
-    setLinks(findCommonHeaders(target.headers, supplemental.headers));
     setPiiWarnings([
       ...detectPII(target.headers, "target"),
       ...detectPII(supplemental.headers, "supplemental"),
     ]);
+    // A restored run already carries its own column selection (including the
+    // exclusions that shaped it); re-deriving links here would silently undo
+    // them and reproduce a DIFFERENT run.
+    if (restoredRef.current) {
+      restoredRef.current = false;
+      return;
+    }
+    setLinks(findCommonHeaders(target.headers, supplemental.headers));
   }, [target, supplemental]);
 
   const ambiguousHeaders = useMemo(
@@ -179,6 +198,39 @@ export default function Match() {
     [proceedToLink]
   );
 
+  // Reopen a previous run from its results zip: the package carries the
+  // original inputs and the settings, so loading it back reproduces the run
+  // exactly. Lands on the Link step with everything pre-filled — the user
+  // presses Run, rather than the page starting minutes of compute uninvited.
+  const handleRestore = useCallback((run: RestoredRun) => {
+    restoredRef.current = true;
+    setTarget(run.target);
+    setSupplemental(run.supplemental);
+    setThreshold(run.threshold);
+    setMaxDistance(run.maxDistance);
+    setMinConfidence(run.minConfidence);
+    setMatchOutput(null);
+    setRunError(null);
+    setRestored(run);
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
+
+    // Re-apply the run's column selection: any shared column it did not
+    // match on was excluded, and the results only reproduce if it stays so.
+    const restoredLinks = findCommonHeaders(
+      run.target.headers,
+      run.supplemental.headers
+    ).map((link) =>
+      run.features.length > 0 && !run.features.includes(link.headerName)
+        ? { ...link, excluded: true }
+        : link
+    );
+    setLinks(restoredLinks);
+
+    if (loadSavedAgreement()) setStep("link");
+    else setStep("agreement");
+  }, []);
+
   const handleAgreementRevoke = useCallback(() => {
     clearAgreement();
     setAgreementSavedAt(null);
@@ -200,6 +252,9 @@ export default function Match() {
       .then((report) => {
         if (ablationRunRef.current === token) {
           setAblation({ status: "done", report });
+          if (runRecordIdRef.current) {
+            recordAblation(runRecordIdRef.current, report);
+          }
         }
       })
       .catch((err) => {
@@ -239,10 +294,20 @@ export default function Match() {
         setPyStatus,
         setProgressPct
       );
-      setRunDurationMs(performance.now() - t0);
-      setCompletedAt(new Date());
+      const durationMs = performance.now() - t0;
+      const finishedAt = new Date();
+      setRunDurationMs(durationMs);
+      setCompletedAt(finishedAt);
       setWorkersUsed(nWorkers);
       setMatchOutput(output);
+      // Metadata-only history entry (no dataset contents — see run-history.ts).
+      runRecordIdRef.current = recordRun({
+        output,
+        target,
+        supplemental,
+        finishedAt,
+        durationMs,
+      }).id;
       // The worker's last status message is "running"; without this the
       // link step shows a phantom "Running matcher…" forever after a run.
       setPyStatus({ phase: "ready" });
@@ -289,6 +354,7 @@ export default function Match() {
     setThreshold(DEFAULT_THRESHOLD);
     setMaxDistance(null);
     setMinConfidence(null);
+    setRestored(null);
     ablationRunRef.current++;
     setAblation({ status: "idle" });
     setRunError(null);
@@ -392,6 +458,8 @@ export default function Match() {
                   </ul>
                 </div>
               </details>
+              <RecentRuns onRestore={handleRestore} />
+
               <div className="flex justify-end">
                 <button
                   onClick={handleNext}
@@ -412,6 +480,29 @@ export default function Match() {
 
           {step === "link" && target && supplemental && (
             <div className="space-y-6">
+              {restored && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+                  <strong>Reopened {restored.zipName}.</strong> Its original
+                  files, {restored.features.length || "all shared"} matching
+                  variable{restored.features.length === 1 ? "" : "s"}, and the
+                  settings it used (NNDR {restored.threshold}
+                  {restored.maxDistance != null && `, cutoff ${restored.maxDistance}`}
+                  {restored.minConfidence && `, minimum ${restored.minConfidence}`}
+                  ) are loaded
+                  {restored.generatedAt && ` from the run of ${restored.generatedAt}`}
+                  . Matching is deterministic, so running now reproduces that
+                  run exactly.
+                  {restored.toolVersion &&
+                    restored.toolVersion !== MATCHER_VERSION && (
+                      <>
+                        {" "}
+                        Note: it was produced by engine v{restored.toolVersion}
+                        {`, this build runs v${MATCHER_VERSION}`} —
+                        results may differ.
+                      </>
+                    )}
+                </div>
+              )}
               {agreementSavedAt && (
                 <p className="text-xs text-gray-500">
                   Data-use agreement previously accepted on this device (

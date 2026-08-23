@@ -50,6 +50,30 @@ that honest:
 `index.html` applies the stored/system theme before the bundle loads, so
 dark-mode visitors never see a white flash.
 
+## Local storage and reopening runs
+
+The app keeps three small things per device, all in `localStorage`, none of
+them dataset contents: the data-use agreement acceptance, the theme choice,
+the worker-count override — and a **run history** (`nbhdmatch:runs`, last 20)
+holding settings, run-level quality numbers, and per-variable diagnostics.
+Row-level data is deliberately excluded: results here can constitute PHI,
+browser storage is unencrypted and outlives the tab, so participant data has
+no business in it. The panel that shows the history says so and can clear it.
+
+To **reopen a full run** — every number and chart — load its results zip back
+in from the upload step. The package already carries the original inputs and
+the settings used, and matching is deterministic, so replaying it reproduces
+the run exactly. That keeps the "should this persist?" decision in the
+researcher's file system, under their institution's rules, instead of in
+browser storage (`src/lib/restore.ts`).
+
+A service worker (`public/sw.js`) caches the Pyodide runtime — the ~15 MB of
+public, version-pinned CDN assets — so it downloads once per device and keeps
+working on networks that block jsDelivr. It touches nothing else: not the
+app's own bundle (a deploy is never served stale), not `/matcher/*.py` (which
+changes per deploy — a stale engine beside a fresh UI would compute with the
+wrong code), and nothing of the user's, which never travels over HTTP here.
+
 ## Key properties
 
 - **Client-side only** — all computation runs in the browser; data never
