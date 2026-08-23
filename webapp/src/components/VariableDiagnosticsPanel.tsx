@@ -110,7 +110,7 @@ export function VariableDiagnosticsPanel({
         {ablation.status === "gated" && (
           <button
             onClick={onRunAblation}
-            className="shrink-0 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+            className="shrink-0 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100"
           >
             Run variable check
           </button>

@@ -29,9 +29,12 @@ copy drifts.
 ## Theming
 
 Light and dark, following the OS/browser (`prefers-color-scheme`) by default
-and overridable per device with the Auto / Light / Dark control in the header.
-The choice lives in `localStorage` (`nbhdmatch:theme`); "Auto" keeps following
-the system, including when it flips while the page is open.
+and overridable per device with the single theme icon in the header, which
+cycles Auto → Light → Dark and shows the state it is in. The choice lives in
+`localStorage` (`nbhdmatch:theme`); "Auto" keeps following the system,
+including when it flips while the page is open. The dark palette is GitHub's
+(Primer): canvas `#0d1117`, cards `#161b22`, borders `#30363d`, text
+`#e6edf3`, with Primer's accent / success / attention / danger families.
 
 The palette is a variable layer, not a per-component `dark:` sweep: the app is
 written in literal Tailwind utilities, Tailwind v4 compiles those to

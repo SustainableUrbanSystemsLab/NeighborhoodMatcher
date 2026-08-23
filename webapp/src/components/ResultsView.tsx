@@ -501,7 +501,7 @@ export function ResultsView({
             href={REPO_URL}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-gray-600 hover:text-blue-700"
+            className="font-medium text-gray-600 hover:text-blue-700 dark:hover:text-blue-300"
           >
             {output.provenance?.tool ?? TOOL_NAME}
           </a>{" "}

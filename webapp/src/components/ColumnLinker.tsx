@@ -133,7 +133,7 @@ export function ColumnLinker({
         <p className="text-sm font-medium text-blue-800">
           Column Linking
         </p>
-        <p className="mt-1 text-xs text-blue-700">
+        <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
           Columns with matching names are auto-linked. Use <strong>Exclude</strong> to
           keep a column linked but skip it during matching (e.g., ID columns you
           want in the output but not used for distance calculation). Use{" "}

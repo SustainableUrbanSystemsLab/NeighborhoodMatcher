@@ -471,14 +471,14 @@ export function ScenarioExplainer({
       <p className="mt-3 text-[11px] text-gray-400">
         Printable version:{" "}
         <a
-          className="text-blue-500 hover:text-blue-700"
+          className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
           href={`${import.meta.env.BASE_URL}explanatory/${scenario.scenario_label}.pdf`}
         >
           scatter PDF
         </a>{" "}
         ·{" "}
         <a
-          className="text-blue-500 hover:text-blue-700"
+          className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
           href={`${import.meta.env.BASE_URL}explanatory/${scenario.scenario_label}_hist.pdf`}
         >
           histogram PDF

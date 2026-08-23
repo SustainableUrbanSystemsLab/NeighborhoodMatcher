@@ -1,12 +1,12 @@
-// Site-wide footer: project badges, version of the running build, and who
-// made the tool. Shown on every page so a researcher can always tell which
-// version they are using and where the source lives.
+// Site-wide footer: a link to the source, the version of the running build,
+// and who made the tool. Shown on every page so a researcher can always tell
+// which version they are using and where the code lives.
 //
-// The badge images are the same ones the README uses (CI + deploy status),
-// so they show LIVE status rather than a claim baked into the bundle. They
-// are the only third-party requests the app makes; no-referrer keeps the
-// visited URL out of the request, and the page works fine if they fail to
-// load.
+// The GitHub mark is inline SVG rather than a row of status badges: badges
+// are noise on a tool page, and fetching them from shields.io / Netlify would
+// be the only third-party request this app makes — at odds with "your data
+// never leaves your browser". Live CI and deploy status belong in the README,
+// where they are about the repository rather than about this page.
 
 import {
   AUTHORS_LINE,
@@ -16,56 +16,40 @@ import {
   buildLabel,
 } from "@/lib/about";
 
-const BADGES = [
-  {
-    href: REPO_URL,
-    src: "https://img.shields.io/badge/GitHub-NeighborhoodMatcher-181717?logo=github",
-    alt: "Source on GitHub",
-  },
-  {
-    href: `${REPO_URL}/actions/workflows/python-tests.yml`,
-    src: `${REPO_URL}/actions/workflows/python-tests.yml/badge.svg`,
-    alt: "Python tests status",
-  },
-  {
-    href: "https://app.netlify.com/projects/nbhdmatch/deploys",
-    src: "https://api.netlify.com/api/v1/badges/f2fe942a-24a9-41d3-9ed6-29dac67da9b3/deploy-status",
-    alt: "Netlify deploy status",
-  },
-];
+/** GitHub's official mark (octicon mark-github-16). */
+function GitHubMark() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
+  );
+}
 
 export function SiteFooter({ className = "" }: { className?: string }) {
   return (
     <footer
       className={`mt-10 border-t border-gray-200 pt-4 text-center text-xs text-gray-500 ${className}`}
     >
-      <div className="mb-2 flex flex-wrap items-center justify-center gap-2">
-        {BADGES.map((b) => (
-          <a key={b.alt} href={b.href} target="_blank" rel="noreferrer">
-            <img
-              src={b.src}
-              alt={b.alt}
-              height={20}
-              className="h-5"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-            />
-          </a>
-        ))}
-      </div>
-      <p>
+      <a
+        href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
+        title={`${TOOL_NAME} on GitHub — source code and issue tracker`}
+        aria-label={`${TOOL_NAME} on GitHub — source code and issue tracker`}
+        className="inline-flex items-center gap-1.5 text-gray-400 transition-colors hover:text-gray-700"
+      >
+        <GitHubMark />
+        <span className="sr-only">Source code and issue tracker</span>
+      </a>
+      <p className="mt-2">
         <span className="font-medium text-gray-600">{TOOL_NAME}</span>{" "}
         {buildLabel()} · Developed by {AUTHORS_LINE} · {ORGANIZATION}
-      </p>
-      <p className="mt-1">
-        <a
-          href={REPO_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="text-blue-600 dark:text-blue-400 hover:text-blue-800"
-        >
-          Source code and issue tracker
-        </a>
       </p>
     </footer>
   );

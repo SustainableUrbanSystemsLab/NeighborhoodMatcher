@@ -63,77 +63,86 @@
 }
 
 [data-theme="dark"] {
-  --color-surface: oklch(21% 0.034 264.665); /* gray-900 */
-  --color-surface-muted: oklch(17% 0.031 263); /* between gray-900 and -950 */
+  /* GitHub's dark theme (Primer) — canvas #0d1117, cards #161b22, borders
+     #30363d, text #e6edf3, and the accent/success/attention/danger families
+     at their Primer values. Tinted callouts are Primer's translucent
+     "subtle"/"muted" tokens pre-composited over the card, so they behave
+     predictably on either background. */
+  --color-surface: #161b22; /* canvas.subtle — cards and panels */
+  --color-surface-muted: #0d1117;
 
   /* Neutrals: 50–300 become canvas/fills/borders, 400–900 become text. */
-  --color-gray-50: oklch(13% 0.028 261.692); /* was 950 — page canvas */
-  --color-gray-100: oklch(21% 0.034 264.665); /* 900 — recessed fills */
-  --color-gray-200: oklch(27.8% 0.033 256.848); /* 800 — hairline borders */
-  --color-gray-300: oklch(37.3% 0.034 259.733); /* 700 — stronger borders */
-  /* Muted text (step labels, placeholders, separators) lands on this shade,
-     so it has to clear 4.5:1 on the card as well as the canvas — 48% did
-     not. Verified by the contrast sweep in the dark-mode E2E. */
-  --color-gray-400: oklch(63% 0.024 259);
-  --color-gray-500: oklch(70.7% 0.022 261.325); /* 400 — muted text */
-  --color-gray-600: oklch(80% 0.016 260); /* secondary text */
-  --color-gray-700: oklch(87.2% 0.01 258.338); /* 300 — body text */
-  --color-gray-800: oklch(92.8% 0.006 264.531); /* 200 */
-  --color-gray-900: oklch(98.5% 0.002 247.839); /* 50 — headings */
+  --color-gray-50: #0d1117; /* canvas.default */
+  --color-gray-100: #161b22; /* canvas.subtle — recessed fills */
+  --color-gray-200: #30363d; /* border.default */
+  --color-gray-300: #444c56; /* stronger borders */
+  --color-gray-400: #8b949e; /* fg.muted — placeholders, step labels */
+  --color-gray-500: #9198a1; /* muted body text */
+  --color-gray-600: #b1bac4; /* secondary text */
+  --color-gray-700: #c9d1d9; /* body text */
+  --color-gray-800: #d8dee4;
+  --color-gray-900: #e6edf3; /* fg.default — headings */
 
-  /* Accents: tinted callouts (50–300) go dark; their text shades go light. */
-  --color-blue-50: oklch(25% 0.062 265); /* callout background */
-  --color-blue-100: oklch(30% 0.08 265);
-  --color-blue-200: oklch(38% 0.1 265); /* callout border */
-  --color-blue-300: oklch(45% 0.13 264);
-  --color-blue-700: oklch(80.9% 0.105 251.813); /* 300 — link hover */
-  --color-blue-800: oklch(85% 0.08 252); /* callout text */
-  --color-blue-900: oklch(90% 0.05 252);
+  /* Accent. 500–700 stay backgrounds (primary button + its hover), so the
+     blue TEXT shades live at 300/400 and carry `dark:` variants where a
+     component needs them. */
+  --color-blue-50: #1b2c43; /* accent.subtle over the card */
+  --color-blue-100: #1e3758;
+  --color-blue-200: #24487a; /* accent.muted — callout borders */
+  --color-blue-300: #79c0ff; /* bright accent text */
+  --color-blue-400: #58a6ff; /* accent.fg — links */
+  --color-blue-500: #388bfd;
+  --color-blue-600: #1f6feb; /* accent.emphasis — primary button */
+  --color-blue-700: #388bfd; /* its hover, per Primer */
+  --color-blue-800: #a5d6ff; /* text on tinted callouts */
+  --color-blue-900: #cae8ff;
 
-  --color-red-50: oklch(24% 0.07 26); /* warning background */
-  --color-red-100: oklch(29% 0.09 26);
-  --color-red-200: oklch(36% 0.11 27); /* warning border */
-  --color-red-300: oklch(43% 0.14 27);
-  --color-red-600: oklch(72% 0.16 22); /* verdict/error text */
-  --color-red-700: oklch(80.8% 0.114 19.571); /* 300 */
-  --color-red-800: oklch(85% 0.09 20);
-  --color-red-900: oklch(90% 0.06 20);
+  --color-red-50: #38201f; /* danger.subtle over the card */
+  --color-red-100: #4e2826;
+  --color-red-200: #70312e; /* danger.muted — borders */
+  --color-red-300: #8b3a37;
+  --color-red-500: #f85149; /* danger.fg — dots and bars */
+  --color-red-600: #ff7b72;
+  --color-red-700: #ff9a94;
+  --color-red-800: #ffb8b3;
+  --color-red-900: #ffd6d3;
 
-  --color-green-50: oklch(24% 0.055 153);
-  --color-green-100: oklch(29% 0.07 153);
-  --color-green-200: oklch(36% 0.085 152);
-  --color-green-600: oklch(78% 0.16 152);
-  --color-green-700: oklch(84% 0.13 153);
-  --color-green-800: oklch(88% 0.1 153);
-  --color-green-900: oklch(92% 0.07 153);
+  --color-green-50: #1a2f27; /* success.subtle over the card */
+  --color-green-100: #1c3c2a;
+  --color-green-200: #20502f;
+  --color-green-500: #3fb950; /* success.fg */
+  --color-green-600: #3fb950;
+  --color-green-700: #56d364;
+  --color-green-800: #7ee787;
+  --color-green-900: #aff5b4;
 
-  --color-amber-50: oklch(25% 0.06 60);
-  --color-amber-100: oklch(30% 0.075 58);
-  --color-amber-200: oklch(37% 0.09 55); /* border on amber callouts */
-  --color-amber-300: oklch(44% 0.11 52);
-  --color-amber-600: oklch(80% 0.15 75);
-  --color-amber-700: oklch(85% 0.13 80);
-  --color-amber-800: oklch(89% 0.1 85);
-  --color-amber-900: oklch(93% 0.07 90);
+  --color-amber-50: #2f2b1e; /* attention.subtle over the card */
+  --color-amber-100: #3f341c;
+  --color-amber-200: #584318;
+  --color-amber-300: #7d6420;
+  --color-amber-500: #d29922; /* attention.fg */
+  --color-amber-600: #d29922;
+  --color-amber-700: #e3b341;
+  --color-amber-800: #f2cc60;
+  --color-amber-900: #f8e3a1;
 
-
-  /* Charts: lighten what carries meaning, darken what is only scaffolding. */
-  --chart-grid: oklch(27% 0.02 260);
-  --chart-rule: oklch(33% 0.022 260);
-  --chart-label: oklch(72% 0.02 260);
-  --chart-muted: oklch(65% 0.025 260);
-  --chart-muted-strong: oklch(80% 0.02 260);
-  --chart-best: oklch(70.7% 0.165 254.624); /* blue-400 */
-  --chart-best-text: oklch(80.9% 0.105 251.813); /* blue-300 */
-  --chart-best-soft: oklch(38% 0.1 265);
-  --chart-near: oklch(82.8% 0.189 84.429); /* amber-400 */
-  --chart-ok: oklch(79.2% 0.209 151.711); /* green-400 */
-  --chart-cutoff: oklch(71% 0.18 15);
-  --chart-cutoff-text: oklch(80% 0.13 15);
-  --chart-good-bg: oklch(30% 0.07 153);
-  --chart-good-text: oklch(87% 0.13 153);
-  --chart-warn-bg: oklch(30% 0.075 58);
-  --chart-warn-text: oklch(89% 0.11 85);
+  /* Charts: scaffolding recedes to the border tokens, marks keep meaning. */
+  --chart-grid: #21262d;
+  --chart-rule: #30363d;
+  --chart-label: #8b949e;
+  --chart-muted: #8b949e;
+  --chart-muted-strong: #b1bac4;
+  --chart-best: #58a6ff;
+  --chart-best-text: #79c0ff;
+  --chart-best-soft: #1f6feb;
+  --chart-near: #e3b341;
+  --chart-ok: #3fb950;
+  --chart-cutoff: #f85149;
+  --chart-cutoff-text: #ff7b72;
+  --chart-good-bg: #1a2f27;
+  --chart-good-text: #7ee787;
+  --chart-warn-bg: #2f2b1e;
+  --chart-warn-text: #f2cc60;
 
   color-scheme: dark; /* native form controls, scrollbars, and caret */
 }
