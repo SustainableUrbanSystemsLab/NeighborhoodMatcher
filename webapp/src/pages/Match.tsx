@@ -34,6 +34,7 @@ import {
 } from "@/lib/agreement";
 import { FileUpload } from "@/components/FileUpload";
 import { ColumnLinker } from "@/components/ColumnLinker";
+import { DataChecklist } from "@/components/DataChecklist";
 import { ResultsView } from "@/components/ResultsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -409,53 +410,12 @@ export default function Match() {
                   dataset={supplemental}
                 />
               </div>
-              <details className="rounded-lg border border-gray-200 bg-surface p-4 text-sm text-gray-600">
+              <details open className="rounded-lg border border-gray-200 bg-surface p-4 text-sm text-gray-600">
                 <summary className="cursor-pointer font-medium text-gray-800">
                   File format &amp; pre-upload checklist
                 </summary>
-                <div className="mt-2 space-y-2 text-xs leading-relaxed">
-                  <p>
-                    <strong>Format:</strong> CSV files with one header row,
-                    then one row per geographic unit. Column names should
-                    match between the two files; columns whose names differ
-                    can be linked manually in the Link Columns step. Matching
-                    variables must be numeric.
-                  </p>
-                  <p>
-                    <strong>Before uploading, check that:</strong>
-                  </p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    <li>
-                      Every variable you plan to match on uses the{" "}
-                      <strong>same units and scale</strong> in both files
-                      (e.g., not a proportion 0.72 in one file and a
-                      percentage 72 in the other), and contains{" "}
-                      <strong>raw values</strong>, never already-standardized
-                      (z-scored) columns.
-                    </li>
-                    <li>
-                      Every variable also uses the{" "}
-                      <strong>same definition and coding</strong> in both
-                      files — e.g., a poverty rate computed against 100% of
-                      the federal poverty line in one file and 180% in the
-                      other will look like a valid match but systematically
-                      disagree and degrade every link. The results page
-                      reports a per-variable check for this pattern.
-                    </li>
-                    <li>
-                      Missing values are <strong>blank or NA</strong> — not
-                      sentinel codes like 9999, which would be treated as
-                      real values and distort the match.
-                    </li>
-                    <li>
-                      <strong>Fewer well-measured shared variables usually
-                      beat many spotty ones.</strong> A variable with heavy
-                      missingness or an inconsistent definition can make
-                      every match worse, not better. You can exclude
-                      variables at the Link Columns step, and the results
-                      page will tell you if one is hurting the linkage.
-                    </li>
-                  </ul>
+                <div className="mt-3">
+                  <DataChecklist />
                 </div>
               </details>
               <RecentRuns onRestore={handleRestore} />
