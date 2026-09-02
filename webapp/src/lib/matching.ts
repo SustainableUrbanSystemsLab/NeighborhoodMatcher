@@ -5,6 +5,8 @@
 import type { ColumnLink } from "@/types";
 
 export {
+  cancelBackgroundWork,
+  WorkAbandoned,
   runMatching,
   runAblation,
   ablationAutoRunAllowed,

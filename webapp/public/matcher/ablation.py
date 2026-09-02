@@ -48,8 +48,6 @@ baseline near 100% cannot improve by 10 points, so already-clean runs never
 flag anything.
 """
 
-import math
-
 import numpy as np
 
 from .distance import match_all, validate_threshold, winner_observed_stats
@@ -76,9 +74,9 @@ def ablation_sample_indices(n_targets, m, d,
     """
     Deterministic target sample for the ablation suite.
 
-    Returns (indices, sampled): indices is a list of target-row indices,
-    evenly spaced from row 0 (no RNG — reruns are identical); sampled is
-    False when every target row fits the budget.
+    Returns (indices, sampled): indices is a list of exactly t target-row
+    indices, evenly spaced from the first row to the last (no RNG — reruns
+    are identical); sampled is False when every target row fits the budget.
     """
     if n_targets <= 0:
         return [], False
@@ -87,8 +85,12 @@ def ablation_sample_indices(n_targets, m, d,
     t = min(n_targets, max(floor, min(cap, t_budget)))
     if t >= n_targets:
         return list(range(n_targets)), False
-    step = math.ceil(n_targets / t)
-    return list(range(0, n_targets, step)), True
+    # linspace, not range(0, n, ceil(n / t)): the stride form under-delivers
+    # by up to half when n barely exceeds t (n=201, t=200 -> 101 rows),
+    # breaking the floor the verdict margins are calibrated on. The spacing
+    # is >= 1 here, so the rounded positions are distinct.
+    positions = np.rint(np.linspace(0, n_targets - 1, t))
+    return [int(i) for i in positions], True
 
 
 def variant_metrics(std_rows_1, std_rows_2, threshold, drop_index=None,

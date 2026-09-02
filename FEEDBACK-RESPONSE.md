@@ -249,3 +249,110 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
 - Exact-tie rows are withheld only when a minimum confidence is set; default still links the first tied row.
 - Link-step SMD with heavy missingness: computed over observed values, but please re-test on the file that showed 0.9.
 - Automatic exclusion of harmful variables is a recommendation with a one-click apply, not automatic; keeping the researcher in the loop was deliberate.
+
+---
+
+## Test coverage, point by point
+
+Which automated test pins each change above. Paths are under
+`matcher/tests/`; run with `pytest` from `matcher/`. Items marked *copy only*
+are wording changes with no behaviour to test; items marked *browser-verified*
+are webapp behaviour (the webapp has no unit-test runner) that was exercised
+with Playwright scripts kept outside the repository.
+
+### ABCD test notes
+
+**Rows with missingness matched incorrectly (proof-of-concept run)**
+- `signals/test_confidence_tier.py::test_partial_missingness_is_medium` — a match resting on fewer variables than were linked is at most Medium.
+- `signals/test_confidence_tier.py::test_single_feature_of_many_is_low` — one variable out of several forces Low.
+- `test_min_confidence.py::test_medium_withholds_exactly_the_low_rows`, `::test_high_also_withholds_medium` — those rows can be withheld automatically.
+- `test_pipeline.py::test_missing_target_features_are_flagged` — the "missing k of n shared feature(s)" flag reaches the CSV.
+
+**One high-missingness variable collapsed MNN confirmation (28.2% vs 99.9%)**
+- `test_ablation.py::test_collapse_fixture_reproduces_mnn_collapse` — reproduces the experiment: adding the sparse variable collapses MNN-confirmed %.
+- `test_ablation.py::test_suite_flags_exactly_the_harmful_variable` — the leave-one-out check flags that variable and none of the clean ones; excluding it recovers.
+- `test_ablation.py::test_variant_equals_fresh_run_with_link_excluded`, `::test_baseline_variant_matches_full_run` — "re-run without it" is bitwise the run you get by excluding the link.
+- `test_ablation.py::test_load_bearing_variable_detected` — the inverse verdict (removal hurts) is detected, so the check is not biased toward exclusion.
+- `test_ablation.py::test_recommendation_margins_and_veto`, `::test_recommendation_insufficient_rows`, `::test_saturated_baseline_never_flags` — the 10-point margin, the counter-signal veto, the 50-row floor, and no flags when the baseline is already perfect.
+- `test_ablation.py::test_sample_*` (5 tests) — deterministic subsampling delivers exactly the budgeted rows; `::test_sample_delivers_exact_size_when_n_barely_exceeds_t` is a regression for a case that silently halved the sample.
+- `test_ablation.py::test_coordinator_ablation_writes_csv_and_prints_table` — CLI `--ablation` output.
+- `signals/test_variable_report.py::test_missing_pct_and_high_missingness_note` — the > 50% missingness note itself.
+
+**A variable coded or defined differently (pct living alone; poverty 100% vs 180%)**
+- `signals/test_variable_report.py::test_poverty_style_shift_is_noted_but_scale_check_silent` — the exact case: same spread, shifted mean; the old scale warning stays silent, the offset-SMD note fires.
+- `signals/test_variable_report.py::test_offset_smd_hand_computed` — the statistic against a hand calculation.
+- `signals/test_variable_report.py::test_warning_gate_on_observed_count`, `::test_no_warning_below_offset_threshold` — the ≥ 30-observed gate and the 0.5 threshold.
+- `signals/test_variable_report.py::test_constant_columns_equal_and_different` — constant-but-different coding is noted even though no SMD can be computed.
+- "excluding it may produce more accurate matches" — the ablation tests above.
+
+**`â€` weird symbol in flags**
+- `test_io_bom.py::test_dump_csv_starts_with_bom`, `::test_coordinator_outputs_start_with_bom` — every CLI CSV starts with the UTF-8 BOM Excel needs.
+- `test_io_bom.py::test_dump_csv_bom_round_trips_through_load_csv`, `::test_bom_invisible_to_plain_utf8_sig_reader` — the BOM is harmless on the way back in.
+- Webapp zip files: *browser-verified* (byte-level check that `linked_dataset.csv` begins with the BOM).
+
+**Fill in missing target values from linked data**
+- `test_fill_from_match.py::test_blank_cell_filled_with_raw_supplemental_string`, `::test_na_token_cell_filled` — blank and `NA` cells are filled verbatim.
+- `test_fill_from_match.py::test_observed_cells_untouched` — observed values are never overwritten.
+- `test_fill_from_match.py::test_no_match_row_not_filled`, `::test_rejected_row_not_filled`, `test_min_confidence.py::test_no_fill_on_withheld_rows` — never for no-match, cutoff-rejected, or withheld rows.
+- `test_fill_from_match.py::test_supplemental_missing_cell_stays_blank`, `::test_provenance_lists_columns_in_shared_order`, `::test_reserved_name_collision_warns`, `::test_sharded_equals_single_with_fills`.
+
+**Quality metrics interpretable; good vs bad flagged matches**
+- `signals/test_confidence_tier.py` (13 tests) — the whole High / Medium / Low / No match rule table, including precedence (`::test_no_match_wins`, `::test_rejected_wins`, `::test_rejected_beats_tie`, `::test_tie_beats_near_miss`) and `::test_csv_confidence_matches_per_target` (CSV column ≡ per-row payload).
+- The composed plain-language interpretation lives in the webapp (`confidence-text.ts`): *browser-verified* only.
+
+**Scaling and missingness must be made clear up front**
+- Documentation — *copy only*. The detection behind the advice: `test_standardize.py::test_scale_warning_fires_on_prestandardized_target`, `test_simulated_benchmark.py::test_a20_zscored_variant_warns`, `test_pipeline.py::test_scale_mismatch_warning_returned`, `test_edge_cases.py::test_constant_vs_varying_column_warns`, and `signals/test_variable_report.py::test_scale_note_agrees_with_dataset_scale_warning` (the per-variable note and the dataset warning can never disagree).
+- Per-column missing counts and sentinel detection on the Link step: *browser-verified*.
+
+**Quality threshold so the output only reports links that meet a standard**
+- `test_min_confidence.py::test_medium_withholds_exactly_the_low_rows`, `::test_high_also_withholds_medium` — the exact withheld set per tier.
+- `test_min_confidence.py::test_off_is_identical_to_base_run`, `::test_run_level_statistics_unchanged` — a pure reporting filter: SMD, tier counts, and every other row are byte-identical.
+- `test_min_confidence.py::test_precedence_cutoff_rejection_beats_withholding`, `::test_validation_*` (3), `::test_sharded_equals_single_with_filter`, `::test_cli_web_parity_with_filter`.
+
+### "Notes and suggestions" document
+
+- **"Identify shared columns"**, **standardization wording**, **"Measure similarity"**, **signals orientation paragraph**, **per-signal overviews**, **MNN wording**, **Scenario 2/3/5 text**, **Step 1 intro and checklist**, **CPU-cores wording**, **"Click a row to expand"** — *copy only*. The behaviour those texts describe is pinned elsewhere: `test_align.py::test_exclude_removes_column` (excluding a column), `test_standardize.py::test_combined_mean_is_zero` / `::test_combined_std_is_one` (joint z-scoring), `test_distance.py::test_known_345_triangle` (Euclidean distance), `signals/test_mnn_confirmed.py` (8 tests, MNN in both directions).
+
+**Report how many matching variables informed the match (`features_used`)**
+- `test_observed_signals.py::test_end_to_end_values` — hand-checked `features_used` / `exact_on_observed` per row.
+- `test_observed_signals.py::test_vectorized_matches_reference_on_random_missingness` — the vectorized engine agrees with a per-row reference under random missingness.
+- `test_observed_signals.py::test_sharded_equals_single_for_new_fields`, `::test_shard_payload_new_fields_json_serializable`, `::test_assemble_rejects_versionless_shard`.
+
+**"1 tie being no ties" is confusing**
+- Display change is *browser-verified*. Engine semantics: `test_distance.py::test_repeat_count_one_when_unique`, `::test_repeat_count_on_exact_tie`; `signals/test_build_flags.py::test_repeat_count_of_one_no_flag`, `::test_repeat_count_of_two_flags_tie`.
+
+**Step 3 — NAs used as evidence of poor balance (SMD = 0.9)**
+- `signals/test_dataset_smd.py::test_missing_cells_excluded_from_smd` — SMD is computed over observed cells only; a blank never shifts it.
+- Pre-run missing counts on the Link step: *browser-verified*.
+
+**Step 5 — flags should be plain English; odd symbols**
+- Odd symbols: the BOM tests above. Flag content: `signals/test_build_flags.py` (15 tests, one per trigger) and `signals/test_no_match_flags.py` (below). The composed paragraph is webapp code: *browser-verified*.
+
+**Empty rows: "match uses observed features" on a no-match row makes no sense**
+- `signals/test_no_match_flags.py::test_no_match_with_missing_features_omits_observed_features_tail`, `::test_no_match_without_missing_reports_warning_only` — the tail is gone on no-match rows.
+- `signals/test_no_match_flags.py::test_matched_path_keeps_observed_features_tail` — and still present where it belongs.
+- `test_pipeline.py::test_all_missing_target_is_no_match_not_confident`, `test_simulated_benchmark.py::test_a100_missing_all_is_never_a_confident_match`.
+
+**Distinguish an exact match on the available variables from an ambiguous one**
+- `test_observed_signals.py::test_end_to_end_values` — `exact_on_observed` is True for a row that matches exactly on every available variable and False otherwise.
+- `test_distance.py::test_partial_agreement_cannot_fake_an_exact_match`, `::test_partial_missing_still_finds_best`.
+
+**Only one of four variables available → stronger warning**
+- `signals/test_confidence_tier.py::test_single_feature_of_many_is_low` (forced Low) and `::test_single_feature_run_can_be_high` (a run that only ever had one variable is not penalised).
+
+**Handles rounding well**
+- `test_edge_cases.py::test_float_dust_column_does_not_repel_exact_twin`.
+
+**Exact duplicate supplemental rows: leave blank rather than pick one?**
+- `signals/test_confidence_tier.py::test_tie_is_low`, `::test_tie_beats_near_miss` — a tie is Low.
+- `test_match_all.py::test_exact_matches_and_ties`, `::test_exact_mode_preserves_coincidental_ties` — the winner is the reference brute-force winner (first in file order), never random.
+- `test_edge_cases.py::test_all_rows_identical_is_flagged_maximally_ambiguous`.
+- Withholding ties for large datasets: `test_min_confidence.py::test_medium_withholds_exactly_the_low_rows`.
+
+**Reject matches beyond a user-defined distance**
+- `test_max_distance.py::test_far_row_rejected_with_diagnostics_kept` — rejected → No match, nearest candidate kept in the detail file.
+- `test_max_distance.py::test_boundary_is_not_rejected` (strict `>`), `::test_cutoff_off_is_identical` (off ≡ byte-identical), `::test_sharded_equals_single_with_cutoff`, `::test_validate_max_distance_rejects_bad_values`, `::test_validate_max_distance_accepts_none_and_positive`.
+- `signals/test_confidence_tier.py::test_rejected_wins`, `::test_rejected_beats_tie`; `test_min_confidence.py::test_precedence_cutoff_rejection_beats_withholding`.
+
+**Common theme: good at finding close matches, not at saying which to take seriously**
+- Everything under confidence tiers, minimum confidence, distance cutoff, and the plain-language flags above; `test_min_confidence.py::test_cli_web_parity_with_filter` and `test_variable_panel.py::test_cli_and_web_distance_share_agree` pin that the CLI and the webapp report the same verdicts.

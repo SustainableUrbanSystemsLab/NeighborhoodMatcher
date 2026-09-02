@@ -4,7 +4,12 @@
 
 import JSZip from "jszip";
 import Papa from "papaparse";
-import type { AblationReport, MatchOutput, ParsedDataset } from "@/types";
+import type {
+  AblationReport,
+  ColumnLink,
+  MatchOutput,
+  ParsedDataset,
+} from "@/types";
 import {
   AGREEMENT_TEXT,
   CONTACT_TEXT,
@@ -31,6 +36,8 @@ export async function buildResultsZip(
   output: MatchOutput,
   target: ParsedDataset,
   supplemental: ParsedDataset,
+  /** the column links the run used (active ones are recorded in run_info) */
+  links: ColumnLink[],
   ablation: AblationReport | null = null,
   /** when the package was generated; injected for deterministic tests */
   generatedAt: Date = new Date()
@@ -42,7 +49,9 @@ export async function buildResultsZip(
   // when, by whom, and under which settings.
   zip.file(
     "run_info.csv",
-    withBom(buildRunInfoCsv(output, target, supplemental, generatedAt, ablation))
+    withBom(
+      buildRunInfoCsv(output, target, supplemental, links, generatedAt, ablation)
+    )
   );
 
   zip.file(

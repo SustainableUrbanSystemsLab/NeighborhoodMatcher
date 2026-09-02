@@ -146,10 +146,41 @@ export function prefetchPyodide(onStatus?: StatusCallback): void {
  * the next run's listeners — silently wrong output. The cost is a cold
  * (re-)init on the next run; correctness wins.
  */
+// Bumped on every terminate. Background work (the variable check) captures
+// it at start so a failure in an ABANDONED suite can never terminate the
+// pool a newer run is using.
+let poolGeneration = 0;
+// Abandon callbacks for in-flight background work: a terminated worker never
+// posts again, so without these the work's promise would hang forever.
+const abandonHandlers = new Set<() => void>();
+
+/** Thrown to background work when the pool it was running on was reset. */
+export class WorkAbandoned extends Error {
+  constructor() {
+    super("cancelled: the worker pool was reset");
+    this.name = "WorkAbandoned";
+  }
+}
+
 export function terminatePool(): void {
   for (const w of pool) w.terminate();
   pool.length = 0;
   prefetchStarted = false;
+  poolGeneration++;
+  for (const abandon of abandonHandlers) abandon();
+  abandonHandlers.clear();
+}
+
+/**
+ * Stops the background variable check, if one is running, by resetting the
+ * pool — in-flight Pyodide work cannot be interrupted any other way. A new
+ * matching run must not queue behind stale variants on the same workers
+ * (its wall time would roughly double), and a stale variant's error would
+ * even reject the new run's shard. No-op when nothing is in flight, so the
+ * warm pool is kept.
+ */
+export function cancelBackgroundWork(): void {
+  if (abandonHandlers.size > 0) terminatePool();
 }
 
 function statusFromPhase(phase: StatusPhase): PyodideStatus {
@@ -302,6 +333,10 @@ export async function runMatching(
   );
   const nRows = target.rows.length;
   const nWorkers = poolSizeFor(nRows, supplemental.rows.length);
+
+  // "Exclude and adjust" → Run arrives while the previous results' variable
+  // check may still be computing. Never share workers with it.
+  cancelBackgroundWork();
 
   if (nWorkers <= 1) {
     try {
@@ -481,29 +516,55 @@ export async function runAblation(
     onProgress?.(completed / dropIndices.length);
   };
 
+  // Abandonment: terminatePool() rejects `abandoned`, which every await
+  // below races against — otherwise a suite whose workers were killed
+  // would simply never settle.
+  const generation = poolGeneration;
+  let abandon: () => void = () => {};
+  const abandoned = new Promise<never>((_, reject) => {
+    abandon = () => reject(new WorkAbandoned());
+  });
+  abandonHandlers.add(abandon);
+
   try {
     // Stripe the variants round-robin; each worker runs its share
     // sequentially while the workers themselves run concurrently.
     const results = new Array<AblationVariantPayload>(dropIndices.length);
-    await Promise.all(
-      Array.from({ length: nWorkers }, async (_, w) => {
-        for (let k = w; k < dropIndices.length; k += nWorkers) {
-          results[k] = await runAblationVariantOn(
-            getWorker(w), payloads, dropIndices[k] as number | null
-          );
-          report();
-        }
-      })
-    );
+    await Promise.race([
+      abandoned,
+      Promise.all(
+        Array.from({ length: nWorkers }, async (_, w) => {
+          for (let k = w; k < dropIndices.length; k += nWorkers) {
+            // A result that landed just before a reset must not post the
+            // next variant into the NEW pool getWorker() would spawn.
+            if (poolGeneration !== generation) throw new WorkAbandoned();
+            results[k] = await runAblationVariantOn(
+              getWorker(w), payloads, dropIndices[k] as number | null
+            );
+            report();
+          }
+        })
+      ),
+    ]);
 
+    if (poolGeneration !== generation) throw new WorkAbandoned();
     const featureNames = payloads.links.map((l) => l.headerName);
-    return await runAssembleAblationOn(
-      getWorker(0), results, featureNames, payloads.threshold
-    );
+    return await Promise.race([
+      abandoned,
+      runAssembleAblationOn(
+        getWorker(0), results, featureNames, payloads.threshold
+      ),
+    ]);
   } catch (err) {
     // Same stale-results hygiene as runMatching: a failed variant leaves
     // workers mid-compute; kill the pool rather than risk poisoned output.
-    terminatePool();
+    // Only OUR pool, though — after a reset it is gone or belongs to a
+    // newer run, and killing that would hang the run.
+    if (!(err instanceof WorkAbandoned) && poolGeneration === generation) {
+      terminatePool();
+    }
     throw err;
+  } finally {
+    abandonHandlers.delete(abandon);
   }
 }

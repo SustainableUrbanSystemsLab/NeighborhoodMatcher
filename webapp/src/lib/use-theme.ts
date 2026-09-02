@@ -1,6 +1,6 @@
 // React binding for the theme preference (see lib/theme.ts).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyTheme,
   loadPreference,
@@ -24,6 +24,12 @@ export function useTheme(): ThemeControl {
   const [resolved, setResolved] = useState<ResolvedTheme>(() =>
     resolveTheme(loadPreference())
   );
+  // The OS listener below is registered once; it reads the CURRENT
+  // preference through this ref rather than smuggling a setState side
+  // effect into an updater function (React treats updaters as pure and may
+  // invoke them twice under StrictMode or replay them when rendering
+  // concurrently).
+  const preferenceRef = useRef(preference);
 
   // Keep <html data-theme> in step with the resolved theme.
   useEffect(() => {
@@ -35,15 +41,13 @@ export function useTheme(): ThemeControl {
   useEffect(
     () =>
       watchSystemTheme((systemNow) => {
-        setPreferenceState((current) => {
-          if (current === "system") setResolved(systemNow);
-          return current;
-        });
+        if (preferenceRef.current === "system") setResolved(systemNow);
       }),
     []
   );
 
   const setPreference = useCallback((pref: ThemePreference) => {
+    preferenceRef.current = pref;
     setPreferenceState(pref);
     savePreference(pref);
     setResolved(resolveTheme(pref));

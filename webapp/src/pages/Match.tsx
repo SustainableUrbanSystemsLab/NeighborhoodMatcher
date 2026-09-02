@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import {
   ablationAutoRunAllowed,
+  cancelBackgroundWork,
   findAmbiguousHeaders,
   findCommonHeaders,
   getSavedWorkerCount,
@@ -20,6 +21,7 @@ import {
   runMatching,
   saveWorkerCount,
   terminatePool,
+  WorkAbandoned,
   type PyodideStatus,
 } from "@/lib/matching";
 import { detectPII } from "@/lib/pii-detector";
@@ -214,18 +216,11 @@ export default function Match() {
     setRestored(run);
     ablationRunRef.current++;
     setAblation({ status: "idle" });
+    cancelBackgroundWork();
 
-    // Re-apply the run's column selection: any shared column it did not
-    // match on was excluded, and the results only reproduce if it stays so.
-    const restoredLinks = findCommonHeaders(
-      run.target.headers,
-      run.supplemental.headers
-    ).map((link) =>
-      run.features.length > 0 && !run.features.includes(link.headerName)
-        ? { ...link, excluded: true }
-        : link
-    );
-    setLinks(restoredLinks);
+    // The run's own column selection (exclusions and manual links included)
+    // — rebuilt by restore.ts; the results only reproduce if it stays so.
+    setLinks(run.links);
 
     if (loadSavedAgreement()) setStep("link");
     else setStep("agreement");
@@ -258,6 +253,8 @@ export default function Match() {
         }
       })
       .catch((err) => {
+        // Abandoned on purpose (re-run, restore, start over): not an error.
+        if (err instanceof WorkAbandoned) return;
         console.error("runAblation failed:", err);
         if (ablationRunRef.current === token) {
           setAblation({
@@ -336,6 +333,9 @@ export default function Match() {
   const handleExcludeFeature = useCallback((featureName: string) => {
     ablationRunRef.current++;
     setAblation({ status: "idle" });
+    // Stop the check still running on the old selection; the Link step's
+    // prefetch warms a fresh pool while the user reviews.
+    cancelBackgroundWork();
     setLinks((prev) =>
       prev.map((l) =>
         l.headerName === featureName ? { ...l, excluded: true } : l
@@ -490,8 +490,20 @@ export default function Match() {
                   {restored.minConfidence && `, minimum ${restored.minConfidence}`}
                   ) are loaded
                   {restored.generatedAt && ` from the run of ${restored.generatedAt}`}
-                  . Matching is deterministic, so running now reproduces that
-                  run exactly.
+                  .{" "}
+                  {restored.unlinked.length > 0 ? (
+                    <span className="font-medium text-amber-800">
+                      {restored.unlinked.length === 1
+                        ? `The matching variable "${restored.unlinked[0]}" could not be re-linked automatically`
+                        : `${restored.unlinked.length} matching variables (${restored.unlinked.join(", ")}) could not be re-linked automatically`}
+                      {" "}— the package predates link recording and the
+                      column was linked to a differently named one, or the
+                      column is missing. Re-create the link below before
+                      running, or the result will differ from the original.
+                    </span>
+                  ) : (
+                    "Matching is deterministic, so running now reproduces that run exactly."
+                  )}
                   {restored.toolVersion &&
                     restored.toolVersion !== MATCHER_VERSION && (
                       <>

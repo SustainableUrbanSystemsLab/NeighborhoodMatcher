@@ -3,7 +3,7 @@
 
 import Papa from "papaparse";
 import { isMissingCell, parseNumeric } from "@/lib/missing";
-import type { AblationReport, MatchOutput, ParsedDataset } from "@/types";
+import type { AblationReport, MatchOutput, ParsedDataset, ColumnLink } from "@/types";
 import {
   AUTHORS_LINE,
   ORGANIZATION,
@@ -298,9 +298,19 @@ export function buildRunInfoCsv(
   output: MatchOutput,
   target: ParsedDataset,
   supplemental: ParsedDataset,
+  links: ColumnLink[],
   generatedAt: Date,
   ablation: AblationReport | null = null
 ): string {
+  // Which target column was matched to which supplemental column. A restore
+  // needs this to re-create manual links between differently named columns
+  // — `matching_variables` names only the target side.
+  const columnLinks = links
+    .filter((l) => !l.excluded)
+    .map((l) => [
+      target.headers[l.targetIndex] ?? l.headerName,
+      supplemental.headers[l.supplementalIndex] ?? l.headerName,
+    ]);
   const p = output.provenance;
   const { summary } = output;
   const rows: [string, string | number][] = [
@@ -318,6 +328,7 @@ export function buildRunInfoCsv(
     ["target_rows", target.rows.length],
     ["supplemental_rows", supplemental.rows.length],
     ["matching_variables", output.feature_names.join("; ")],
+    ["column_links", JSON.stringify(columnLinks)],
     ["nndr_threshold", summary.threshold],
     [
       "max_distance_cutoff",

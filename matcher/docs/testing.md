@@ -26,14 +26,14 @@ discovers everything below `tests/`.
 | `tests/signals/test_cascading_nndr.py` | Degenerate inputs, clear / ambiguous matches, threshold sensitivity, cascading stop condition, flat-landscape edge case. |
 | `tests/signals/test_mnn_confirmed.py` | Symmetric / one-directional matches, single-target row, tie handling (permissive — `reverse_repeat_count`). |
 | `tests/signals/test_per_row_feature_contribution.py` | Sums to 1.0, hand-computed decomposition, single-feature dominance, sign invariance, exact-match → all zeros. |
-| `tests/signals/test_dataset_smd.py` | Hand-computed values against pooled-SD formula, threshold benchmarks (0.10 / 0.25), constant-feature → 0, single-pair → 0. |
+| `tests/signals/test_dataset_smd.py` | Hand-computed values against pooled-SD formula, threshold benchmarks (0.10 / 0.25), constant-feature → 0, single-pair → 0, missing cells excluded (a blank never shifts the SMD). |
 | `tests/signals/test_build_flags.py` | Each individual flag trigger, NNDR threshold inclusivity, SMD warn/poor band exclusivity, multi-flag joining. |
 | `tests/test_about.py` | Tool identity and run provenance — authors and version constants, UTC/local timestamp formats, `provenance_rows` order, the `provenance` key in web results, the CLI's `<base>_run_info.csv` (settings recorded, paths not leaked), and drift between `about.py` and the webapp's `about.ts` mirror. |
 | `tests/test_io_bom.py` | UTF-8 BOM on every written CSV (Excel/ANSI mojibake fix), BOM round-trip through `load_csv`, coordinator outputs. |
-| `tests/signals/test_variable_report.py` | `variable_report` / `variable_warnings` — hand-computed offset SMD (incl. a shifted-mean "poverty definition" fixture), missing-pct math, ≥30-observed warning gate, constant-column edge cases, JSON safety. |
+| `tests/signals/test_variable_report.py` | `variable_report` / `variable_warnings` — hand-computed offset SMD (incl. a shifted-mean "poverty definition" fixture), missing-pct math, ≥30-observed warning gate, constant-column and rounding-dust edge cases, per-variable scale note ≡ dataset scale warning (parametrized), JSON safety. |
 | `tests/test_variable_panel.py` | `variables` key wiring — distance_share aggregation (single-row == contributions, matches definition, sums to 1), sharded ≡ single, CLI `<base>_variables.csv` + CLI↔web agreement. |
 | `tests/test_min_confidence.py` | Minimum-confidence filter — off ≡ base run, exact withheld set per tier, run-level statistics invariant, precedence vs the distance cutoff, no fill on withheld rows, validation, sharded ≡ single, CLI↔web parity. |
-| `tests/test_ablation.py` | Leave-one-variable-out — re-slice ≡ fresh-run anchor equivalence, deterministic sampling arithmetic, recommendation margins/veto/floor, MNN-collapse reproduction (harmful variable flagged, clean ones not), load-bearing detection, assembly validation + order independence, CLI table + CSV. |
+| `tests/test_ablation.py` | Leave-one-variable-out — re-slice ≡ fresh-run anchor equivalence, deterministic sampling arithmetic, recommendation margins/veto/floor, MNN-collapse reproduction (harmful variable flagged, clean ones not), load-bearing detection, assembly validation + order independence, CLI table + CSV. Sampling: exact budgeted size (regression for the stride form that halved it). |
 
 ## Conventions
 

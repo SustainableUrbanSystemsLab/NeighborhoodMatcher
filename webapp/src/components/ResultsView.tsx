@@ -88,6 +88,7 @@ export function ResultsView({
         output,
         target,
         supplemental,
+        links,
         ablation.status === "done" ? ablation.report : null,
         completedAt
       );

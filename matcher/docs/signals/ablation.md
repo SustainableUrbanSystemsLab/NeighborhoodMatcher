@@ -51,7 +51,8 @@ discriminating work — removing it would collapse the linkage.
   is d+1 matching passes over the prepared arrays — brute force preserved.
 - **Deterministic subsampling.** Above a compute budget (~t·M·d·(d+1)
   element-ops ≈ 6e9, roughly 15 s single-core), targets are subsampled
-  evenly from row 0 (200–2,000 rows, no RNG). Run-level percentages are
+  evenly from the first row to the last — exactly the budgeted count,
+  200–2,000 rows, no RNG. Run-level percentages are
   statistics, so the sample answers the question; determinism keeps reruns
   identical.
 - **Restricted-run MNN.** On a sampled run the reverse search sees only the

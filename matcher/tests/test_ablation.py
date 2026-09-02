@@ -123,8 +123,11 @@ def test_sample_evenly_spaced_and_deterministic():
         10_000, m=5_000, d=10, budget=6_000_000_000
     )
     assert sampled is True
-    # budget // (5000*10*11) = 10909 -> capped at 2000 -> step ceil(10000/2000)=5
-    assert indices == list(range(0, 10_000, 5))
+    # budget // (5000*10*11) = 10909 -> capped at 2000 rows, first to last.
+    assert len(indices) == 2000
+    assert indices[0] == 0 and indices[-1] == 9_999
+    gaps = {b - a for a, b in zip(indices, indices[1:])}
+    assert gaps <= {5, 6}, gaps
     again, _ = ablation_sample_indices(10_000, m=5_000, d=10, budget=6_000_000_000)
     assert again == indices
 
@@ -133,12 +136,30 @@ def test_sample_respects_floor_and_cap():
     # Tiny budget: still samples at least the floor.
     indices, sampled = ablation_sample_indices(10_000, m=10**6, d=20, budget=1)
     assert sampled is True
-    assert len(indices) >= 200 // 2  # step = ceil(10000/200) = 50 -> 200 rows
     assert len(indices) == 200
     # Huge budget: capped at the target cap.
     indices, sampled = ablation_sample_indices(100_000, m=10, d=2, budget=10**18)
     assert sampled is True
-    assert len(indices) == pytest.approx(2000, abs=1)
+    assert len(indices) == 2000
+
+
+def test_sample_delivers_exact_size_when_n_barely_exceeds_t():
+    """
+    Regression: range(0, n, ceil(n/t)) returned ~t/2 rows whenever n was just
+    above t (201 rows at a 200-row floor gave 101), silently halving the
+    sample the verdict margins are calibrated on.
+    """
+    indices, sampled = ablation_sample_indices(201, m=10**6, d=10, budget=1)
+    assert sampled is True
+    assert len(indices) == 200
+    assert indices[0] == 0 and indices[-1] == 200
+    assert len(set(indices)) == len(indices)          # distinct rows
+    assert indices == sorted(indices)                 # in file order
+
+    # t just under n from the budget itself: budget // (1e5*10*11) = 545
+    indices, sampled = ablation_sample_indices(546, m=10**5, d=10)
+    assert sampled is True
+    assert len(indices) == 545
 
 
 def test_sample_empty_targets():

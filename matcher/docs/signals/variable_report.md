@@ -13,9 +13,9 @@ Per variable:
 | Field | Meaning |
 |-------|---------|
 | `target_missing_pct` / `supp_missing_pct` | Missing cells as % of rows, per side. |
-| `target_mean` / `supp_mean`, `target_std` / `supp_std` | Observed-value stats per side (sample SD, ddof = 1). |
-| `offset_smd` | `abs(target_mean − supp_mean) / pooled SD` — the definition-shift check (below). |
-| `spread_ratio` | `target_std / supp_std` (`None` when either is 0). |
+| `target_mean` / `supp_mean`, `target_std` / `supp_std` | Observed-value stats per side. The SDs use the scale check's convention (population SD; float rounding dust counts as constant, i.e. exactly 0) so `spread_ratio` is literally `target_std / supp_std`. |
+| `offset_smd` | `abs(target_mean − supp_mean) / pooled SD` — the definition-shift check (below). The pooled SD is the sample SD (ddof = 1), mirroring `dataset_smd`. |
+| `spread_ratio` | `target_std / supp_std` (`None` when either is 0 or not finite). |
 | `distance_share` | Share of the run's total squared match distance attributable to this variable, aggregated over accepted matches: `Σ contrib_f · d1² / Σ d1²`. Answers "which variable drove the matching overall?" |
 | `notes` | Short pre-rendered observations (`""` when clean) — identical wording in the CLI CSV, the webapp panel, and the results zip. |
 
@@ -48,8 +48,11 @@ the [ablation signal](ablation.md) measures the actual damage.
   when **both** sides have at least 30 observed values; below that, means
   differ by chance and the warning would be noise.
 - High-missingness note at > 50% (matches the upload UI's red badge);
-  scale-mismatch note outside spread ratio [1/50, 50] (matches
-  `scale_compatibility_warnings`).
+  scale-mismatch note outside spread ratio [1/50, 50], and a
+  constant-on-one-side note. Both use `standardize.SCALE_RATIO_LIMIT` and
+  `standardize.observed_column_std` — the same helper and limit as the
+  dataset-level `scale_compatibility_warnings` — so the per-variable note and
+  the dataset warning fire together or not at all (pinned by test).
 
 Unlike the SMD flag thresholds (Austin), these are pragmatic defaults —
 revisit them if they prove noisy or blind on real data.

@@ -147,3 +147,27 @@ def test_direction_of_bias_does_not_affect_magnitude():
     smd_low  = dataset_smd(targets, [0, 1], supp_low)
 
     assert smd_high[0] == pytest.approx(smd_low[0], rel=1e-6)
+
+def test_missing_cells_excluded_from_smd():
+    """
+    Reviewer note: blanks must not read as evidence of poor balance. Stats
+    are per side over OBSERVED cells, so a NaN never shifts a mean the way
+    a zero would — the observed target values {1, 3} and the matched values
+    {1, 2, 3} share a mean of 2 and the SMD is exactly 0. (Had the NaN been
+    treated as 0 the target mean would be 4/3 and the SMD clearly positive.)
+    """
+    targets = np.array([[1.0], [np.nan], [3.0]])
+    refs = np.array([[1.0], [2.0], [3.0]])
+    smd = dataset_smd(targets, [0, 1, 2], refs)
+    assert smd[0] == pytest.approx(0.0)
+
+    # Same on the supplemental side.
+    targets = np.array([[1.0], [2.0], [3.0]])
+    refs = np.array([[1.0], [np.nan], [3.0]])
+    smd = dataset_smd(targets, [0, 1, 2], refs)
+    assert smd[0] == pytest.approx(0.0)
+
+    # And a genuine shift among the observed cells is still seen.
+    targets = np.array([[1.0], [np.nan], [3.0]])
+    refs = np.array([[10.0], [2.0], [12.0]])
+    assert dataset_smd(targets, [0, 1, 2], refs)[0] > 0.25

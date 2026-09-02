@@ -16,6 +16,8 @@ from matcher.distance import MISSING_PENALTY, brute_find_best_match, euclidean_d
 
 import numpy as np
 
+from .standardize import SCALE_RATIO_LIMIT, observed_column_std
+
 def cascading_nndr(sorted_dists, threshold=0.8):
     """
     Cascading nearest-neighbor distance ratio (Lowe 2004, extended).
@@ -211,20 +213,30 @@ def variable_report(filtered_rs1, filtered_rs2, feature_names):
         target_missing_pct / supp_missing_pct  — as % of rows
         target_observed    / supp_observed     — observed cell counts
         target_mean / supp_mean                — over observed (None if none)
-        target_std  / supp_std                 — sample SD over observed
-        offset_smd   — |target_mean − supp_mean| / pooled SD; the
-                       definition-shift check. None when either side has no
-                       observed values, or when both sides are constant with
-                       different values (shift real but not scalable).
-        spread_ratio — target_std / supp_std (None when either is 0)
+        target_std  / supp_std                 — SD over observed values, in
+                       the scale check's convention (population SD; rounding
+                       dust counts as constant) — see standardize.
+        offset_smd   — |target_mean − supp_mean| / pooled SD (sample SD,
+                       mirroring dataset_smd); the definition-shift check.
+                       None when either side has no observed values, or
+                       when both sides are constant with different values
+                       (shift real but not scalable).
+        spread_ratio — target_std / supp_std (None when either is 0 or not
+                       finite). The note fires outside [1/limit, limit] with
+                       the SAME limit as scale_compatibility_warnings, so the
+                       per-variable note and the dataset warning agree.
         notes        — "; "-joined short observations, "" when clean.
                        Pre-rendered here so every consumer (CLI CSV, webapp
                        panel, zip diagnostics) shows identical wording.
     """
     n1 = len(filtered_rs1)
     n2 = len(filtered_rs2)
-    means1, vars1, counts1 = _column_observed_stats(filtered_rs1)
-    means2, vars2, counts2 = _column_observed_stats(filtered_rs2)
+    a1 = np.asarray(filtered_rs1, dtype=float)  # None -> NaN
+    a2 = np.asarray(filtered_rs2, dtype=float)
+    means1, vars1, counts1 = _column_observed_stats(a1)
+    means2, vars2, counts2 = _column_observed_stats(a2)
+    stds1, _ = observed_column_std(a1)
+    stds2, _ = observed_column_std(a2)
     report = []
     for f, name in enumerate(feature_names):
         obs1, obs2 = int(counts1[f]), int(counts2[f])
@@ -235,8 +247,8 @@ def variable_report(filtered_rs1, filtered_rs2, feature_names):
         miss2 = n2 - obs2
         miss1_pct = (miss1 / n1) * 100.0 if n1 else 0.0
         miss2_pct = (miss2 / n2) * 100.0 if n2 else 0.0
-        std1 = float(np.sqrt(var1))
-        std2 = float(np.sqrt(var2))
+        std1 = float(stds1[f])
+        std2 = float(stds2[f])
 
         offset_smd = None
         if mean1 is not None and mean2 is not None:
@@ -248,7 +260,11 @@ def variable_report(filtered_rs1, filtered_rs2, feature_names):
             # else: two different constants — a real shift with no scale to
             # express it in; offset_smd stays None and the note below fires.
 
-        spread_ratio = (std1 / std2) if (std1 > 0 and std2 > 0) else None
+        spread_ratio = (
+            (std1 / std2)
+            if (np.isfinite(std1) and np.isfinite(std2) and std1 > 0 and std2 > 0)
+            else None
+        )
 
         notes = []
         if offset_smd is not None and offset_smd >= OFFSET_SMD_WARN:
@@ -265,8 +281,18 @@ def variable_report(filtered_rs1, filtered_rs2, feature_names):
             notes.append(f"high missingness (target {miss1_pct:.0f}%)")
         if miss2_pct > HIGH_MISSING_PCT:
             notes.append(f"high missingness (supplemental {miss2_pct:.0f}%)")
-        if spread_ratio is not None and not (1.0 / 50.0 <= spread_ratio <= 50.0):
+        if spread_ratio is not None and not (
+            1.0 / SCALE_RATIO_LIMIT <= spread_ratio <= SCALE_RATIO_LIMIT
+        ):
             notes.append(f"scale mismatch (spread ratio {spread_ratio:.3g})")
+        elif obs1 > 0 and obs2 > 0 and (std1 == 0) != (std2 == 0):
+            # The most extreme spread mismatch there is; the ratio cannot
+            # express it. Same case scale_compatibility_warnings reports.
+            const_side = "target" if std1 == 0 else "supplemental"
+            notes.append(
+                f"constant in the {const_side} file but varies in the other "
+                f"— possible unit or coding difference"
+            )
 
         report.append({
             "feature": name,

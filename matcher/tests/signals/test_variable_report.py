@@ -65,6 +65,48 @@ def test_scale_mismatch_note():
     assert "scale mismatch" in row["notes"]
 
 
+def test_rounding_dust_is_constant_not_a_scale_mismatch():
+    # Constant up to float dust on both sides: the scale check treats both
+    # as constant and says nothing; the per-variable note must agree rather
+    # than report the arbitrary ratio of two dust-sized spreads.
+    target = _rows([1.0, 1.0, 1.0 + 1e-13])
+    supp = _rows([1.0, 1.0 + 3e-13, 1.0])
+    [row] = variable_report(target, supp, ["a"])
+    assert row["target_std"] == 0.0 and row["supp_std"] == 0.0
+    assert row["spread_ratio"] is None
+    assert "scale mismatch" not in row["notes"]
+
+
+def test_constant_on_one_side_only_is_noted():
+    target = _rows([5.0, 5.0, 5.0])
+    supp = _rows([1.0, 2.0, 3.0])
+    [row] = variable_report(target, supp, ["a"])
+    assert row["spread_ratio"] is None
+    assert "constant in the target file but varies in the other" in row["notes"]
+
+
+@pytest.mark.parametrize("target_vals, supp_vals", [
+    ([0.0, 1.0, 2.0, 3.0], [0.0, 1000.0, 2000.0, 3000.0]),   # clear mismatch
+    ([0.0, 1.0, 2.0, 3.0], [0.0, 40.0, 80.0, 120.0]),        # inside the limit
+    ([0.0, 1.0, 2.0, 3.0], [0.0, 49.9, 99.8, 149.7]),        # just inside
+    ([0.0, 1.0, 2.0, 3.0], [0.0, 50.1, 100.2, 150.3]),       # just outside
+    ([2.0, 2.0, 2.0], [2.0, 2.0, 2.0]),                       # constant both
+    ([2.0, 2.0, 2.0], [1.0, 2.0, 3.0]),                       # constant one side
+])
+def test_scale_note_agrees_with_dataset_scale_warning(target_vals, supp_vals):
+    """
+    The per-variable note and scale_compatibility_warnings share one helper
+    and one limit, so on any column they must fire together or not at all.
+    """
+    from matcher.standardize import scale_compatibility_warnings
+    target, supp = _rows(target_vals), _rows(supp_vals)
+    [row] = variable_report(target, supp, ["a"])
+    warned = bool(scale_compatibility_warnings(target, supp, ["a"]))
+    noted = ("scale mismatch" in row["notes"]
+             or "but varies in the other" in row["notes"])
+    assert noted == warned, (row["notes"], warned)
+
+
 def test_all_missing_side_yields_none_stats():
     target = _rows([None, None])
     supp = _rows([1.0, 2.0])
