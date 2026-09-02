@@ -24,7 +24,7 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
 
 - **Done.**
   - New leave-one-variable-out check re-runs the match with each linked variable removed and compares run-level quality (MNN-confirmed %, High-confidence %). A variable whose removal improves the run by 10 points or more gets a red **Consider excluding** chip with a one-click **Exclude and adjust** button back to the Link step.
-  - Reproduced this exact experiment in a test: one high-missingness variable collapses MNN confirmation, the check flags it, excluding it recovers 100%.
+  - Reproduced this exact experiment: [`test_collapse_fixture_reproduces_mnn_collapse`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_ablation.py#L220) builds a dataset where one high-missingness variable collapses MNN confirmation, and [`test_suite_flags_exactly_the_harmful_variable`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_ablation.py#L231) checks that the leave-one-out check flags that variable and nothing else. [`test_variant_equals_fresh_run_with_link_excluded`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_ablation.py#L80) proves each leave-one-out variant equals a fresh run with that link excluded.
   - Runs automatically after results when the dataset is small enough; a button above the panel runs it on demand for larger data.
   - Where: results page → **Variable check** panel; CLI `--ablation` writes `<base>_ablation.csv`; docs in `matcher/docs/signals/ablation.md`.
 
@@ -35,16 +35,19 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
   - Combined with the leave-one-out check above, a variable that is both offset and harmful gets flagged twice.
   - Where: same **Variable check** panel; `diagnostics/variable_diagnostics.csv` in the results zip; `matcher/docs/signals/variable_report.md`.
   - Caveat: dataset-level warnings need at least 30 observed values per side, so very small test files will not trigger them.
+  - Verified by: [`test_poverty_style_shift_is_noted_but_scale_check_silent`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_variable_report.py#L41) (a 100% vs 180% FPL style shift is caught by the offset check while the old scale check stays silent), [`test_missing_pct_and_high_missingness_note`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_variable_report.py#L51), [`test_warning_gate_on_observed_count`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_variable_report.py#L97).
+  - Panel wiring verified by: [`test_distance_share_matches_definition`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_variable_panel.py#L49) and [`test_cli_and_web_distance_share_agree`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_variable_panel.py#L105).
 
 > â€ weird symbol seems to be triggered in flags at times
 
-- **Done.** This was Excel reading UTF-8 em-dashes as ANSI. Every generated file in the results zip and every CLI CSV now carries a UTF-8 byte-order mark, which Excel honours. Original uploads are still copied byte-for-byte.
+- **Done.** This was Excel reading UTF-8 em-dashes as ANSI. Every generated file in the results zip and every CLI CSV now carries a UTF-8 byte-order mark, which Excel honours. Original uploads are still copied byte-for-byte. Verified by: [`test_coordinator_outputs_start_with_bom`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_io_bom.py#L48) and [`test_dump_csv_bom_round_trips_through_load_csv`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_io_bom.py#L30).
 
 > When matching targets rows with missingness, I wonder if it would be beneficial to have the tool also try to fill in the missing values with linked data?
 
 - **Done.**
   - When a target cell in a shared column is blank and the row has a match, the linked dataset fills it with the supplemental value verbatim. A new `filled_from_match` column lists which cells were filled so nothing is silent.
   - Never fills for rows with no match or rejected matches. Matching itself still never imputes; the fill happens only in the output.
+  - Verified by: [`test_blank_cell_filled_with_raw_supplemental_string`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_fill_from_match.py#L45), [`test_observed_cells_untouched`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_fill_from_match.py#L39), [`test_no_match_row_not_filled`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_fill_from_match.py#L61), [`test_rejected_row_not_filled`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_fill_from_match.py#L97).
 
 > An overall note I have that is related to the ABCD test is that the tool seems to be great at finding 'best' matches with given data but less clear at conveying which should be taken seriously as matches and which should be discarded—i think the quality metrics could be explained in a more interpretable way for laypersons, and ultimately it should be easier to distinguish between good matches that were flagged and poor matches that were flagged
 
@@ -52,6 +55,7 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
   - Every row now gets one plain verdict: **High / Medium / Low / No match**, computed by a fixed rule table (documented in `matcher/docs/signals/flags.md`). Shown as a table column, a summary card, and in both CSVs.
   - The drill-down composes a plain-language interpretation from the signals (e.g. "Only 1 of 4 matching variables was available … many supplemental rows were similarly close"), replacing the pipe-separated flag string as the thing a reader looks at first.
   - The How-it-works page gained an orientation paragraph on which signals matter most and in what order.
+  - Verified by: the rule table in [`test_clean_row_is_high`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_confidence_tier.py#L23) through [`test_single_feature_run_can_be_high`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_confidence_tier.py#L69) (one test per rule, including precedence between rules), and [`test_csv_confidence_matches_per_target`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_confidence_tier.py#L76) for CSV/screen agreement.
 
 > The tool does not handle differences in scaling (z-scores, ratio/%, etc.)—this should be made clear to anyone when formatting their data for input
 >    * Same with missingness
@@ -65,6 +69,7 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
 - **Done.**
   - New **Minimum confidence** control on the Link step (off / Medium / High). Links below the tier are written *unlinked* in the linked dataset with a "link withheld" note; the detail file keeps full diagnostics so nothing is lost.
   - Purely a reporting filter: SMD, tier counts, and all other rows are byte-identical to a run with it off.
+  - Verified by: [`test_medium_withholds_exactly_the_low_rows`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_min_confidence.py#L57), [`test_high_also_withholds_medium`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_min_confidence.py#L93), [`test_run_level_statistics_unchanged`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_min_confidence.py#L100), [`test_off_is_identical_to_base_run`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_min_confidence.py#L51), and [`test_cli_web_parity_with_filter`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_min_confidence.py#L168) (CLI and webapp agree).
   - Also a separate **distance cutoff** (see "no genuinely similar row" below) for rejecting matches that are simply too far.
 
 ---
@@ -213,17 +218,17 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
 > Algorithm skips entirely empty rows and throws error: WARNING: no valid match â€" target shares no observed features with any supplemental row | target row missing 4 of 4 shared feature(s); match uses observed features only.
 > 'match uses observed' doesn't make sense in a case where there was no match assigned…
 
-- **Done.** The no-match flag no longer appends that tail.
+- **Done.** The no-match flag no longer appends that tail. Verified by: [`test_no_match_with_missing_features_omits_observed_features_tail`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_no_match_flags.py#L11).
 
 ### Other trial notes
 
 > With 2 of 4 matching variables missing, the tool was sometimes able to identify the correct supplemental row, but NNDR remained very high (~ 0.99). I wonder whether the output could distinguish between an exact/very close match and an ambiguous match. For example, if the selected row is an exact match on all available variables (even if there are near misses), could that be made evident?
 
-- **Done.** New `exact_on_observed` signal. The drill-down says when the chosen row matches exactly on every available variable even though the overall distance is inflated by the missing-data penalty. It is used for explanation, not for the tier, so an exact match on 1 of 4 still reads Low.
+- **Done.** New `exact_on_observed` signal. The drill-down says when the chosen row matches exactly on every available variable even though the overall distance is inflated by the missing-data penalty. It is used for explanation, not for the tier, so an exact match on 1 of 4 still reads Low. Verified by: [`test_end_to_end_values`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_observed_signals.py#L65) and [`test_vectorized_matches_reference_on_random_missingness`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_observed_signals.py#L51).
 
 > When 3 of 4 matching variables are missing, leaving only one available to match on, the tool began producing incorrect matches—expected, and I wonder if the output could provide a stronger warning such as "low confidence match: only 1 matching variable was available" to distinguish a clear guess from other more informed matches. Not sure ab this one…
 
-- **Done.** A match resting on a single variable when more were linked is forced to **Low**, and the interpretation says so in those words.
+- **Done.** A match resting on a single variable when more were linked is forced to **Low**, and the interpretation says so in those words. Verified by: [`test_single_feature_of_many_is_low`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_confidence_tier.py#L47).
 
 > Handles rounding well—perfect matches with low NNDR.
 
@@ -231,11 +236,11 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
 
 > When two supplemental rows are exact duplicates on all matching variables (but not variables being linked), the tool randomly selects one row to match but flags it as ambiguous (NNDR 1.00)—reasonable, but I wonder whether the tool should instead leave the supplemental match blank where there are exact ties, particularly for large datasets where users may not be able to manually review every ambiguous match.
 
-- **Partly.** Ties are now **Low** confidence, the winner rule (first in file order, not random) is documented, and the interpretation lists the tie. Setting **Minimum confidence** to Medium or High withholds them from the linked dataset, which gives the "leave blank" behaviour for large datasets. Open: not blank by default, because for many datasets a tie between two identical rows is still a usable link.
+- **Partly.** Ties are now **Low** confidence, the winner rule (first in file order, not random) is documented, and the interpretation lists the tie. Setting **Minimum confidence** to Medium or High withholds them from the linked dataset, which gives the "leave blank" behaviour for large datasets. Open: not blank by default, because for many datasets a tie between two identical rows is still a usable link. Verified by: [`test_tie_is_low`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/signals/test_confidence_tier.py#L35).
 
 > When a target row has no genuinely similar supplemental row, the algorithm still assigned the 'closest' supplemental row and flagged it as MMN-non-confirmed and potentially invalid—is this what we want? I wonder if there could be an option to reject matches beyond a user-defined distance threshold. For example, if the Euclidian distance exceeds a specific threshold, could the tool return "no match" rather than assigning the least-dissimilar record? (Euclidian distance in this case was 13.95, not sure if it can be threshold-ed like that)
 
-- **Done.** New **Reject matches beyond a distance cutoff** control on the Link step. Distance is averaged per variable used (distance ÷ √variables used), so 1.0 ≈ the rows differ by about one standard deviation on every variable. Rejected rows become "No match" with a distinct flag but keep their nearest candidate in the detail file for review. Off by default.
+- **Done.** New **Reject matches beyond a distance cutoff** control on the Link step. Distance is averaged per variable used (distance ÷ √variables used), so 1.0 ≈ the rows differ by about one standard deviation on every variable. Rejected rows become "No match" with a distinct flag but keep their nearest candidate in the detail file for review. Off by default. Verified by: [`test_far_row_rejected_with_diagnostics_kept`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_max_distance.py#L35), [`test_boundary_is_not_rejected`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_max_distance.py#L72), [`test_cutoff_off_is_identical`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/blob/claude/abcd-test-linkage-review-hsbcig/matcher/tests/test_max_distance.py#L29).
 
 > Noticing a common theme—tool is good at finding close matches, but not so great at distinguishing when matches shouldn't be taken seriously versus those that should.
 
