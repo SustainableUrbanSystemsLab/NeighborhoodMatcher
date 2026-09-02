@@ -166,7 +166,8 @@ const ITEMS: Item[] = [
   {
     Icon: PictoFormat,
     title: "CSV: one header row, then one row per geographic unit.",
-    detail: "Matching variables must be numeric.",
+    detail:
+      "Matching variables must be numeric. A second header or label row on line 2 (as in NDA/ABCD exports) is detected and skipped, with a notice.",
   },
   {
     Icon: PictoNames,

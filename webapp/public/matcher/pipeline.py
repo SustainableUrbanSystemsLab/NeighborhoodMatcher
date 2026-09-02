@@ -5,7 +5,7 @@ import numpy as np
 
 from .ablation import ablation_sample_indices, ablation_suite
 from .about import TOOL_NAME, VERSION, authors_line, provenance_rows
-from .io import load_csv, clean_val, dump_csv
+from .io import MISSING_TOKENS, load_csv, clean_val, drop_label_row, dump_csv
 from .align import find_common_headers, header_warnings, no_shared_columns_error
 from .standardize import dual_standardize, scale_compatibility_warnings
 from .distance import match_all, validate_threshold, validate_max_distance, winner_observed_stats
@@ -20,6 +20,34 @@ from .signals import (
     validate_min_confidence,
     _TIERS_WITHHELD,
 )
+
+
+def _parse_hint(row, common, index_key, header_name, raw):
+    """
+    Extra guidance appended to a cell parse failure: a cell that repeats its
+    column name, or a line with no number in any matching column, is a
+    second header / label row (NDA and ABCD exports carry one), not bad
+    data — and the fix is different.
+    """
+    if raw.strip().lower() == header_name.strip().lower():
+        return (" — this line repeats the column names: a second header or "
+                "label row? Delete it from the file before matching")
+    try:
+        cells = [row[c[index_key]] for c in common]
+    except IndexError:
+        return ""
+
+    def _num(v):
+        try:
+            return clean_val(v) is not None
+        except ValueError:
+            return False
+
+    observed = [v for v in cells if v.strip().lower() not in MISSING_TOKENS]
+    if observed and not any(_num(v) for v in observed):
+        return (" — no matching column on this line holds a number; if it is "
+                "a label or description row, delete it before matching")
+    return ""
 
 
 def extract_features(rows, common, index_key, file_label, line_numbers=None):
@@ -40,8 +68,11 @@ def extract_features(rows, common, index_key, file_label, line_numbers=None):
                 values.append(clean_val(row[c[index_key]]))
             except ValueError as exc:
                 line = line_numbers[r] if line_numbers else r + 2
+                hint = _parse_hint(row, common, index_key, c["headerName"],
+                                   row[c[index_key]])
                 raise ValueError(
-                    f"{file_label}: line {line}, column '{c['headerName']}': {exc}"
+                    f"{file_label}: line {line}, column '{c['headerName']}': "
+                    f"{exc}{hint}"
                 ) from None
             except IndexError:
                 raise ValueError(
@@ -58,7 +89,8 @@ def missing_counts(extracted_rows):
 
 
 def coordinator(target, supplemental, output="data/output.csv", exclude=None, threshold=0.8,
-                fast=False, max_distance=None, min_confidence=None, ablation=False):
+                fast=False, max_distance=None, min_confidence=None, ablation=False,
+skip_label_row=True):
     """
     Full matching pipeline.
 
@@ -127,6 +159,15 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     h1, rs1, lines1 = load_csv(target, with_line_numbers=True)
     h2, rs2, lines2 = load_csv(supplemental, with_line_numbers=True)
 
+    # A label row (NDA/ABCD exports: variable descriptions on line 2) is not
+    # a unit to match. Skip it — loudly, via the warnings — rather than fail
+    # on "cannot parse 'pctPoor ' as a number".
+    label_notes = []
+    if skip_label_row:
+        rs1, lines1, note1 = drop_label_row(h1, rs1, lines1, "target file")
+        rs2, lines2, note2 = drop_label_row(h2, rs2, lines2, "supplemental file")
+        label_notes = [n for n in (note1, note2) if n]
+
     # Align columns
     common = find_common_headers(h1, h2, exclude)
     feature_names = [c["headerName"] for c in common]
@@ -149,6 +190,7 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
     # Dataset-level sanity checks before pooling the two files
     warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
     warnings += header_warnings(h1, h2, feature_names)
+    warnings = label_notes + warnings
 
     # Per-variable input diagnostics (missingness, definition-shift check) —
     # computed on raw parsed values, before standardization can absorb a
@@ -363,6 +405,8 @@ def coordinator(target, supplemental, output="data/output.csv", exclude=None, th
             ("supplemental_file", os.path.basename(supplemental)),
             ("target_rows", len(rs1)),
             ("supplemental_rows", len(rs2)),
+            ("label_rows_skipped",
+             "; ".join(n.split(" looks like")[0] for n in label_notes) or "none"),
             ("matching_variables", "; ".join(feature_names)),
             ("nndr_threshold", threshold),
             ("max_distance_cutoff", "off" if max_distance is None else max_distance),

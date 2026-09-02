@@ -188,7 +188,15 @@ function statusFromPhase(phase: StatusPhase): PyodideStatus {
 }
 
 function datasetToCsv(dataset: ParsedDataset): string {
-  return Papa.unparse({ fields: dataset.headers, data: dataset.rows });
+  const csv = Papa.unparse({ fields: dataset.headers, data: dataset.rows });
+  if (!dataset.labelRowSkipped) return csv;
+  // The skipped label row becomes an EMPTY line: the engine skips blank
+  // lines but keeps original line numbers, so a later parse error still
+  // cites the line the user sees in their own file.
+  const nl = csv.includes("\r\n") ? "\r\n" : "\n";
+  const cut = csv.indexOf(nl);
+  if (cut < 0) return csv;
+  return csv.slice(0, cut + nl.length) + nl + csv.slice(cut + nl.length);
 }
 
 interface RunPayloads {

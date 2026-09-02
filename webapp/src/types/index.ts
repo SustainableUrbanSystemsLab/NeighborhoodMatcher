@@ -3,6 +3,14 @@ export interface ParsedDataset {
   rows: string[][];
   fileName: string;
   file: File;
+  /**
+   * Line 2 of the file when it looked like a second header / label row
+   * (NDA and ABCD exports carry one). Present whether it was skipped or,
+   * on the user's say-so, kept in `rows`.
+   */
+  labelRow?: string[];
+  /** true when `labelRow` was removed from `rows` */
+  labelRowSkipped?: boolean;
 }
 
 export interface ColumnLink {

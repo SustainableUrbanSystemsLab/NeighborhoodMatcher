@@ -34,6 +34,7 @@ discovers everything below `tests/`.
 | `tests/test_variable_panel.py` | `variables` key wiring — distance_share aggregation (single-row == contributions, matches definition, sums to 1), sharded ≡ single, CLI `<base>_variables.csv` + CLI↔web agreement. |
 | `tests/test_min_confidence.py` | Minimum-confidence filter — off ≡ base run, exact withheld set per tier, run-level statistics invariant, precedence vs the distance cutoff, no fill on withheld rows, validation, sharded ≡ single, CLI↔web parity. |
 | `tests/test_ablation.py` | Leave-one-variable-out — re-slice ≡ fresh-run anchor equivalence, deterministic sampling arithmetic, recommendation margins/veto/floor, MNN-collapse reproduction (harmful variable flagged, clean ones not), load-bearing detection, assembly validation + order independence, CLI table + CSV. Sampling: exact budgeted size (regression for the stride form that halved it). |
+| `tests/test_label_row.py` | Second header / label rows (NDA/ABCD exports put descriptions on line 2) — detection rule (name echo, text in an otherwise-numeric column, any number = data, numeric-share threshold), `drop_label_row` line-number shift + note, CLI skips loudly and records it in `run_info`, `skip_label_row=False` opt-out, web-path parse errors explain the line, the web app's empty-line placeholder keeps original line numbers, TS mirror constants pinned. |
 
 ## Conventions
 

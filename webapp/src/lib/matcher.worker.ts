@@ -455,9 +455,20 @@ ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       await runAssembleAblation(msg);
     }
   } catch (err) {
-    send({
-      type: "error",
-      message: err instanceof Error ? err.message : String(err),
-    });
+    send({ type: "error", message: userFacingMessage(err) });
   }
 };
+
+/**
+ * Pyodide's PythonError.message is the whole Python traceback; the sentence
+ * the user needs ("target file: line 2, column 'pctPoor': cannot parse …")
+ * is its last line. Show that, keep the traceback in the console.
+ */
+function userFacingMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (!raw.includes("Traceback (most recent call last)")) return raw;
+  console.error(raw);
+  const lines = raw.trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const last = lines[lines.length - 1] ?? raw;
+  return last.replace(/^\w+(?:Error|Exception):\s*/, "");
+}

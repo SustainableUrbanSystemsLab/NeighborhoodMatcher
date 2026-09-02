@@ -112,6 +112,11 @@ The matcher standardizes both files together (joint z-scoring), which
 corrects for *scale* — dollars vs thousands of dollars — but never for
 *meaning*. Before uploading:
 
+- **One header row.** NDA/ABCD-style exports carry a second row of variable
+  labels or descriptions. Both the web app and the CLI detect such a row
+  (text where the column is otherwise numeric, or a repeat of the column
+  names), skip it, and say so — in the upload card, where you can keep it
+  instead, and in the run's warnings and `run_info.csv`.
 - **Same definition and coding in both files.** A column must measure the
   same quantity computed the same way. Example failure: "poverty rate" as
   % below 100% of the federal poverty line in one file but below 180% in

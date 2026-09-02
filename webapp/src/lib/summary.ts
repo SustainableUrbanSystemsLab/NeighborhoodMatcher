@@ -327,6 +327,11 @@ export function buildRunInfoCsv(
     ["supplemental_file", supplemental.fileName],
     ["target_rows", target.rows.length],
     ["supplemental_rows", supplemental.rows.length],
+    ["target_label_row", target.labelRowSkipped ? "line 2 skipped (label row)" : "none"],
+    [
+      "supplemental_label_row",
+      supplemental.labelRowSkipped ? "line 2 skipped (label row)" : "none",
+    ],
     ["matching_variables", output.feature_names.join("; ")],
     ["column_links", JSON.stringify(columnLinks)],
     ["nndr_threshold", summary.threshold],
