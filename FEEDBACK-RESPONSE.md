@@ -128,7 +128,7 @@ Legend: **Done** · **Partly** (something shipped, something still open) ·
 
 - **Done.** Column renamed **Tied at min** and never shows the winner-inclusive 1; shows "none" or the number of *other* rows tied.
 
-### Worked scenarios
+### Scenarios
 
 > Scenario 1 looks great
 

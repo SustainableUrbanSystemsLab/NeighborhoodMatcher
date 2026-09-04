@@ -243,7 +243,7 @@ export default function About() {
             </span>
             <span>
               <span className="block text-lg font-semibold text-gray-900">
-                Worked scenarios
+                Scenarios
               </span>
               <span className="block text-xs text-gray-500">
                 Five small datasets — an exact match, rounding, a scale
