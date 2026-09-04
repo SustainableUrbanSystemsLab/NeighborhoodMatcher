@@ -13,9 +13,9 @@ whatever the page was built with.
 from datetime import datetime, timezone
 
 TOOL_NAME = "NeighborhoodMatcher"
-VERSION = "0.8.7"
+VERSION = "0.8.8"
 AUTHORS = ("Dr. Benson Ku", "Dr. Patrick Kastner")
-ORGANIZATION = "Sustainable Urban Systems Lab"
+ORGANIZATION = "Emory University and Georgia Institute of Technology"
 REPO_URL = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"
 SITE_URL = "https://nbhdmatch.netlify.app/"
 ORGANIZATION_URL = "https://sustainableurbansystems.com/"

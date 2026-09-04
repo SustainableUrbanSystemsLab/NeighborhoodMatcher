@@ -6,6 +6,12 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.8.8] - 2026-09-04
+
+### Changed
+
+- The organization recorded in a run's results package — `run_info.csv`, `README.txt`, and `agreements/contact.txt` — is now "Emory University and Georgia Institute of Technology" (was "Sustainable Urban Systems Lab", the lab's own name rather than the PIs' institutions). The footer's link to the lab's site (sustainableurbansystems.com) is unchanged.
+
 ## [0.8.7] - 2026-09-04
 
 ### Changed

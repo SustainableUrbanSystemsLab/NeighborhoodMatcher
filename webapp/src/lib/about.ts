@@ -8,9 +8,9 @@
 
 export const TOOL_NAME = "NeighborhoodMatcher";
 /** Engine version this build ships (mirrors matcher/about.py VERSION). */
-export const MATCHER_VERSION = "0.8.7";
+export const MATCHER_VERSION = "0.8.8";
 export const AUTHORS = ["Dr. Benson Ku", "Dr. Patrick Kastner"] as const;
-export const ORGANIZATION = "Sustainable Urban Systems Lab";
+export const ORGANIZATION = "Emory University and Georgia Institute of Technology";
 export const REPO_URL =
   "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher";
 export const SITE_URL = "https://nbhdmatch.netlify.app/";
