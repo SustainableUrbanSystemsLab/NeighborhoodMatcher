@@ -8,7 +8,7 @@
 
 export const TOOL_NAME = "NeighborhoodMatcher";
 /** Engine version this build ships (mirrors matcher/about.py VERSION). */
-export const MATCHER_VERSION = "0.8.5";
+export const MATCHER_VERSION = "0.8.6";
 export const AUTHORS = ["Dr. Benson Ku", "Dr. Patrick Kastner"] as const;
 export const ORGANIZATION = "Sustainable Urban Systems Lab";
 export const REPO_URL =

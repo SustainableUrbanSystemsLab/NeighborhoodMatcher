@@ -307,8 +307,21 @@ export function ScenarioExplainer({
       {/* Distance strip */}
       <div className="mt-4 rounded border border-gray-200 p-2">
         <p className="mb-1 px-1 text-[11px] text-gray-500">
-          Every supplemental row, placed by its distance to the target. Blue =
-          chosen match; amber = near-miss competitors inside the cutoff.
+          Every supplemental row, placed by its distance to the target.{" "}
+          <span
+            className="font-semibold"
+            style={{ color: "var(--chart-best-text)" }}
+          >
+            Blue
+          </span>{" "}
+          = chosen match;{" "}
+          <span
+            className="font-semibold"
+            style={{ color: "var(--chart-warn-text)" }}
+          >
+            amber
+          </span>{" "}
+          = near-miss competitors inside the cutoff.
         </p>
         <DistanceStrip rows={scenario.supp_table} threshold={scenario.nndr_threshold} />
       </div>

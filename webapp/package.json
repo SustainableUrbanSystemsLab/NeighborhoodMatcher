@@ -1,7 +1,7 @@
 {
   "name": "dataset-merge",
   "private": true,
-  "version": "0.8.5",
+  "version": "0.8.6",
   "type": "module",
   "scripts": {
     "sync-assets": "node scripts/sync-assets.mjs",

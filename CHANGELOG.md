@@ -6,6 +6,12 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.8.6] - 2026-09-04
+
+### Changed
+
+- Scenario cards' distance-strip caption now colors the words "Blue" and "amber" to match the dots they describe, using the same text-safe chart tokens (`--chart-best-text` / `--chart-warn-text`) the app already uses for on-chart labels — legible against the page canvas in both themes (verified AA).
+
 ## [0.8.5] - 2026-09-04
 
 ### Changed
