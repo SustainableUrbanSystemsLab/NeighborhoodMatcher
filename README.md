@@ -140,6 +140,22 @@ corrects for *scale* — dollars vs thousands of dollars — but never for
   The results page runs a leave-one-variable-out check and recommends
   excluding variables that hurt the linkage.
 
+## Versioning
+
+[Semantic Versioning](https://semver.org/), and **every change that ships bumps
+the version** — the footer, the results page, `run_info.csv` and the CLI banner
+all show it, so two runs can always be told apart.
+
+- **patch** — fixes, copy, visual polish, docs that ship in the app
+- **minor** — new behaviour: a signal, a control, an output column or file
+- **major** — an incompatible change to an output format or the CLI/Python API
+
+Bump with `python scripts/bump_version.py patch|minor|major`, which rewrites
+every declaration (`matcher/about.py`, `webapp/src/lib/about.ts`,
+`webapp/package.json`, both `pyproject.toml`) and keeps them in agreement;
+`--check` verifies. Add a line to `CHANGELOG.md`. CI fails a pull request that
+changes `matcher/src`, `webapp/src` or `webapp/public/matcher` without a bump.
+
 ## Repository layout
 
 | Folder | What it is |
