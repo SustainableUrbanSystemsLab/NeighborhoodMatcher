@@ -2,6 +2,16 @@ import { Link } from "react-router";
 import { ScenarioExplainer, type ScenarioData } from "@/components/ScenarioExplainer";
 import { STEP_VISUALS } from "@/components/AlgorithmSteps";
 import { DataChecklist } from "@/components/DataChecklist";
+import {
+  IconContribution,
+  IconFeatures,
+  IconFlags,
+  IconMnn,
+  IconNndr,
+  IconSmd,
+  IconTier,
+  IconTies,
+} from "@/components/SignalIcons";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/use-theme";
@@ -14,18 +24,20 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
     title: "Identify shared columns.",
     body: (
       <>
-        Same-named columns link automatically; link others by hand. A column
-        can be excluded from matching (an ID, say) and still stay in the
-        output.
+        Columns with the same name in both files are linked automatically;
+        you can link the others by hand. A column can be left out of the
+        matching (an ID column, for example) and still appear in the output.
       </>
     ),
   },
   {
-    title: "Standardize jointly.",
+    title: "Put every variable on the same scale.",
     body: (
       <>
-        Every variable is put on one z-score scale, with the mean and SD
-        pooled across both files, so large numbers don&apos;t dominate.
+        Each variable is converted to a z-score using the mean and standard
+        deviation of both files together, so a variable with big numbers
+        (rent in dollars) does not count more than one with small numbers
+        (a percentage).
       </>
     ),
   },
@@ -33,8 +45,10 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
     title: "Measure similarity.",
     body: (
       <>
-        Each target row&apos;s Euclidean distance to every supplemental row:
-        small means alike (0.03), large means different (0.99).
+        For each target row, the tool computes the straight-line (Euclidean)
+        distance to every supplemental row across all the variables. A small
+        distance means the rows are alike (say 0.03); a large one means they
+        differ (say 0.99).
       </>
     ),
   },
@@ -42,17 +56,17 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
     title: "Pick the best match.",
     body: (
       <>
-        The closest row wins. Exact ties go to the first in file order —
-        deterministically — and are flagged.
+        The closest row wins. If two rows tie exactly, the first one in file
+        order is chosen, the same way every time, and the row is flagged.
       </>
     ),
   },
   {
-    title: "Derive quality signals.",
+    title: "Report quality signals.",
     body: (
       <>
         Confidence tier, NNDR, MNN, near misses, ties, per-feature
-        contribution and SMD — defined below.
+        contribution and SMD, all explained below.
       </>
     ),
   },
@@ -60,52 +74,66 @@ const ALGORITHM_STEPS: Array<{ title: string; body: React.ReactNode }> = [
 
 const LINK = "text-blue-600 dark:text-blue-400 underline hover:text-blue-800";
 
-const SIGNALS: Array<{ name: React.ReactNode; question: string; body: React.ReactNode }> = [
+const SIGNALS: Array<{
+  name: React.ReactNode;
+  question: string;
+  body: React.ReactNode;
+  Icon: () => React.JSX.Element;
+}> = [
   {
     name: "Confidence tier",
-    question: "How much should you trust this row's match?",
+    question: "How much should you trust this match?",
+    Icon: IconTier,
     body: (
       <>
-        <strong>High</strong>: one clearly closest row, confirmed both ways,
-        all variables compared. <strong>Medium</strong>: plausible, but close
-        competitors or missing variables. <strong>Low</strong>: an exact tie,
-        a one-sided pairing, a near-ambiguous ratio, or only one variable.{" "}
+        <strong>High</strong>: one row is clearly the closest, the pairing
+        holds in both directions, and every variable was compared.{" "}
+        <strong>Medium</strong>: a reasonable match, but other rows were
+        nearly as close or some variables were missing.{" "}
+        <strong>Low</strong>: an exact tie, a one-sided pairing, a ratio
+        close to 1, or only one variable to go on.{" "}
         <strong>No match</strong>: nothing could be assigned.
       </>
     ),
   },
   {
-    name: "NNDR + near-miss count",
-    question: "How clearly was one row the best?",
+    name: "NNDR and near-miss count",
+    question: "How clearly did one row stand out?",
+    Icon: IconNndr,
     body: (
       <>
-        d₁/d₂ (
+        NNDR is the best distance divided by the second-best (
         <a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className={LINK}>Lowe 2004</a>
-        ): near 0 is clear, near 1 is ambiguous. Near misses = rows within
-        the threshold of the best.
+        ). Near 0 means one row stood out; near 1 means two rows were about
+        as close. The near-miss count is how many other rows were almost as
+        close as the winner.
       </>
     ),
   },
   {
     name: "Mutual Nearest Neighbor (MNN)",
     question: "Does the match hold in both directions?",
+    Icon: IconMnn,
     body: (
       <>
-        Not confirmed means the supplemental row is closer to a different
-        target — review before use (
+        Confirmed means the supplemental row is also closest to this target.
+        Not confirmed means it is actually closer to a different target row,
+        so check the match before you use it (
         <a href="https://doi.org/10.5220/0001787803310340" target="_blank" rel="noreferrer" className={LINK}>Muja &amp; Lowe 2009</a>
         ).
       </>
     ),
   },
   {
-    name: "Features used",
-    question: "How many variables informed the match?",
+    name: "Variables used",
+    question: "How many variables went into the match?",
+    Icon: IconFeatures,
     body: (
       <>
-        Missing values never compare — they add a fixed penalty — so 1 of 4
-        rests on far less than 4 of 4. Also reported: exact on every
-        available variable.
+        Missing values are never compared; they add a fixed penalty instead.
+        A match on 1 of 4 variables rests on much less than a match on 4 of
+        4. The tool also tells you when the winner matches exactly on every
+        variable that was available.
       </>
     ),
   },
@@ -115,40 +143,51 @@ const SIGNALS: Array<{ name: React.ReactNode; question: string; body: React.Reac
         Ties (<code>repeats</code>)
       </>
     ),
-    question: "Several rows at exactly the same minimum distance?",
+    question: "Did several rows land at exactly the same distance?",
+    Icon: IconTies,
     body: (
       <>
-        <code>repeats</code> counts them including the winner (1 = unique).
-        First in file order is chosen, deterministically, and the row is
-        flagged.
+        <code>repeats</code> counts the rows at the minimum distance,
+        including the winner (1 means no tie). The first row in file order is
+        chosen, the same way every time, and the row is flagged.
       </>
     ),
   },
   {
     name: "Per-feature contribution",
-    question: "Which variables drove the distance?",
+    question: "Which variables made up the distance?",
+    Icon: IconContribution,
     body: (
       <>
-        Diagnostic only. 80% from one column <em>and</em> a large distance
-        suggests a unit or scale problem; concentration alone is normal.
+        For information only. If one column accounts for most of a{" "}
+        <em>large</em> distance, check its units or scale. One column
+        dominating a small distance is normal.
       </>
     ),
   },
   {
     name: "Standardized Mean Difference (SMD)",
-    question: "Is the whole run balanced?",
+    question: "Are the two datasets balanced overall?",
+    Icon: IconSmd,
     body: (
       <>
-        |SMD| &lt; 0.10 good, &gt; 0.25 poor (
+        Below 0.10 is good, above 0.25 is poor (
         <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className={LINK}>Austin</a>
-        ). A dataset-level check, not a verdict on any one match.
+        ). This looks at the two datasets as a whole, not at any single
+        match.
       </>
     ),
   },
   {
     name: "Plain-English flags",
-    question: "Why exactly was this row flagged?",
-    body: <>The specific reasons in one string; the tier summarizes them.</>,
+    question: "Why was this row flagged?",
+    Icon: IconFlags,
+    body: (
+      <>
+        The specific reasons, written out in one line. The confidence tier
+        is the short version.
+      </>
+    ),
   },
 ];
 
@@ -172,9 +211,9 @@ export default function About() {
             The matching algorithm
           </h2>
           <p className="mb-3 text-sm text-gray-500">
-            For each row in your target file, the most similar row in the
-            supplemental file — by the characteristics you choose, never by
-            ZIP code or any identifier.
+            For each row in your target file, the tool finds the most similar
+            row in the supplemental file, using the characteristics you
+            choose and never ZIP code or any other identifier.
           </p>
           <ol className="space-y-2">
             {ALGORITHM_STEPS.map((step, i) => {
@@ -201,9 +240,9 @@ export default function About() {
             Preparing your data
           </h2>
           <p className="mb-3 text-sm text-gray-500">
-            Standardization corrects <em>scale</em>, never <em>meaning</em>:
-            the tool cannot tell that two same-named columns were computed
-            differently. That check is yours.
+            Standardization fixes <em>scale</em>, not <em>meaning</em>: the
+            tool cannot tell that two columns with the same name were
+            computed differently. That check is yours.
           </p>
           <DataChecklist />
         </section>
@@ -218,19 +257,24 @@ export default function About() {
                 Quality signals
               </span>
               <span className="block text-xs text-gray-500">
-                Start with the confidence tier and the flags; then NNDR, MNN
-                and near misses. Contribution explains <em>why</em>; SMD
-                judges the whole run.
+                Start with the confidence tier and the flags. Then look at
+                NNDR, MNN and near misses. Contribution tells you <em>why</em>;
+                SMD tells you about the run as a whole.
               </span>
             </span>
           </summary>
           <dl className="grid gap-x-6 gap-y-3 px-5 pb-5 text-sm text-gray-700 sm:grid-cols-2">
             {SIGNALS.map((s, i) => (
-              <div key={i}>
-                <dt className="font-semibold text-gray-900">{s.name}</dt>
-                <dd className="mt-0.5">
-                  <span className="text-gray-500">{s.question}</span> {s.body}
-                </dd>
+              <div key={i} className="flex gap-3">
+                <div className="h-12 w-12 flex-none rounded border border-gray-100 bg-gray-50/60 p-1">
+                  <s.Icon />
+                </div>
+                <div>
+                  <dt className="font-semibold text-gray-900">{s.name}</dt>
+                  <dd className="mt-0.5">
+                    <span className="text-gray-500">{s.question}</span> {s.body}
+                  </dd>
+                </div>
               </div>
             ))}
           </dl>
@@ -246,9 +290,10 @@ export default function About() {
                 Scenarios
               </span>
               <span className="block text-xs text-gray-500">
-                Five small datasets — an exact match, rounding, a scale
-                mismatch, an ambiguous match, MNN not confirmed — with the
-                matcher&apos;s real numbers and the worked math.
+                Five small example datasets: an exact match, rounding, a
+                scale mismatch, an ambiguous match, and MNN not confirmed.
+                Each shows the matcher&apos;s real numbers and the
+                corresponding math.
               </span>
             </span>
           </summary>
