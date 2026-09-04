@@ -235,10 +235,7 @@ export function ScenarioExplainer({
   const ex = scenario.example;
 
   return (
-    <details
-      open={index === 0}
-      className="group rounded-lg border border-gray-200 bg-surface"
-    >
+    <details className="group rounded-lg border border-gray-200 bg-surface">
       <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
         <span className="text-gray-400 transition-transform group-open:rotate-90">
           ▸

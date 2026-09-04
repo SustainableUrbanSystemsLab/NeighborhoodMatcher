@@ -8,7 +8,7 @@
 
 export const TOOL_NAME = "NeighborhoodMatcher";
 /** Engine version this build ships (mirrors matcher/about.py VERSION). */
-export const MATCHER_VERSION = "0.8.4";
+export const MATCHER_VERSION = "0.8.5";
 export const AUTHORS = ["Dr. Benson Ku", "Dr. Patrick Kastner"] as const;
 export const ORGANIZATION = "Sustainable Urban Systems Lab";
 export const REPO_URL =
@@ -18,6 +18,10 @@ export const ORGANIZATION_URL = "https://sustainableurbansystems.com/";
 /** Mirrors matcher/about.py AUTHOR_URLS — one entry per AUTHORS name that has a public profile. */
 export const AUTHOR_URLS: Partial<Record<(typeof AUTHORS)[number], string>> = {
   "Dr. Benson Ku": "https://med.emory.edu/directory/profile/?u=BSKU",
+  // Same URL as ORGANIZATION_URL, written literally so the object-literal
+  // parity test (test_webapp_mirror_matches_python_author_urls) can see it —
+  // it reads quoted-string pairs, not identifier references.
+  "Dr. Patrick Kastner": "https://sustainableurbansystems.com/",
 };
 
 /** Authors as one display string: "A and B" / "A, B, and C". */

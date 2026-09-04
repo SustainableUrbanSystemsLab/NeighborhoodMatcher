@@ -11,8 +11,6 @@
 import {
   AUTHOR_URLS,
   AUTHORS,
-  ORGANIZATION,
-  ORGANIZATION_URL,
   REPO_URL,
   TOOL_NAME,
   buildLabel,
@@ -95,17 +93,6 @@ export function SiteFooter({ className = "" }: { className?: string }) {
         </p>
         <p>
           <AuthorCredit />
-        </p>
-        <p>
-          <a
-            href={ORGANIZATION_URL}
-            target="_blank"
-            rel="noreferrer"
-            title={`${ORGANIZATION} website`}
-            className={FOOTER_LINK}
-          >
-            {ORGANIZATION}
-          </a>
         </p>
       </div>
     </footer>

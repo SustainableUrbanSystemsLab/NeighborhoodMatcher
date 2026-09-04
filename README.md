@@ -19,7 +19,7 @@
 </p>
 
 Developed by **[Dr. Benson Ku](https://med.emory.edu/directory/profile/?u=BSKU)**
-and **Dr. Patrick Kastner** ([Sustainable Urban Systems Lab](https://sustainableurbansystems.com/)). Given a **target** CSV (e.g. study participants) and a
+and **[Dr. Patrick Kastner](https://sustainableurbansystems.com/)**. Given a **target** CSV (e.g. study participants) and a
 **supplemental** CSV (e.g. census tracts), the matcher links every target row to its closest supplemental row by
 standardized Euclidean distance and reports how trustworthy each link is:
 nearest-neighbor distance ratio (NNDR), mutual-nearest-neighbor confirmation,

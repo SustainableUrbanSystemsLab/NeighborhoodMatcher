@@ -6,6 +6,13 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.8.5] - 2026-09-04
+
+### Changed
+
+- Footer credits both PIs as links (Dr. Benson Ku's Emory profile; Dr. Patrick Kastner's lab site) and drops the separate "Sustainable Urban Systems Lab" line; README matches.
+- The About page's "Scenarios" section no longer pre-expands Scenario 1 when opened — every scenario card starts collapsed, consistent with the section itself being collapsed by default.
+
 ## [0.8.4] - 2026-09-04
 
 ### Changed

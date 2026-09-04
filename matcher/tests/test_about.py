@@ -142,9 +142,12 @@ def test_webapp_mirror_matches_python(ts_name, py_value):
 
 def test_author_urls_key_only_real_authors():
     # A typo in AUTHOR_URLS would silently credit-by-name-only rather than
-    # error, so pin that every key is a real author.
-    assert set(about.AUTHOR_URLS) <= set(about.AUTHORS)
-    assert about.AUTHOR_URLS["Dr. Benson Ku"].startswith("https://")
+    # error, so pin that every key is a real author, and that AUTHOR_URLS
+    # covers every current author (both PIs are linked; the "an author with
+    # no entry stays plain text" fallback in the webapp is exercised by
+    # test_authors_line_handles_one_and_three_names's fictional names).
+    assert set(about.AUTHOR_URLS) == set(about.AUTHORS)
+    assert all(url.startswith("https://") for url in about.AUTHOR_URLS.values())
 
 
 @pytest.mark.skipif(not TS_ABOUT.exists(), reason="webapp not present")
