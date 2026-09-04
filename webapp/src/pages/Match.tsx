@@ -46,6 +46,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/lib/use-theme";
 
 const DEFAULT_THRESHOLD = 0.8;
+// High by default: a first-time user gets only links that meet a standard;
+// the Link step explains how to relax it. Start over must return here too.
+const DEFAULT_MIN_CONFIDENCE: "medium" | "high" | null = "high";
 
 function formatComparisons(n: number): string {
   if (n >= 1e9) return `about ${(n / 1e9).toFixed(1)} billion`;
@@ -84,7 +87,7 @@ export default function Match() {
   const [threshold, setThreshold] = useState<number>(DEFAULT_THRESHOLD);
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
   const [minConfidence, setMinConfidence] = useState<"medium" | "high" | null>(
-    "high"
+    DEFAULT_MIN_CONFIDENCE
   );
   const [ablation, setAblation] = useState<AblationState>({ status: "idle" });
   // Invalidates in-flight ablation updates after a re-run / start-over — a
@@ -354,7 +357,7 @@ export default function Match() {
     setMatchOutput(null);
     setThreshold(DEFAULT_THRESHOLD);
     setMaxDistance(null);
-    setMinConfidence(null);
+    setMinConfidence(DEFAULT_MIN_CONFIDENCE);
     setRestored(null);
     ablationRunRef.current++;
     setAblation({ status: "idle" });
