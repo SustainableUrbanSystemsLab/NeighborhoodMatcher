@@ -255,11 +255,19 @@ export function ColumnLinker({
       )}
 
       {unmatchedTarget.length > 0 && unmatchedSupplemental.length > 0 && (
-        <div className="rounded-lg border border-gray-200 p-4">
-          <p className="mb-3 text-sm font-medium text-gray-700">
-            Manual Column Linking
-          </p>
-          <div className="flex items-end gap-3">
+        <details className="group rounded-lg border border-gray-200 p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-gray-700 [&::-webkit-details-marker]:hidden">
+            <span>Manual Column Linking</span>
+            <span className="text-xs font-normal text-gray-500">
+              {unmatchedTarget.length} target / {unmatchedSupplemental.length}{" "}
+              supplemental column{unmatchedSupplemental.length === 1 ? "" : "s"}{" "}
+              unlinked
+              <span className="ml-2 inline-block transition-transform group-open:rotate-90">
+                ▸
+              </span>
+            </span>
+          </summary>
+          <div className="mt-3 flex items-end gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-gray-500">
                 Target Column
@@ -302,7 +310,7 @@ export function ColumnLinker({
               Link
             </button>
           </div>
-        </div>
+        </details>
       )}
 
       <div className="flex gap-4 text-xs text-gray-500">

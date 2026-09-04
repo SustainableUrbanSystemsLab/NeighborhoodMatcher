@@ -84,7 +84,7 @@ export default function Match() {
   const [threshold, setThreshold] = useState<number>(DEFAULT_THRESHOLD);
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
   const [minConfidence, setMinConfidence] = useState<"medium" | "high" | null>(
-    null
+    "high"
   );
   const [ablation, setAblation] = useState<AblationState>({ status: "idle" });
   // Invalidates in-flight ablation updates after a re-run / start-over — a
@@ -666,13 +666,7 @@ function WorkerControl({
           </h3>
           <p className="mt-0.5 max-w-md text-xs text-gray-500">
             Your browser reports {reported} CPU core
-            {reported === 1 ? "" : "s"}. Privacy protections in some browsers
-            (Brave, Firefox strict mode, Safari) deliberately under-report the
-            real count — if your machine has more cores, set the number here.{" "}
-            <span className="font-medium">
-              If you&apos;re not sure, leave this on Auto
-            </span>{" "}
-            — it only affects speed, never the results.
+            {reported === 1 ? "" : "s"}.
           </p>
         </div>
         <select
@@ -727,8 +721,7 @@ function ThresholdControl({
         A match is flagged when the ratio of the best distance to the i-th
         distance is ≥ threshold. Lower = stricter. The 0.80 default comes
         from image matching (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Lowe 2004</a>)
-        and has not been calibrated for tabular data — treat flags as
-        guidance, not verdicts.
+        and has not been calibrated for tabular data.
       </p>
     </div>
   );
@@ -795,8 +788,8 @@ function MinConfidenceControl({
           </h3>
           <p className="mt-0.5 max-w-md text-xs text-gray-500">
             {value == null
-              ? "Off (default): every link is reported and the quality signals flag doubtful ones. Set a minimum for large runs where you only want links that meet a standard — rows below it are written unlinked instead of flagged."
-              : `Links below ${value === "high" ? "High" : "Medium"} confidence are withheld: those rows appear unlinked in the linked dataset, with the nearest row and full diagnostics kept in the detail file for review. Nothing else about the run changes.`}
+              ? "Off: every link is reported and the quality signals flag doubtful ones. Set a minimum for large runs where you only want links that meet a standard — rows below it are written unlinked instead of flagged."
+              : `Links below ${value === "high" ? "High" : "Medium"} confidence are withheld: those rows appear unlinked in the linked dataset, with the nearest row and full diagnostics kept in the detail file for review.`}
           </p>
         </div>
         <select

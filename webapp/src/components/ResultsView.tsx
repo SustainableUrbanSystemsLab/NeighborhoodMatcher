@@ -56,6 +56,7 @@ type SortKey =
   | "best_distance"
   | "nndr"
   | "near_miss"
+  | "features_used"
   | "confidence"
   | "flags";
 
@@ -125,6 +126,9 @@ export function ResultsView({
           break;
         case "near_miss":
           cmp = a.near_miss - b.near_miss;
+          break;
+        case "features_used":
+          cmp = a.features_used - b.features_used;
           break;
         case "confidence":
           cmp = tierRank(a.confidence) - tierRank(b.confidence);
@@ -310,6 +314,13 @@ export function ResultsView({
                   desc={sortDesc}
                   onClick={() => toggleSort("near_miss")}
                 />
+                <SortableHead
+                  label="Variables used"
+                  active={sortKey === "features_used"}
+                  desc={sortDesc}
+                  onClick={() => toggleSort("features_used")}
+                  help="How many of the linked matching variables were observed on both sides of this pair and therefore informed the match. Fewer than the total means the missing-data penalty contributed to the distance."
+                />
                 <th
                   className="cursor-help px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 underline decoration-dotted underline-offset-2"
                   title="Mutual nearest neighbor. ✓ = the pairing holds in both directions: the matched supplemental row is not closer to any other target row. ✗ = one-sided — the supplemental row fits a different target even better, so this match may not be a real correspondence."
@@ -365,6 +376,15 @@ export function ResultsView({
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
                         {row.near_miss}
                       </td>
+                      <td
+                        className={`px-3 py-1.5 font-mono text-xs ${
+                          row.features_used < feature_names.length
+                            ? "text-amber-800"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        {row.features_used}/{feature_names.length}
+                      </td>
                       <td className="px-3 py-1.5 text-xs">
                         {row.mnn_confirmed ? (
                           <span className="text-green-700">✓</span>
@@ -402,7 +422,7 @@ export function ResultsView({
                     </tr>
                     {isSelected && (
                       <tr className="bg-blue-50/40">
-                        <td colSpan={8} className="px-3 py-3">
+                        <td colSpan={9} className="px-3 py-3">
                           <DrilldownPanel
                             detail={row}
                             features={feature_names}
@@ -561,16 +581,21 @@ function SortableHead({
   active,
   desc,
   onClick,
+  help,
 }: {
   label: string;
   active: boolean;
   desc: boolean;
   onClick: () => void;
+  help?: string;
 }) {
   return (
     <th
       onClick={onClick}
-      className="cursor-pointer px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-800"
+      title={help}
+      className={`cursor-pointer px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-800 ${
+        help ? "underline decoration-dotted underline-offset-2" : ""
+      }`}
     >
       {label}
       {active && <span className="ml-1">{desc ? "▼" : "▲"}</span>}
