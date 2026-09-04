@@ -107,86 +107,92 @@
 }
 
 [data-theme="dark"] {
-  /* GitHub's dark theme (Primer primitives v11, the tokens github.com
-     serves), same structure as light: boxes are the CANVAS colour with a
-     border; #151b23 (bgColor-muted) is for insets, headers and hover; text
-     is fgColor-default / fgColor-muted. Tinted callouts are Primer's
-     translucent *-muted tokens composited over the canvas. */
-  --color-canvas: #0d1117; /* bgColor-default — the page */
-  --color-surface: #0d1117; /* bgColor-default — boxes, same as the canvas */
-  --color-surface-muted: #151b23; /* bgColor-muted */
+  /* GitHub's DARK DIMMED theme (Primer primitives v11 — the tokens
+     github.com serves for Settings › Appearance › Dark dimmed), same
+     structure as light: boxes are the CANVAS colour with a border;
+     bgColor-muted is for insets, headers and hover; text is
+     fgColor-default / fgColor-muted. Tinted callouts are Primer's
+     translucent *-muted tokens composited over the canvas. Where a
+     Primer text token lands a hair under WCAG AA on this canvas (links
+     #478be6 = 4.3:1, danger #e5534b = 4.0:1) the next lighter step of the
+     same Primer scale is used for TEXT; fills keep the token. */
+  --color-canvas: #212830; /* bgColor-default — the page */
+  --color-surface: #212830; /* bgColor-default — boxes, same as the canvas */
+  --color-surface-muted: #262c36; /* bgColor-muted */
 
-  --color-gray-50: #151b23; /* bgColor-muted — recessed fills, row hover */
-  --color-gray-100: #212830; /* control-bgColor-rest — chips, hover */
+  --color-gray-50: #262c36; /* bgColor-muted — recessed fills, row hover */
+  --color-gray-100: #262c36; /* chips and hover on the canvas */
   --color-gray-200: #3d444d; /* borderColor-default */
   --color-gray-300: #3d444d; /* control-borderColor-rest — inputs */
-  --color-gray-400: #9198a1; /* fgColor-muted — placeholders */
-  --color-gray-500: #9198a1; /* fgColor-muted */
-  --color-gray-600: #9198a1;
-  --color-gray-700: #f0f6fc; /* fgColor-default — body */
-  --color-gray-800: #f0f6fc;
-  --color-gray-900: #f0f6fc; /* headings */
+  /* fgColor-muted is #9198a1, which lands at 4.2:1 on the tinted callouts
+     of this lighter canvas; one step up keeps every muted string ≥ 4.5:1. */
+  --color-gray-400: #a5adb6; /* muted — placeholders, row markers */
+  --color-gray-500: #a5adb6; /* muted text */
+  --color-gray-600: #a5adb6;
+  --color-gray-700: #d1d7e0; /* fgColor-default — body */
+  --color-gray-800: #d1d7e0;
+  --color-gray-900: #d1d7e0; /* headings */
 
-  /* Accent. 500–700 stay backgrounds (primary button + its hover), so the
-     blue TEXT shades live at 300/400 and carry `dark:` variants where a
-     component needs them. */
-  --color-blue-50: #111d2e; /* bgColor-accent-muted over the canvas */
-  --color-blue-100: #1e3758;
-  --color-blue-200: #1e4273; /* borderColor-accent-muted over the canvas */
-  --color-blue-300: #79c0ff; /* bright accent text */
-  --color-blue-400: #4493f8; /* fgColor-accent — links */
-  --color-blue-500: #388bfd;
-  --color-blue-600: #1f6feb; /* accent.emphasis — primary button */
-  --color-blue-700: #388bfd; /* its hover, per Primer */
-  --color-blue-800: #a5d6ff; /* text on tinted callouts */
-  --color-blue-900: #cae8ff;
+  /* Accent (Primer dimmed blue scale). 500–700 stay backgrounds (primary
+     button + hover); the blue TEXT shades live at 300/400 and carry
+     `dark:` variants where a component needs them. */
+  --color-blue-50: #243142; /* bgColor-accent-muted over the canvas */
+  --color-blue-100: #273a54;
+  --color-blue-200: #2e4d78; /* borderColor-accent-muted over the canvas */
+  --color-blue-300: #96d0ff; /* bright accent text */
+  --color-blue-400: #6cb6ff; /* links (fgColor-accent #478be6 is 4.3:1 here) */
+  --color-blue-500: #478be6; /* fgColor-accent — fills, indicator dots */
+  --color-blue-600: #316dca; /* bgColor-accent-emphasis — primary button */
+  --color-blue-700: #478be6; /* its hover */
+  --color-blue-800: #96d0ff; /* text on tinted callouts */
+  --color-blue-900: #c6e6ff;
 
-  --color-red-50: #25181c; /* bgColor-danger-muted over the canvas */
-  --color-red-100: #4e2826;
-  --color-red-200: #6b2b2b; /* borderColor-danger-muted over the canvas */
-  --color-red-300: #8b3a37;
-  --color-red-500: #f85149; /* danger.fg — dots and bars */
-  --color-red-600: #ff7b72;
-  --color-red-700: #ff9a94;
-  --color-red-800: #ffb8b3;
-  --color-red-900: #ffd6d3;
+  --color-red-50: #352c33; /* bgColor-danger-muted over the canvas */
+  --color-red-100: #483135;
+  --color-red-200: #6f393b; /* borderColor-danger-muted over the canvas */
+  --color-red-300: #c93c37; /* bgColor-danger-emphasis */
+  --color-red-500: #f47067; /* danger text/dots (fgColor-danger #e5534b is 4.0:1 here) */
+  --color-red-600: #ff938a;
+  --color-red-700: #ffb8b0;
+  --color-red-800: #ffd8d3;
+  --color-red-900: #ffd8d3;
 
-  --color-green-50: #12261e; /* bgColor-success-muted over the canvas */
-  --color-green-100: #1c3c2a;
-  --color-green-200: #1a4a29; /* borderColor-success-muted over the canvas */
-  --color-green-500: #3fb950; /* success.fg */
-  --color-green-600: #3fb950;
-  --color-green-700: #56d364;
-  --color-green-800: #7ee787;
-  --color-green-900: #aff5b4;
+  --color-green-50: #273834; /* bgColor-success-muted over the canvas */
+  --color-green-100: #2a4337;
+  --color-green-200: #30543a; /* borderColor-success-muted over the canvas */
+  --color-green-500: #57ab5a; /* fgColor-success */
+  --color-green-600: #57ab5a;
+  --color-green-700: #6bc46d;
+  --color-green-800: #8ddb8c;
+  --color-green-900: #b4f1b4;
 
-  --color-amber-50: #272215; /* bgColor-attention-muted over the canvas */
-  --color-amber-100: #3f341c;
-  --color-amber-200: #533d11; /* borderColor-attention-muted over the canvas */
-  --color-amber-300: #7d6420;
-  --color-amber-500: #d29922; /* attention.fg */
-  --color-amber-600: #d29922;
-  --color-amber-700: #e3b341;
-  --color-amber-800: #f2cc60;
-  --color-amber-900: #f8e3a1;
+  --color-amber-50: #36352c; /* bgColor-attention-muted over the canvas */
+  --color-amber-100: #443d29;
+  --color-amber-200: #594a25; /* borderColor-attention-muted over the canvas */
+  --color-amber-300: #966600; /* bgColor-attention-emphasis */
+  --color-amber-500: #c69026; /* fgColor-attention — dots and bars */
+  --color-amber-600: #daaa3f; /* attention text (the token is 4.4:1 on its own tint here) */
+  --color-amber-700: #eac55f;
+  --color-amber-800: #eac55f;
+  --color-amber-900: #fbe090;
 
   /* Charts: scaffolding recedes to the border tokens, marks keep meaning. */
   --chart-grid: #3d444db3; /* borderColor-muted */
   --chart-rule: #3d444d;
-  --chart-label: #8b949e;
-  --chart-muted: #8b949e;
+  --chart-label: #9198a1;
+  --chart-muted: #9198a1;
   --chart-muted-strong: #b1bac4;
-  --chart-best: #58a6ff;
-  --chart-best-text: #79c0ff;
-  --chart-best-soft: #1f6feb;
-  --chart-near: #e3b341;
-  --chart-ok: #3fb950;
-  --chart-cutoff: #f85149;
-  --chart-cutoff-text: #ff7b72;
-  --chart-good-bg: #1a2f27;
-  --chart-good-text: #7ee787;
-  --chart-warn-bg: #2f2b1e;
-  --chart-warn-text: #f2cc60;
+  --chart-best: #478be6;
+  --chart-best-text: #6cb6ff;
+  --chart-best-soft: #316dca;
+  --chart-near: #c69026;
+  --chart-ok: #57ab5a;
+  --chart-cutoff: #e5534b;
+  --chart-cutoff-text: #f47067;
+  --chart-good-bg: #273834;
+  --chart-good-text: #6bc46d;
+  --chart-warn-bg: #36352c;
+  --chart-warn-text: #daaa3f;
 
   color-scheme: dark; /* native form controls, scrollbars, and caret */
 }

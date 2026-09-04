@@ -13,7 +13,7 @@ whatever the page was built with.
 from datetime import datetime, timezone
 
 TOOL_NAME = "NeighborhoodMatcher"
-VERSION = "0.8.1"
+VERSION = "0.8.2"
 AUTHORS = ("Dr. Benson Ku", "Dr. Patrick Kastner")
 ORGANIZATION = "Sustainable Urban Systems Lab"
 REPO_URL = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"

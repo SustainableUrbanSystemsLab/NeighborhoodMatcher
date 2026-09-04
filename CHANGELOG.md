@@ -6,6 +6,12 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.8.2] - 2026-09-04
+
+### Fixed
+
+- Dark mode is GitHub's **Dark dimmed** theme (canvas `#212830`, insets `#262c36`, text `#d1d7e0`), not the near-black Dark default; boxes stay the canvas colour with a border. Link and danger text use the next lighter step of the same Primer scale where the token itself sits a hair under WCAG AA on this canvas.
+
 ## [0.8.1] - 2026-09-04
 
 ### Fixed
