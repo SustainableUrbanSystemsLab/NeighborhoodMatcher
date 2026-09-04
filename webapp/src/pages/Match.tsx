@@ -370,7 +370,7 @@ export default function Match() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas">
       <div className="mx-auto max-w-4xl p-4">
         <div className="mb-2 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5" title="Back to the landing page">

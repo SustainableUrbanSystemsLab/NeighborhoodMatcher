@@ -194,7 +194,7 @@ const SIGNALS: Array<{
 export default function About() {
   const theme = useTheme();
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas">
       <div className="mx-auto max-w-4xl p-4">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">How it works</h1>

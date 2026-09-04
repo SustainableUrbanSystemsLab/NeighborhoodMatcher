@@ -8,7 +8,7 @@ export default function Home() {
   const theme = useTheme();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-xl text-center">
         <div className="mb-2 flex justify-end">
           <ThemeToggle theme={theme} />
@@ -26,7 +26,7 @@ export default function Home() {
         </p>
 
         <div className="mb-8 space-y-3 text-left">
-          <div className="rounded-lg bg-surface p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-surface p-4">
             <h3 className="font-medium text-gray-900">1. Upload two datasets</h3>
             <p className="text-sm text-gray-500">
               A target dataset (the one you want to add information to) and a
@@ -34,13 +34,13 @@ export default function Home() {
               census extract), both CSV
             </p>
           </div>
-          <div className="rounded-lg bg-surface p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-surface p-4">
             <h3 className="font-medium text-gray-900">2. Link matching columns</h3>
             <p className="text-sm text-gray-500">
               Auto-detect shared columns or manually link them
             </p>
           </div>
-          <div className="rounded-lg bg-surface p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-surface p-4">
             <h3 className="font-medium text-gray-900">3. Download merged results</h3>
             <p className="text-sm text-gray-500">
               Each target row matched to its closest supplemental row

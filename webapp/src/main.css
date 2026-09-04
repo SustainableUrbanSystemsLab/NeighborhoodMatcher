@@ -35,8 +35,8 @@
    target) keep their meaning and only shift lightness where contrast needs it.
 --------------------------------------------------------------------------- */
 :root {
-  --chart-grid: #f1f5f9;        /* histogram gridlines */
-  --chart-rule: #e2e8f0;        /* axis rules, inert cells */
+  --chart-grid: #f6f8fa;        /* histogram gridlines — bgColor-muted */
+  --chart-rule: #d1d9e0;        /* axis rules, inert cells — borderColor-default */
   --chart-label: #64748b;       /* tick and axis labels */
   --chart-muted: #94a3b8;       /* ordinary, unremarkable points */
   --chart-muted-strong: #475569;
@@ -56,40 +56,83 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
-  /* Card / panel background. A token rather than `white` so it can move with
-     the theme; sits one step above the page canvas in both. */
-  --color-surface: #ffffff;
-  --color-surface-muted: oklch(98.5% 0.002 247.839); /* gray-50 */
+  /* GitHub's light theme, by ROLE (Primer primitives v11 — the tokens
+     github.com serves). The structure matters as much as the values: on
+     GitHub a box is the CANVAS colour delimited by a border, and the muted
+     shade is reserved for headers, insets, hover fills and default buttons.
+     So `surface` (cards) equals `canvas` (page), and gray-50 is the muted
+     recessed fill — never the page background. */
+  --color-canvas: #ffffff; /* bgColor-default — the page */
+  --color-surface: #ffffff; /* bgColor-default — boxes, same as the canvas */
+  --color-surface-muted: #f6f8fa; /* bgColor-muted */
+
+  /* Neutrals: 50–300 are fills and borders, 400–900 are text. GitHub has
+     two text colours (default and muted); the shades map onto those. */
+  --color-gray-50: #f6f8fa; /* bgColor-muted — recessed fills, row hover */
+  --color-gray-100: #eff2f5; /* control-bgColor-hover — chips, hover */
+  --color-gray-200: #d1d9e0; /* borderColor-default */
+  --color-gray-300: #d1d9e0; /* control-borderColor-rest — inputs */
+  --color-gray-400: #59636e; /* fgColor-muted — placeholders */
+  --color-gray-500: #59636e; /* fgColor-muted */
+  --color-gray-600: #59636e;
+  --color-gray-700: #1f2328; /* fgColor-default — body */
+  --color-gray-800: #1f2328;
+  --color-gray-900: #1f2328; /* headings */
+
+  /* Tinted callouts: Primer's *-muted backgrounds, borders composited over
+     white the way the browser does it (accent/success/attention/danger). */
+  --color-blue-50: #ddf4ff;
+  --color-blue-200: #bbdfff;
+  --color-green-50: #dafbe1;
+  --color-green-200: #b7e7c4;
+  --color-amber-50: #fff8c5;
+  --color-amber-200: #eedcab;
+  --color-red-50: #ffebe9;
+  --color-red-200: #ffcdcd;
+
+  /* Semantic text on white and on the tints above: Primer's fgColor-* and
+     the next darker steps, all ≥ 4.5:1 where the app uses them (the
+     Tailwind defaults fall to ~3–4.4:1 on GitHub's whiter surfaces). */
+  --color-blue-500: #0969da; /* fgColor-accent — secondary links */
+  --color-green-600: #1a7f37; /* fgColor-success — "Active" labels */
+  --color-green-700: #116329; /* on success-muted callouts */
+  --color-green-800: #116329;
+  --color-amber-600: #9a6700; /* fgColor-attention */
+  --color-amber-700: #7d4e00;
+  --color-amber-800: #633c01;
+  --color-red-500: #cf222e; /* bgColor-danger-emphasis — "Unlink" */
+  --color-red-600: #a40e26; /* on success/attention tints ("Remove") */
+  --color-red-700: #82071e;
+  --color-red-800: #82071e;
 }
 
 [data-theme="dark"] {
-  /* GitHub's dark theme — the live Primer tokens read from github.com
-     (Sept 2026): canvas #0d1117, muted surfaces #151b23, borders #3d444d,
-     text #f0f6fc, and the accent/success/attention/danger families
-     at their Primer values. Tinted callouts are Primer's translucent
-     "subtle"/"muted" tokens pre-composited over the card, so they behave
-     predictably on either background. */
-  --color-surface: #151b23; /* bgColor-muted — cards and panels */
-  --color-surface-muted: #0d1117;
+  /* GitHub's dark theme (Primer primitives v11, the tokens github.com
+     serves), same structure as light: boxes are the CANVAS colour with a
+     border; #151b23 (bgColor-muted) is for insets, headers and hover; text
+     is fgColor-default / fgColor-muted. Tinted callouts are Primer's
+     translucent *-muted tokens composited over the canvas. */
+  --color-canvas: #0d1117; /* bgColor-default — the page */
+  --color-surface: #0d1117; /* bgColor-default — boxes, same as the canvas */
+  --color-surface-muted: #151b23; /* bgColor-muted */
 
-  /* Neutrals: 50–300 become canvas/fills/borders, 400–900 become text. */
-  --color-gray-50: #0d1117; /* bgColor-default */
-  --color-gray-100: #151b23; /* bgColor-muted — recessed fills */
+  --color-gray-50: #151b23; /* bgColor-muted — recessed fills, row hover */
+  --color-gray-100: #212830; /* control-bgColor-rest — chips, hover */
   --color-gray-200: #3d444d; /* borderColor-default */
-  --color-gray-300: #4b535d; /* stronger borders */
-  --color-gray-400: #9198a1; /* fgColor-muted — placeholders, step labels */
-  --color-gray-500: #9198a1; /* muted body text */
-  --color-gray-600: #b1bac4; /* secondary text */
-  --color-gray-700: #c9d1d9; /* body text */
-  --color-gray-800: #d8dee4;
-  --color-gray-900: #f0f6fc; /* fgColor-default — headings */
+  --color-gray-300: #3d444d; /* control-borderColor-rest — inputs */
+  --color-gray-400: #9198a1; /* fgColor-muted — placeholders */
+  --color-gray-500: #9198a1; /* fgColor-muted */
+  --color-gray-600: #9198a1;
+  --color-gray-700: #f0f6fc; /* fgColor-default — body */
+  --color-gray-800: #f0f6fc;
+  --color-gray-900: #f0f6fc; /* headings */
 
   /* Accent. 500–700 stay backgrounds (primary button + its hover), so the
      blue TEXT shades live at 300/400 and carry `dark:` variants where a
      component needs them. */
-  --color-blue-50: #1b2c43; /* accent.subtle over the card */
+  --color-blue-50: #111d2e; /* bgColor-accent-muted over the canvas */
   --color-blue-100: #1e3758;
-  --color-blue-200: #24487a; /* accent.muted — callout borders */
+  --color-blue-200: #1e4273; /* borderColor-accent-muted over the canvas */
   --color-blue-300: #79c0ff; /* bright accent text */
   --color-blue-400: #4493f8; /* fgColor-accent — links */
   --color-blue-500: #388bfd;
@@ -98,9 +141,9 @@
   --color-blue-800: #a5d6ff; /* text on tinted callouts */
   --color-blue-900: #cae8ff;
 
-  --color-red-50: #38201f; /* danger.subtle over the card */
+  --color-red-50: #25181c; /* bgColor-danger-muted over the canvas */
   --color-red-100: #4e2826;
-  --color-red-200: #70312e; /* danger.muted — borders */
+  --color-red-200: #6b2b2b; /* borderColor-danger-muted over the canvas */
   --color-red-300: #8b3a37;
   --color-red-500: #f85149; /* danger.fg — dots and bars */
   --color-red-600: #ff7b72;
@@ -108,18 +151,18 @@
   --color-red-800: #ffb8b3;
   --color-red-900: #ffd6d3;
 
-  --color-green-50: #1a2f27; /* success.subtle over the card */
+  --color-green-50: #12261e; /* bgColor-success-muted over the canvas */
   --color-green-100: #1c3c2a;
-  --color-green-200: #20502f;
+  --color-green-200: #1a4a29; /* borderColor-success-muted over the canvas */
   --color-green-500: #3fb950; /* success.fg */
   --color-green-600: #3fb950;
   --color-green-700: #56d364;
   --color-green-800: #7ee787;
   --color-green-900: #aff5b4;
 
-  --color-amber-50: #2f2b1e; /* attention.subtle over the card */
+  --color-amber-50: #272215; /* bgColor-attention-muted over the canvas */
   --color-amber-100: #3f341c;
-  --color-amber-200: #584318;
+  --color-amber-200: #533d11; /* borderColor-attention-muted over the canvas */
   --color-amber-300: #7d6420;
   --color-amber-500: #d29922; /* attention.fg */
   --color-amber-600: #d29922;
@@ -151,5 +194,5 @@
 /* The canvas itself, so overscroll and the area behind short pages match the
    theme instead of flashing the browser default. */
 html {
-  background-color: var(--color-gray-50);
+  background-color: var(--color-canvas);
 }
