@@ -13,11 +13,14 @@ behaviour (a new signal, control, output column or file); MAJOR when an
 output format or the CLI/Python API changes incompatibly.
 """
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SEMVER = r"(\d+)\.(\d+)\.(\d+)"
+SYNC_SCRIPT = ROOT / "webapp" / "scripts" / "sync-assets.mjs"
 
 # (path, regex with one capture group around the version)
 DECLARATIONS = [
@@ -72,6 +75,28 @@ def set_version(new):
         text, n = re.subn(pattern, lambda m: m.group(0).replace(m.group(1), new), text, count=1, flags=re.M)
         assert n == 1, path
         write(path, text, crlf)
+    resync_webapp_copy()
+
+
+def resync_webapp_copy():
+    """
+    webapp/public/matcher/*.py is a build-time COPY of matcher/src/matcher/
+    (made by sync-assets.mjs, normally run as vite's predev/prebuild hook),
+    not a second declaration this script rewrites directly. A version bump
+    edits the source (about.py) but never touches the copy, so without this
+    step the copy silently falls behind — exactly the failure this function
+    exists to make impossible: CI's "webapp matcher copy is in sync" check
+    diffs the two and fails on any drift, version included.
+    """
+    node = shutil.which("node")
+    if node is None:
+        print(
+            "warning: node not found, could not re-sync webapp/public/matcher/ — "
+            "run `pnpm build` (or `node webapp/scripts/sync-assets.mjs`) before committing",
+            file=sys.stderr,
+        )
+        return
+    subprocess.run([node, str(SYNC_SCRIPT)], cwd=ROOT, check=True)
 
 
 def main(argv):
