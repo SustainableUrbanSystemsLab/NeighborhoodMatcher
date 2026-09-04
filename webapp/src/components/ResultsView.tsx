@@ -19,7 +19,7 @@ import type {
 
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 1000] as const;
 const DEFAULT_PAGE_SIZE = 10;
 
 interface ResultsViewProps {
@@ -280,7 +280,7 @@ export function ResultsView({
       <div className="rounded-lg border border-gray-200 bg-surface">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
           <h3 className="text-sm font-semibold text-gray-900">
-            Per-row diagnostics
+            Row diagnostics
           </h3>
           <span className="text-xs text-gray-500">
             Click a row to expand match details

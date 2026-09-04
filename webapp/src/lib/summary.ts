@@ -390,7 +390,7 @@ Folder layout:
                             from the matched row), and flags.
 
   results/
-    match_detail.csv        Per-row diagnostics: distance, NNDR, MNN
+    match_detail.csv        Row diagnostics: distance, NNDR, MNN
                             confirmation, confidence, features used,
                             flags, near-miss count, missing-feature counts.
 

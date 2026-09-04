@@ -6,6 +6,15 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.8.4] - 2026-09-04
+
+### Changed
+
+- Results table heading renamed **Row diagnostics** (was "Per-row diagnostics"); matches the results-zip README.
+- Row diagnostics page size now offers **1000 rows per page** in addition to 10/25/50/100.
+- Removed the paragraph explaining why a run used fewer CPU cores than reported; the run still states target/supplemental row counts and total comparisons.
+- Footer credits Dr. Benson Ku and the Sustainable Urban Systems Lab as links (Emory faculty profile; lab website) rather than plain text; README matches.
+
 ## [0.8.2] - 2026-09-04
 
 ### Fixed

@@ -133,10 +133,29 @@ def _ts_literal(name):
         ("ORGANIZATION", about.ORGANIZATION),
         ("REPO_URL", about.REPO_URL),
         ("SITE_URL", about.SITE_URL),
+        ("ORGANIZATION_URL", about.ORGANIZATION_URL),
     ],
 )
 def test_webapp_mirror_matches_python(ts_name, py_value):
     assert _ts_literal(ts_name) == py_value
+
+
+def test_author_urls_key_only_real_authors():
+    # A typo in AUTHOR_URLS would silently credit-by-name-only rather than
+    # error, so pin that every key is a real author.
+    assert set(about.AUTHOR_URLS) <= set(about.AUTHORS)
+    assert about.AUTHOR_URLS["Dr. Benson Ku"].startswith("https://")
+
+
+@pytest.mark.skipif(not TS_ABOUT.exists(), reason="webapp not present")
+def test_webapp_mirror_matches_python_author_urls():
+    # AUTHOR_URLS is an object literal, not a bare string, so it needs its
+    # own small parser rather than _ts_literal.
+    text = TS_ABOUT.read_text()
+    m = re.search(r"export const AUTHOR_URLS[^=]*=\s*\{([^}]*)\}", text, re.S)
+    assert m, f"AUTHOR_URLS not found in {TS_ABOUT}"
+    pairs = dict(re.findall(r'"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"', m.group(1)))
+    assert pairs == about.AUTHOR_URLS
 
 
 @pytest.mark.skipif(not TS_ABOUT.exists(), reason="webapp not present")

@@ -13,11 +13,18 @@ whatever the page was built with.
 from datetime import datetime, timezone
 
 TOOL_NAME = "NeighborhoodMatcher"
-VERSION = "0.8.2"
+VERSION = "0.8.4"
 AUTHORS = ("Dr. Benson Ku", "Dr. Patrick Kastner")
 ORGANIZATION = "Sustainable Urban Systems Lab"
 REPO_URL = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"
 SITE_URL = "https://nbhdmatch.netlify.app/"
+ORGANIZATION_URL = "https://sustainableurbansystems.com/"
+# One entry per AUTHORS name that has a public profile to link to; an author
+# with no entry is credited by name only. Keyed by the exact AUTHORS string
+# so a typo here fails loudly (test_about.py) rather than silently un-linking.
+AUTHOR_URLS = {
+    "Dr. Benson Ku": "https://med.emory.edu/directory/profile/?u=BSKU",
+}
 
 __version__ = VERSION
 

@@ -9,12 +9,53 @@
 // where they are about the repository rather than about this page.
 
 import {
-  AUTHORS_LINE,
+  AUTHOR_URLS,
+  AUTHORS,
   ORGANIZATION,
+  ORGANIZATION_URL,
   REPO_URL,
   TOOL_NAME,
   buildLabel,
 } from "@/lib/about";
+
+const FOOTER_LINK = "underline decoration-gray-300 underline-offset-2 hover:text-gray-700 dark:decoration-gray-600";
+
+/**
+ * "Developed by A, B, and C" with each name linked to AUTHOR_URLS[name]
+ * when one exists (an author with no entry is plain text) — same "A and B" /
+ * "A, B, and C" joiner as AUTHORS_LINE, built by hand because AUTHORS_LINE
+ * itself is a flat string with nowhere to hang a link.
+ */
+function AuthorCredit() {
+  return (
+    <>
+      Developed by{" "}
+      {AUTHORS.map((name, i) => {
+        const url = AUTHOR_URLS[name];
+        const sep =
+          i === 0 ? "" : i < AUTHORS.length - 1 ? ", " : AUTHORS.length > 2 ? ", and " : " and ";
+        return (
+          <span key={name}>
+            {sep}
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                title={`${name}'s profile`}
+                className={FOOTER_LINK}
+              >
+                {name}
+              </a>
+            ) : (
+              name
+            )}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 /** GitHub's official mark (octicon mark-github-16). */
 function GitHubMark() {
@@ -52,8 +93,20 @@ export function SiteFooter({ className = "" }: { className?: string }) {
           <span className="font-medium text-gray-600">{TOOL_NAME}</span>{" "}
           {buildLabel()}
         </p>
-        <p>Developed by {AUTHORS_LINE}</p>
-        <p>{ORGANIZATION}</p>
+        <p>
+          <AuthorCredit />
+        </p>
+        <p>
+          <a
+            href={ORGANIZATION_URL}
+            target="_blank"
+            rel="noreferrer"
+            title={`${ORGANIZATION} website`}
+            className={FOOTER_LINK}
+          >
+            {ORGANIZATION}
+          </a>
+        </p>
       </div>
     </footer>
   );

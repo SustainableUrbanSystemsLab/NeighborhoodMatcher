@@ -588,15 +588,7 @@ export default function Match() {
                   {formatComparisons(
                     target.rows.length * supplemental.rows.length
                   )}{" "}
-                  row comparisons — on {workersUsed} of the{" "}
-                  {navigator.hardwareConcurrency || "?"} CPU cores your
-                  browser reports. Small jobs deliberately use fewer cores:
-                  below a few million comparisons, loading and standardizing
-                  the files (which every worker does) takes longer than the
-                  matching itself, so extra cores wouldn&apos;t make the run
-                  faster. If the core count looks too low, your browser may
-                  under-report it for privacy — pin the real number under
-                  &ldquo;Parallel workers&rdquo; on the previous step.
+                  row comparisons.
                 </p>
               )}
             </div>

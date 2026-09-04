@@ -8,12 +8,17 @@
 
 export const TOOL_NAME = "NeighborhoodMatcher";
 /** Engine version this build ships (mirrors matcher/about.py VERSION). */
-export const MATCHER_VERSION = "0.8.2";
+export const MATCHER_VERSION = "0.8.4";
 export const AUTHORS = ["Dr. Benson Ku", "Dr. Patrick Kastner"] as const;
 export const ORGANIZATION = "Sustainable Urban Systems Lab";
 export const REPO_URL =
   "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher";
 export const SITE_URL = "https://nbhdmatch.netlify.app/";
+export const ORGANIZATION_URL = "https://sustainableurbansystems.com/";
+/** Mirrors matcher/about.py AUTHOR_URLS — one entry per AUTHORS name that has a public profile. */
+export const AUTHOR_URLS: Partial<Record<(typeof AUTHORS)[number], string>> = {
+  "Dr. Benson Ku": "https://med.emory.edu/directory/profile/?u=BSKU",
+};
 
 /** Authors as one display string: "A and B" / "A, B, and C". */
 export const AUTHORS_LINE =
