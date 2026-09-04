@@ -6,6 +6,12 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.8.7] - 2026-09-04
+
+### Changed
+
+- The downloaded results package is now named `YYYYMMDD-HHMM-matcher_results.zip` (local time the run completed), so multiple downloads sort chronologically and never silently overwrite each other. Restore's "not a readable zip" error message updated to match.
+
 ## [0.8.6] - 2026-09-04
 
 ### Changed

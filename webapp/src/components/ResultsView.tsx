@@ -6,6 +6,7 @@ import {
   REPO_URL,
   TOOL_NAME,
   buildLabel,
+  filenameTimestamp,
   localTimestamp,
   utcTimestamp,
 } from "@/lib/about";
@@ -93,7 +94,7 @@ export function ResultsView({
         ablation.status === "done" ? ablation.report : null,
         completedAt
       );
-      triggerDownload(blob, "matcher_results.zip");
+      triggerDownload(blob, `${filenameTimestamp(completedAt)}-matcher_results.zip`);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : String(err));
     } finally {

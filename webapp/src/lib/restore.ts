@@ -149,7 +149,7 @@ export async function restoreFromZip(file: File): Promise<RestoredRun> {
   } catch {
     throw new Error(
       `${file.name} is not a readable zip. Choose the results package this ` +
-        `tool produced (matcher_results.zip).`
+        `tool produced (a name like 20260904-1704-matcher_results.zip).`
     );
   }
 

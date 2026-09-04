@@ -8,7 +8,7 @@
 
 export const TOOL_NAME = "NeighborhoodMatcher";
 /** Engine version this build ships (mirrors matcher/about.py VERSION). */
-export const MATCHER_VERSION = "0.8.6";
+export const MATCHER_VERSION = "0.8.7";
 export const AUTHORS = ["Dr. Benson Ku", "Dr. Patrick Kastner"] as const;
 export const ORGANIZATION = "Sustainable Urban Systems Lab";
 export const REPO_URL =
@@ -65,4 +65,16 @@ export function localTimestamp(at: Date): string {
   const sign = offsetMin < 0 ? "-" : "+";
   const abs = Math.abs(offsetMin);
   return `${date} ${time} UTC${sign}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
+/**
+ * Local date/time as a filename-safe prefix: "20260904-1704". Minute
+ * precision, no separators within each part — sorts chronologically and
+ * survives every filesystem, unlike localTimestamp's colons and spaces.
+ */
+export function filenameTimestamp(at: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const date = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}`;
+  const time = `${pad(at.getHours())}${pad(at.getMinutes())}`;
+  return `${date}-${time}`;
 }
