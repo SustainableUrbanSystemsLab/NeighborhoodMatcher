@@ -34,12 +34,22 @@ DESCRIPTION = (
     "units in the two datasets. Here the target reports Dragon Sightings as a "
     "per-thousand figure (2.469, meaning approximately 2{,}469), while every row in "
     "the supplemental dataset uses the raw count (2{,}469--7{,}389). "
-    "After standardization, the target's Dragon Sightings value becomes an extreme "
-    "outlier --- pulling every candidate's distance upward by roughly the same large "
-    "amount and effectively neutralising that feature's discriminating power. "
-    "The system still selects the nearest row, but inspecting the per-feature "
-    "contribution table alongside the large absolute distance reveals the problem: "
-    "one feature is responsible for nearly all of the distance. "
+    "Standardization does \\textbf{not} fix this: z-scoring rescales each column, "
+    "it cannot know that 2.469 was meant to be 2{,}469. The wrongly-scaled value "
+    "simply becomes an extreme z-score, adding a large, nearly constant amount to "
+    "every candidate's distance --- so that feature stops helping to tell "
+    "candidates apart, while the total distance stays inflated. "
+    "Depending on severity, a unit mismatch ends one of two ways. "
+    "\\textbf{Mild} (this scenario --- one variable off, the others intact): the "
+    "match usually survives, and the per-feature contribution table exposes the "
+    "problem --- one feature responsible for nearly all of a large distance. "
+    "\\textbf{Severe} (several variables misscaled, or ratio-vs-percentage errors "
+    "like 0.72 vs 72 on most columns): the surviving information is too thin and "
+    "the linkage fails outright or lands on a wrong row without a distinctive "
+    "contribution pattern. The tool also compares column ranges across the two "
+    "files before matching and warns when they differ by a large factor --- heed "
+    "that warning, because after a severe mismatch the per-match diagnostics may "
+    "look unremarkable. "
     "Concentration alone is not a warning --- any scenario where only one feature "
     "differs will show 100\\% contribution from that feature. "
     "The concern here is that concentration is paired with a large absolute distance, "
@@ -201,10 +211,14 @@ def build_scenario():
              "match is not symmetric.")
         ),
         "repeats": (
-            f"\\textbf{{{repeats}}} row(s) tied at the minimum distance. "
-            + ("No exact tie." if repeats == 1 else
-               "A tie exists. When the dominant feature is neutralised by a unit "
-               "error, two rows with identical remaining features become equidistant.")
+            ("No exact tie --- a single row sits alone at the minimum distance "
+             "(the count includes the chosen match itself, so 1 means a unique "
+             "winner)."
+             if repeats == 1 else
+             f"\\textbf{{{repeats}}} rows tied at the minimum distance (count "
+             f"includes the chosen match). When a unit error makes the dominant "
+             f"feature useless for discrimination, rows with identical remaining "
+             f"features become equidistant; the first in file order is chosen.")
         ),
         "smd": (
             "With one target row, SMD is not computable and is reported as 0. "

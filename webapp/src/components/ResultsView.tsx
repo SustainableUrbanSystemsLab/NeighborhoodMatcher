@@ -1,6 +1,17 @@
 import { Fragment, useMemo, useState } from "react";
 import { buildResultsZip, triggerDownload } from "@/lib/zip-builder";
+import { tierChipClasses, tierRank, tierSentence } from "@/lib/confidence-text";
+import { VariableDiagnosticsPanel } from "@/components/VariableDiagnosticsPanel";
+import {
+  REPO_URL,
+  TOOL_NAME,
+  buildLabel,
+  filenameTimestamp,
+  localTimestamp,
+  utcTimestamp,
+} from "@/lib/about";
 import type {
+  AblationState,
   ColumnLink,
   MatchOutput,
   ParsedDataset,
@@ -9,7 +20,7 @@ import type {
 
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 1000] as const;
 const DEFAULT_PAGE_SIZE = 10;
 
 interface ResultsViewProps {
@@ -21,6 +32,14 @@ interface ResultsViewProps {
   runDurationMs: number | null;
   /** Pyodide workers (≈ CPU cores) the run used (null if unknown) */
   workersUsed: number | null;
+  /** when this run finished — shown here and stamped into the package */
+  completedAt: Date;
+  /** leave-one-variable-out check, running in the background after results */
+  ablation: AblationState;
+  /** flips the link's exclude toggle and returns to the Link step */
+  onExcludeFeature: (featureName: string) => void;
+  /** starts the (gated) variable check on demand */
+  onRunAblation: () => void;
   onStartOver: () => void;
 }
 
@@ -33,7 +52,14 @@ function formatDuration(ms: number): string {
   return `${m}m ${rest.toString().padStart(2, "0")}s`;
 }
 
-type SortKey = "target_idx" | "best_distance" | "nndr" | "near_miss" | "flags";
+type SortKey =
+  | "target_idx"
+  | "best_distance"
+  | "nndr"
+  | "near_miss"
+  | "features_used"
+  | "confidence"
+  | "flags";
 
 export function ResultsView({
   output,
@@ -42,6 +68,10 @@ export function ResultsView({
   links,
   runDurationMs,
   workersUsed,
+  completedAt,
+  ablation,
+  onExcludeFeature,
+  onRunAblation,
   onStartOver,
 }: ResultsViewProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -56,8 +86,15 @@ export function ResultsView({
     setDownloading(true);
     setDownloadError(null);
     try {
-      const blob = await buildResultsZip(output, target, supplemental);
-      triggerDownload(blob, "matcher_results.zip");
+      const blob = await buildResultsZip(
+        output,
+        target,
+        supplemental,
+        links,
+        ablation.status === "done" ? ablation.report : null,
+        completedAt
+      );
+      triggerDownload(blob, `${filenameTimestamp(completedAt)}-matcher_results.zip`);
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -91,6 +128,12 @@ export function ResultsView({
         case "near_miss":
           cmp = a.near_miss - b.near_miss;
           break;
+        case "features_used":
+          cmp = a.features_used - b.features_used;
+          break;
+        case "confidence":
+          cmp = tierRank(a.confidence) - tierRank(b.confidence);
+          break;
         case "flags":
           cmp = (a.flags ? 1 : 0) - (b.flags ? 1 : 0);
           break;
@@ -113,11 +156,20 @@ export function ResultsView({
     setPage(0);
   }
 
+  const tiers = summary.tiers ?? { High: 0, Medium: 0, Low: 0, "No match": 0 };
+  const highPct = summary.total ? (tiers.High / summary.total) * 100 : 0;
+  const zeroOverlapCount = summary.no_match - (summary.rejected ?? 0);
+
   return (
     <div className="space-y-4">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <SummaryCard label="Rows matched" value={summary.total.toString()} tone="blue" />
+        <SummaryCard
+          label="High confidence"
+          value={`${tiers.High} (${highPct.toFixed(1)}%)`}
+          tone={highPct > 80 ? "green" : highPct > 50 ? "amber" : "red"}
+        />
         <SummaryCard
           label="Flagged"
           value={`${summary.flagged} (${flaggedPct.toFixed(1)}%)`}
@@ -127,6 +179,7 @@ export function ResultsView({
           label="MNN confirmed"
           value={`${summary.mnn_confirmed} (${mnnPct.toFixed(1)}%)`}
           tone={mnnPct > 80 ? "green" : mnnPct > 50 ? "amber" : "red"}
+          help="Mutual nearest neighbor: a match is confirmed when the pairing holds in both directions — the supplemental row this target matched is not closer to any other target row. Rows in this count are the mutually-agreed pairings; a low percentage means many matches are one-sided and the linkage as a whole is doubtful."
         />
         <SummaryCard
           label="Mean NNDR"
@@ -154,18 +207,37 @@ export function ResultsView({
       </div>
 
       {/* Dataset-level warnings (e.g. scale mismatch, no-match rows) */}
-      {(output.warnings?.length > 0 || summary.no_match > 0) && (
+      {(output.warnings?.length > 0 ||
+        summary.no_match > 0 ||
+        (summary.withheld ?? 0) > 0) && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3">
           <p className="mb-1 text-xs font-semibold text-red-800">
             Dataset warnings
           </p>
           <ul className="list-disc pl-4 text-xs text-red-800">
-            {summary.no_match > 0 && (
+            {zeroOverlapCount > 0 && (
               <li>
-                {summary.no_match} target row(s) have no valid match — they
+                {zeroOverlapCount} target row(s) have no valid match — they
                 share no observed features with any supplemental row (all
                 shared columns missing). They appear with blank match cells
                 in the output.
+              </li>
+            )}
+            {(summary.rejected ?? 0) > 0 && (
+              <li>
+                {summary.rejected} target row(s) were reported as no match
+                because their nearest supplemental row exceeded the distance
+                cutoff ({summary.max_distance?.toFixed(2)} per feature).
+                Their diagnostics are preserved in the detail file and
+                drill-down.
+              </li>
+            )}
+            {(summary.withheld ?? 0) > 0 && (
+              <li>
+                {summary.withheld} link(s) were withheld below your minimum
+                confidence ({summary.min_confidence}) — those rows appear
+                unlinked in the linked dataset; the nearest row and full
+                diagnostics are kept in the detail file and drill-down.
               </li>
             )}
             {(output.warnings ?? []).map((w, i) => (
@@ -175,8 +247,16 @@ export function ResultsView({
         </div>
       )}
 
+      {/* Per-variable quality check (input report + leave-one-out ablation) */}
+      <VariableDiagnosticsPanel
+        variables={output.variables ?? []}
+        ablation={ablation}
+        onExcludeFeature={onExcludeFeature}
+        onRunAblation={onRunAblation}
+      />
+
       {/* SMD bar chart */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
+      <div className="rounded-lg border border-gray-200 bg-surface p-4">
         <div className="mb-2 flex items-baseline justify-between">
           <h3 className="text-sm font-semibold text-gray-900">
             Standardized Mean Difference per feature
@@ -192,19 +272,19 @@ export function ResultsView({
         </div>
         <p className="mt-3 text-xs text-gray-500">
           |SMD| &gt; 0.10 indicates feature imbalance; &gt; 0.25 is poor (
-          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Austin, PMC3472075</a>
+          <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3472075/" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Austin, PMC3472075</a>
           ).
         </p>
       </div>
 
       {/* Per-row drill-down */}
-      <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="rounded-lg border border-gray-200 bg-surface">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
           <h3 className="text-sm font-semibold text-gray-900">
-            Per-row diagnostics
+            Row diagnostics
           </h3>
           <span className="text-xs text-gray-500">
-            Click a row to drill down
+            Click a row to expand match details
           </span>
         </div>
         <div className="overflow-x-auto">
@@ -235,12 +315,28 @@ export function ResultsView({
                   desc={sortDesc}
                   onClick={() => toggleSort("near_miss")}
                 />
-                <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                <SortableHead
+                  label="Variables used"
+                  active={sortKey === "features_used"}
+                  desc={sortDesc}
+                  onClick={() => toggleSort("features_used")}
+                  help="How many of the linked matching variables were observed on both sides of this pair and therefore informed the match. Fewer than the total means the missing-data penalty contributed to the distance."
+                />
+                <th
+                  className="cursor-help px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 underline decoration-dotted underline-offset-2"
+                  title="Mutual nearest neighbor. ✓ = the pairing holds in both directions: the matched supplemental row is not closer to any other target row. ✗ = one-sided — the supplemental row fits a different target even better, so this match may not be a real correspondence."
+                >
                   MNN
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Repeats
+                  Tied at min
                 </th>
+                <SortableHead
+                  label="Confidence"
+                  active={sortKey === "confidence"}
+                  desc={sortDesc}
+                  onClick={() => toggleSort("confidence")}
+                />
                 <SortableHead
                   label="Flags"
                   active={sortKey === "flags"}
@@ -281,6 +377,15 @@ export function ResultsView({
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
                         {row.near_miss}
                       </td>
+                      <td
+                        className={`px-3 py-1.5 font-mono text-xs ${
+                          row.features_used < feature_names.length
+                            ? "text-amber-800"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        {row.features_used}/{feature_names.length}
+                      </td>
                       <td className="px-3 py-1.5 text-xs">
                         {row.mnn_confirmed ? (
                           <span className="text-green-700">✓</span>
@@ -289,7 +394,21 @@ export function ResultsView({
                         )}
                       </td>
                       <td className="px-3 py-1.5 font-mono text-xs text-gray-700">
-                        {row.repeats}
+                        {/* repeats counts the winner itself; ≤1 means a unique minimum */}
+                        {row.repeats > 1 ? `${row.repeats} rows` : "—"}
+                      </td>
+                      <td className="px-3 py-1.5 text-xs">
+                        <span
+                          className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${tierChipClasses(row.confidence)}`}
+                          title={
+                            row.withheld
+                              ? "Link withheld below your minimum confidence — reported unlinked; diagnostics kept."
+                              : undefined
+                          }
+                        >
+                          {row.confidence}
+                          {row.withheld ? " · withheld" : ""}
+                        </span>
                       </td>
                       <td className="px-3 py-1.5 text-xs text-amber-800">
                         {row.flags ? (
@@ -304,7 +423,7 @@ export function ResultsView({
                     </tr>
                     {isSelected && (
                       <tr className="bg-blue-50/40">
-                        <td colSpan={7} className="px-3 py-3">
+                        <td colSpan={9} className="px-3 py-3">
                           <DrilldownPanel
                             detail={row}
                             features={feature_names}
@@ -338,7 +457,7 @@ export function ResultsView({
                   setPageSize(Number(e.target.value));
                   setPage(0);
                 }}
-                className="rounded border border-gray-300 bg-white px-1 py-0.5 text-xs"
+                className="rounded border border-gray-300 bg-surface px-1 py-0.5 text-xs"
               >
                 {PAGE_SIZE_OPTIONS.map((n) => (
                   <option key={n} value={n}>
@@ -352,7 +471,7 @@ export function ResultsView({
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="rounded border border-gray-300 bg-white px-2 py-1 disabled:opacity-40"
+              className="rounded border border-gray-300 bg-surface px-2 py-1 disabled:opacity-40"
             >
               ← Prev
             </button>
@@ -362,7 +481,7 @@ export function ResultsView({
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="rounded border border-gray-300 bg-white px-2 py-1 disabled:opacity-40"
+              className="rounded border border-gray-300 bg-surface px-2 py-1 disabled:opacity-40"
             >
               Next →
             </button>
@@ -389,10 +508,34 @@ export function ResultsView({
             <span className="text-xs text-red-600">{downloadError}</span>
           )}
           <span className="text-[11px] text-gray-400">
-            Linked CSV, match detail, data + match stats, SMD, agreement,
-            contact, and original uploads.
+            Linked CSV, match detail, run info, data + match stats, SMD,
+            variable diagnostics, agreement, contact, and original uploads.
           </span>
         </div>
+      </div>
+
+      {/* Provenance: the same identity stamped into run_info.csv and the
+          package README, so what is on screen matches what is downloaded. */}
+      <div className="border-t border-gray-200 pt-3 text-[11px] leading-relaxed text-gray-500">
+        <p>
+          Processed by{" "}
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-gray-600 hover:text-blue-700 dark:hover:text-blue-300"
+          >
+            {output.provenance?.tool ?? TOOL_NAME}
+          </a>{" "}
+          <span title={`Matching engine version · webapp ${buildLabel()}`}>
+            v{output.provenance?.version ?? "unknown"} · webapp {buildLabel()}
+          </span>
+        </p>
+        <p title={utcTimestamp(completedAt)}>
+          Generated {localTimestamp(completedAt)} — the downloaded package
+          carries this stamp, the tool version, and the authors in
+          run_info.csv.
+        </p>
       </div>
     </div>
   );
@@ -402,10 +545,13 @@ function SummaryCard({
   label,
   value,
   tone,
+  help,
 }: {
   label: string;
   value: string;
   tone: "blue" | "green" | "amber" | "red" | "gray";
+  /** plain-language explanation shown on hover */
+  help?: string;
 }) {
   const bg = {
     blue: "bg-blue-50 text-blue-900",
@@ -415,15 +561,17 @@ function SummaryCard({
     gray: "bg-gray-50 text-gray-900",
   }[tone];
   const sub = {
-    blue: "text-blue-600",
+    blue: "text-blue-600 dark:text-blue-400",
     green: "text-green-700",
     amber: "text-amber-700",
     red: "text-red-700",
     gray: "text-gray-600",
   }[tone];
   return (
-    <div className={`rounded-lg p-3 ${bg}`}>
-      <p className={`text-xs ${sub}`}>{label}</p>
+    <div className={`rounded-lg p-3 ${bg}`} title={help}>
+      <p className={`text-xs ${sub}${help ? " cursor-help underline decoration-dotted underline-offset-2" : ""}`}>
+        {label}
+      </p>
       <p className="text-xl font-bold">{value}</p>
     </div>
   );
@@ -434,16 +582,21 @@ function SortableHead({
   active,
   desc,
   onClick,
+  help,
 }: {
   label: string;
   active: boolean;
   desc: boolean;
   onClick: () => void;
+  help?: string;
 }) {
   return (
     <th
       onClick={onClick}
-      className="cursor-pointer px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-800"
+      title={help}
+      className={`cursor-pointer px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500 hover:text-gray-800 ${
+        help ? "underline decoration-dotted underline-offset-2" : ""
+      }`}
     >
       {label}
       {active && <span className="ml-1">{desc ? "▼" : "▲"}</span>}
@@ -533,7 +686,7 @@ function RankPlot({
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => dMin + t * dRange);
 
   return (
-    <div className="rounded border border-gray-200 bg-white p-1">
+    <div className="rounded border border-gray-200 bg-surface p-1">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
@@ -550,7 +703,7 @@ function RankPlot({
                 x2={W - padR}
                 y1={yv}
                 y2={yv}
-                stroke="#f1f5f9"
+                stroke="var(--chart-grid)"
                 strokeWidth={1}
               />
               <text
@@ -558,7 +711,7 @@ function RankPlot({
                 y={yv + 3}
                 fontSize={8}
                 textAnchor="end"
-                fill="#64748b"
+                fill="var(--chart-label)"
                 fontFamily="ui-monospace, monospace"
               >
                 {fmt(t)}
@@ -573,7 +726,7 @@ function RankPlot({
           x2={W - padR}
           y1={y(cutoff)}
           y2={y(cutoff)}
-          stroke="#f43f5e"
+          stroke="var(--chart-cutoff)"
           strokeWidth={1}
           strokeDasharray="4,3"
         />
@@ -582,14 +735,14 @@ function RankPlot({
           y={cutoffLabelY}
           fontSize={8}
           textAnchor="end"
-          fill="#be123c"
+          fill="var(--chart-cutoff-text)"
           fontWeight={600}
         >
           near-miss cutoff (NNDR={threshold.toFixed(2)})
         </text>
 
         {/* Connecting curve */}
-        <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={1} />
+        <path d={linePath} fill="none" stroke="var(--chart-muted)" strokeWidth={1} />
 
         {/* Dots */}
         {distances.map((d, i) => {
@@ -603,7 +756,7 @@ function RankPlot({
               cx={cx}
               cy={cy}
               r={isBest ? 4 : isSecond ? 3 : 1.6}
-              fill={isBest ? "#2563eb" : isSecond ? "#f59e0b" : "#64748b"}
+              fill={isBest ? "var(--chart-best)" : isSecond ? "var(--chart-near)" : "var(--chart-label)"}
             >
               <title>{`Rank ${i + 1}: ${d.toFixed(4)}`}</title>
             </circle>
@@ -616,7 +769,7 @@ function RankPlot({
           x={x(0) + 6}
           y={Math.min(yBest + 3, padT + plotH - 2)}
           fontSize={8}
-          fill="#1d4ed8"
+          fill="var(--chart-best-text)"
           fontWeight={600}
         >
           best {fmt(best)}
@@ -627,7 +780,7 @@ function RankPlot({
           x={padL}
           y={H - 4}
           fontSize={8}
-          fill="#64748b"
+          fill="var(--chart-label)"
           textAnchor="start"
         >
           rank 1
@@ -636,7 +789,7 @@ function RankPlot({
           x={W - padR}
           y={H - 4}
           fontSize={8}
-          fill="#64748b"
+          fill="var(--chart-label)"
           textAnchor="end"
         >
           rank {n}
@@ -669,32 +822,66 @@ function DrilldownPanel({
   // MATCHED SUPPLEMENTAL ROW, using the column links the run was made with.
   // (Reading the shared columns out of linked_rows shows the target's own
   // values — row_merge keeps the target copy — which fabricates agreement.)
+  // For cutoff-rejected rows, show the rejected nearest row for review.
+  const pairIdx = detail.match_idx ?? detail.nearest_idx;
   const featurePairs = links.map((link) => ({
     name: link.headerName,
     targetVal: target.rows[detail.target_idx]?.[link.targetIndex] ?? "",
     matchedVal:
-      detail.match_idx != null
-        ? supplemental.rows[detail.match_idx]?.[link.supplementalIndex] ?? ""
+      pairIdx != null
+        ? supplemental.rows[pairIdx]?.[link.supplementalIndex] ?? ""
         : "",
   }));
 
   const flagList = detail.flags ? detail.flags.split(" | ") : [];
 
   return (
-    <div className="rounded-lg border-2 border-blue-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border-2 border-blue-200 bg-surface p-4 shadow-sm">
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <h3 className="text-base font-semibold text-gray-900">
-            {detail.no_match
-              ? `Target row ${detail.target_idx} — no valid match`
-              : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
+          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+            <span>
+              {detail.no_match
+                ? detail.rejected
+                  ? `Target row ${detail.target_idx} — nearest row ${detail.nearest_idx} rejected by cutoff`
+                  : `Target row ${detail.target_idx} — no valid match`
+                : detail.withheld
+                  ? `Target row ${detail.target_idx} — link to supplemental row ${detail.nearest_idx} withheld`
+                  : `Target row ${detail.target_idx} ↔ Supplemental row ${detail.match_idx}`}
+            </span>
+            <span
+              className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${tierChipClasses(detail.confidence)}`}
+            >
+              {detail.confidence}
+              {detail.withheld ? " · withheld" : ""}
+            </span>
           </h3>
           <p className="mt-0.5 text-xs text-gray-500">
             Distance {detail.best_distance != null ? detail.best_distance.toFixed(4) : "—"} · NNDR{" "}
-            {detail.nndr != null ? detail.nndr.toFixed(3) : "—"} · MNN{" "}
-            {detail.mnn_confirmed ? "✓ confirmed" : "✗ not confirmed"} ·{" "}
-            repeats {detail.repeats} · near-miss {detail.near_miss}
+            {detail.nndr != null ? detail.nndr.toFixed(3) : "—"} ·{" "}
+            <span
+              className="cursor-help underline decoration-dotted underline-offset-2"
+              title="Mutual nearest neighbor: confirmed means the pairing holds in both directions — the matched supplemental row is not closer to any other target row. Not confirmed means the pairing is one-sided and may not be a real correspondence."
+            >
+              MNN {detail.mnn_confirmed ? "✓ confirmed" : "✗ not confirmed"}
+            </span>{" "}
+            ·{" "}
+            tied at min {detail.repeats > 1 ? `${detail.repeats} rows` : "none"} ·
+            near-miss {detail.near_miss} ·
+            features used {detail.features_used}/{features.length}
+            {detail.exact_on_observed ? " (exact on all observed)" : ""}
           </p>
+          <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-gray-700">
+            {tierSentence(detail, features.length, threshold)}
+          </p>
+          {detail.filled_from_match.length > 0 && (
+            <p className="mt-1 max-w-2xl text-xs text-gray-500">
+              Filled from the matched row (target value was missing):{" "}
+              <span className="font-mono">
+                {detail.filled_from_match.join(", ")}
+              </span>
+            </p>
+          )}
         </div>
         <button
           onClick={onClose}

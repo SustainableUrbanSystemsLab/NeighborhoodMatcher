@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import type {
+  AblationState,
   AppStep,
   ColumnLink,
   MatchOutput,
@@ -8,15 +9,19 @@ import type {
   ParsedDataset,
 } from "@/types";
 import {
+  ablationAutoRunAllowed,
+  cancelBackgroundWork,
   findAmbiguousHeaders,
   findCommonHeaders,
   getSavedWorkerCount,
   poolSizeFor,
   prefetchPyodide,
   reportedCores,
+  runAblation,
   runMatching,
   saveWorkerCount,
   terminatePool,
+  WorkAbandoned,
   type PyodideStatus,
 } from "@/lib/matching";
 import { detectPII } from "@/lib/pii-detector";
@@ -29,10 +34,21 @@ import {
 } from "@/lib/agreement";
 import { FileUpload } from "@/components/FileUpload";
 import { ColumnLinker } from "@/components/ColumnLinker";
+import { DataChecklist } from "@/components/DataChecklist";
 import { ResultsView } from "@/components/ResultsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SiteFooter } from "@/components/SiteFooter";
+import { RecentRuns } from "@/components/RecentRuns";
+import { recordAblation, recordRun } from "@/lib/run-history";
+import type { RestoredRun } from "@/lib/restore";
+import { MATCHER_VERSION } from "@/lib/about";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/lib/use-theme";
 
 const DEFAULT_THRESHOLD = 0.8;
+// High by default: a first-time user gets only links that meet a standard;
+// the Link step explains how to relax it. Start over must return here too.
+const DEFAULT_MIN_CONFIDENCE: "medium" | "high" | null = "high";
 
 function formatComparisons(n: number): string {
   if (n >= 1e9) return `about ${(n / 1e9).toFixed(1)} billion`;
@@ -61,6 +77,7 @@ function statusLabel(status: PyodideStatus): string {
 }
 
 export default function Match() {
+  const theme = useTheme();
   const [step, setStep] = useState<AppStep>("upload");
   const [target, setTarget] = useState<ParsedDataset | null>(null);
   const [supplemental, setSupplemental] = useState<ParsedDataset | null>(null);
@@ -68,10 +85,27 @@ export default function Match() {
   const [piiWarnings, setPiiWarnings] = useState<PIIWarning[]>([]);
   const [matchOutput, setMatchOutput] = useState<MatchOutput | null>(null);
   const [threshold, setThreshold] = useState<number>(DEFAULT_THRESHOLD);
+  const [maxDistance, setMaxDistance] = useState<number | null>(null);
+  const [minConfidence, setMinConfidence] = useState<"medium" | "high" | null>(
+    DEFAULT_MIN_CONFIDENCE
+  );
+  const [ablation, setAblation] = useState<AblationState>({ status: "idle" });
+  // Invalidates in-flight ablation updates after a re-run / start-over — a
+  // late resolve or reject from a killed run must not clobber fresh state.
+  const ablationRunRef = useRef(0);
+  // History entry for the current run, so the variable check can add its
+  // verdicts to the same record once it completes.
+  const runRecordIdRef = useRef<string | null>(null);
+  // Set while a restored pair is being installed, so the auto-link effect
+  // skips exactly one pass and leaves the restored exclusions alone.
+  const restoredRef = useRef(false);
   const [pyStatus, setPyStatus] = useState<PyodideStatus>({ phase: "idle" });
   const [runError, setRunError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [runDurationMs, setRunDurationMs] = useState<number | null>(null);
+  // When the run finished: shown on the results page and stamped into the
+  // downloaded package, so screen and report never disagree.
+  const [completedAt, setCompletedAt] = useState<Date | null>(null);
   const [workersUsed, setWorkersUsed] = useState<number | null>(null);
   const [agreementSavedAt, setAgreementSavedAt] = useState<string | null>(
     () => loadSavedAgreement()?.acceptedAt ?? null
@@ -80,6 +114,8 @@ export default function Match() {
     getSavedWorkerCount()
   );
   const [progressPct, setProgressPct] = useState(0);
+  // Banner describing the run a results zip was reproduced from.
+  const [restored, setRestored] = useState<RestoredRun | null>(null);
   const tickRef = useRef<number | null>(null);
 
   // Warm up Pyodide in the background once the user accepts the agreement —
@@ -98,11 +134,18 @@ export default function Match() {
   // user's manual links/exclusions after Back→Next or agreement review.
   useEffect(() => {
     if (!target || !supplemental) return;
-    setLinks(findCommonHeaders(target.headers, supplemental.headers));
     setPiiWarnings([
       ...detectPII(target.headers, "target"),
       ...detectPII(supplemental.headers, "supplemental"),
     ]);
+    // A restored run already carries its own column selection (including the
+    // exclusions that shaped it); re-deriving links here would silently undo
+    // them and reproduce a DIFFERENT run.
+    if (restoredRef.current) {
+      restoredRef.current = false;
+      return;
+    }
+    setLinks(findCommonHeaders(target.headers, supplemental.headers));
   }, [target, supplemental]);
 
   const ambiguousHeaders = useMemo(
@@ -161,11 +204,70 @@ export default function Match() {
     [proceedToLink]
   );
 
+  // Reopen a previous run from its results zip: the package carries the
+  // original inputs and the settings, so loading it back reproduces the run
+  // exactly. Lands on the Link step with everything pre-filled — the user
+  // presses Run, rather than the page starting minutes of compute uninvited.
+  const handleRestore = useCallback((run: RestoredRun) => {
+    restoredRef.current = true;
+    setTarget(run.target);
+    setSupplemental(run.supplemental);
+    setThreshold(run.threshold);
+    setMaxDistance(run.maxDistance);
+    setMinConfidence(run.minConfidence);
+    setMatchOutput(null);
+    setRunError(null);
+    setRestored(run);
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
+    cancelBackgroundWork();
+
+    // The run's own column selection (exclusions and manual links included)
+    // — rebuilt by restore.ts; the results only reproduce if it stays so.
+    setLinks(run.links);
+
+    if (loadSavedAgreement()) setStep("link");
+    else setStep("agreement");
+  }, []);
+
   const handleAgreementRevoke = useCallback(() => {
     clearAgreement();
     setAgreementSavedAt(null);
     setStep("agreement");
   }, []);
+
+  // Fires the leave-one-variable-out check in the background (the results
+  // page is already interactive while it runs). Guarded by a run token so a
+  // stale resolve/reject after start-over or a re-run cannot clobber state.
+  const startAblation = useCallback(() => {
+    if (!target || !supplemental) return;
+    const token = ++ablationRunRef.current;
+    setAblation({ status: "running", progress: 0 });
+    runAblation(target, supplemental, links, threshold, (pct) => {
+      if (ablationRunRef.current === token) {
+        setAblation({ status: "running", progress: pct });
+      }
+    })
+      .then((report) => {
+        if (ablationRunRef.current === token) {
+          setAblation({ status: "done", report });
+          if (runRecordIdRef.current) {
+            recordAblation(runRecordIdRef.current, report);
+          }
+        }
+      })
+      .catch((err) => {
+        // Abandoned on purpose (re-run, restore, start over): not an error.
+        if (err instanceof WorkAbandoned) return;
+        console.error("runAblation failed:", err);
+        if (ablationRunRef.current === token) {
+          setAblation({
+            status: "error",
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      });
+  }, [target, supplemental, links, threshold]);
 
   const handleRunMatching = useCallback(async () => {
     if (!target || !supplemental) return;
@@ -175,6 +277,8 @@ export default function Match() {
 
     setStep("matching");
     setRunError(null);
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
     // Planned pool size — deterministic, same computation the runner makes —
     // so the run screen can show core usage while the job is in flight.
     setWorkersUsed(poolSizeFor(target.rows.length, supplemental.rows.length));
@@ -186,22 +290,63 @@ export default function Match() {
         supplemental,
         links,
         threshold,
+        maxDistance,
+        minConfidence,
         setPyStatus,
         setProgressPct
       );
-      setRunDurationMs(performance.now() - t0);
+      const durationMs = performance.now() - t0;
+      const finishedAt = new Date();
+      setRunDurationMs(durationMs);
+      setCompletedAt(finishedAt);
       setWorkersUsed(nWorkers);
       setMatchOutput(output);
+      // Metadata-only history entry (no dataset contents — see run-history.ts).
+      runRecordIdRef.current = recordRun({
+        output,
+        target,
+        supplemental,
+        finishedAt,
+        durationMs,
+      }).id;
       // The worker's last status message is "running"; without this the
       // link step shows a phantom "Running matcher…" forever after a run.
       setPyStatus({ phase: "ready" });
       setStep("results");
+
+      // Variable check: automatic when even the minimum target sample fits
+      // the compute budget; otherwise offered as a button on the panel.
+      const d = activeLinks.length;
+      if (d < 2) {
+        setAblation({ status: "unavailable" });
+      } else if (ablationAutoRunAllowed(supplemental.rows.length, d)) {
+        startAblation();
+      } else {
+        setAblation({ status: "gated" });
+      }
     } catch (err) {
       console.error("runMatching failed:", err);
       setRunError(err instanceof Error ? err.message : String(err));
       setStep("link");
     }
-  }, [target, supplemental, links, threshold]);
+  }, [target, supplemental, links, threshold, maxDistance, minConfidence, startAblation]);
+
+  // "Exclude and adjust" from the variable panel: flip the link's exclude
+  // toggle and return to the Link step for review — the user re-runs
+  // explicitly (never silently re-matching under them).
+  const handleExcludeFeature = useCallback((featureName: string) => {
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
+    // Stop the check still running on the old selection; the Link step's
+    // prefetch warms a fresh pool while the user reviews.
+    cancelBackgroundWork();
+    setLinks((prev) =>
+      prev.map((l) =>
+        l.headerName === featureName ? { ...l, excluded: true } : l
+      )
+    );
+    setStep("link");
+  }, []);
 
   const handleStartOver = useCallback(() => {
     setStep("upload");
@@ -211,24 +356,33 @@ export default function Match() {
     setPiiWarnings([]);
     setMatchOutput(null);
     setThreshold(DEFAULT_THRESHOLD);
+    setMaxDistance(null);
+    setMinConfidence(DEFAULT_MIN_CONFIDENCE);
+    setRestored(null);
+    ablationRunRef.current++;
+    setAblation({ status: "idle" });
     setRunError(null);
     setRunDurationMs(null);
+    setCompletedAt(null);
     setWorkersUsed(null);
     setPyStatus({ phase: "idle" });
     terminatePool();
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas">
       <div className="mx-auto max-w-4xl p-4">
         <div className="mb-2 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5" title="Back to the landing page">
             <img src="/logo.svg" alt="" className="h-8 w-8" />
             <h1 className="text-2xl font-bold text-gray-900">Dataset Matcher</h1>
           </Link>
-          <Link to="/about" className="text-sm text-blue-600 hover:text-blue-800">
-            How it works →
-          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle theme={theme} />
+            <Link to="/about" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800">
+              How it works →
+            </Link>
+          </div>
         </div>
 
         <StepIndicator currentStep={step} />
@@ -236,22 +390,39 @@ export default function Match() {
         <div className="mt-6">
           {step === "upload" && (
             <div className="space-y-6">
+              <p className="text-sm leading-relaxed text-gray-600">
+                For each row in your <strong>target</strong> dataset, the tool
+                finds the most similar row in the <strong>supplemental</strong>{" "}
+                dataset based on the shared characteristics you choose —
+                linking new information without matching on ZIP code or any
+                other identifier.
+              </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <FileUpload
                   label="Target Dataset"
-                  description="Your primary dataset with rows to match"
+                  description="The dataset you want to add information to (e.g., your study dataset)"
                   onFileLoaded={setTarget}
                   onClear={() => setTarget(null)}
                   dataset={target}
                 />
                 <FileUpload
                   label="Supplemental Dataset"
-                  description="Reference dataset to match against"
+                  description="The dataset containing the information you want to link in (e.g., a public census extract)"
                   onFileLoaded={setSupplemental}
                   onClear={() => setSupplemental(null)}
                   dataset={supplemental}
                 />
               </div>
+              <details open className="rounded-lg border border-gray-200 bg-surface p-4 text-sm text-gray-600">
+                <summary className="cursor-pointer font-medium text-gray-800">
+                  File format &amp; pre-upload checklist
+                </summary>
+                <div className="mt-3">
+                  <DataChecklist />
+                </div>
+              </details>
+              <RecentRuns onRestore={handleRestore} />
+
               <div className="flex justify-end">
                 <button
                   onClick={handleNext}
@@ -272,13 +443,48 @@ export default function Match() {
 
           {step === "link" && target && supplemental && (
             <div className="space-y-6">
+              {restored && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+                  <strong>Reopened {restored.zipName}.</strong> Its original
+                  files, {restored.features.length || "all shared"} matching
+                  variable{restored.features.length === 1 ? "" : "s"}, and the
+                  settings it used (NNDR {restored.threshold}
+                  {restored.maxDistance != null && `, cutoff ${restored.maxDistance}`}
+                  {restored.minConfidence && `, minimum ${restored.minConfidence}`}
+                  ) are loaded
+                  {restored.generatedAt && ` from the run of ${restored.generatedAt}`}
+                  .{" "}
+                  {restored.unlinked.length > 0 ? (
+                    <span className="font-medium text-amber-800">
+                      {restored.unlinked.length === 1
+                        ? `The matching variable "${restored.unlinked[0]}" could not be re-linked automatically`
+                        : `${restored.unlinked.length} matching variables (${restored.unlinked.join(", ")}) could not be re-linked automatically`}
+                      {" "}— the package predates link recording and the
+                      column was linked to a differently named one, or the
+                      column is missing. Re-create the link below before
+                      running, or the result will differ from the original.
+                    </span>
+                  ) : (
+                    "Matching is deterministic, so running now reproduces that run exactly."
+                  )}
+                  {restored.toolVersion &&
+                    restored.toolVersion !== MATCHER_VERSION && (
+                      <>
+                        {" "}
+                        Note: it was produced by engine v{restored.toolVersion}
+                        {`, this build runs v${MATCHER_VERSION}`} —
+                        results may differ.
+                      </>
+                    )}
+                </div>
+              )}
               {agreementSavedAt && (
                 <p className="text-xs text-gray-500">
                   Data-use agreement previously accepted on this device (
                   {new Date(agreementSavedAt).toLocaleDateString()}).{" "}
                   <button
                     onClick={handleAgreementRevoke}
-                    className="text-blue-600 underline hover:text-blue-800"
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
                   >
                     Review or revoke
                   </button>
@@ -302,6 +508,13 @@ export default function Match() {
               />
 
               <ThresholdControl threshold={threshold} onChange={setThreshold} />
+
+              <MaxDistanceControl value={maxDistance} onChange={setMaxDistance} />
+
+              <MinConfidenceControl
+                value={minConfidence}
+                onChange={setMinConfidence}
+              />
 
               <WorkerControl
                 value={workerOverride}
@@ -375,15 +588,7 @@ export default function Match() {
                   {formatComparisons(
                     target.rows.length * supplemental.rows.length
                   )}{" "}
-                  row comparisons — on {workersUsed} of the{" "}
-                  {navigator.hardwareConcurrency || "?"} CPU cores your
-                  browser reports. Small jobs deliberately use fewer cores:
-                  below a few million comparisons, loading and standardizing
-                  the files (which every worker does) takes longer than the
-                  matching itself, so extra cores wouldn&apos;t make the run
-                  faster. If the core count looks too low, your browser may
-                  under-report it for privacy — pin the real number under
-                  &ldquo;Parallel workers&rdquo; on the previous step.
+                  row comparisons.
                 </p>
               )}
             </div>
@@ -402,13 +607,13 @@ export default function Match() {
                   <div className="flex gap-2">
                     <button
                       onClick={reset}
-                      className="rounded border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+                      className="rounded border border-red-300 bg-surface px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
                     >
                       Retry render
                     </button>
                     <button
                       onClick={handleStartOver}
-                      className="rounded border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                      className="rounded border border-gray-300 bg-surface px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
                     >
                       Start Over
                     </button>
@@ -423,11 +628,17 @@ export default function Match() {
                 links={links.filter((l) => !l.excluded)}
                 runDurationMs={runDurationMs}
                 workersUsed={workersUsed}
+                completedAt={completedAt ?? new Date()}
+                ablation={ablation}
+                onExcludeFeature={handleExcludeFeature}
+                onRunAblation={startAblation}
                 onStartOver={handleStartOver}
               />
             </ErrorBoundary>
           )}
         </div>
+
+        <SiteFooter />
       </div>
     </div>
   );
@@ -442,7 +653,7 @@ function WorkerControl({
 }) {
   const reported = reportedCores();
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">
@@ -450,9 +661,7 @@ function WorkerControl({
           </h3>
           <p className="mt-0.5 max-w-md text-xs text-gray-500">
             Your browser reports {reported} CPU core
-            {reported === 1 ? "" : "s"}. Privacy protections in some browsers
-            (Brave, Firefox strict mode, Safari) deliberately under-report the
-            real count — if your machine has more cores, set the number here.
+            {reported === 1 ? "" : "s"}.
           </p>
         </div>
         <select
@@ -484,7 +693,7 @@ function ThresholdControl({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
       <div className="mb-2 flex items-baseline justify-between">
         <label htmlFor="nndr" className="text-sm font-medium text-gray-800">
           Near-miss threshold (NNDR)
@@ -505,8 +714,93 @@ function ThresholdControl({
       />
       <p className="mt-2 text-xs text-gray-500">
         A match is flagged when the ratio of the best distance to the i-th
-        distance is ≥ threshold. Lower = stricter. Default 0.80 (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-800">Lowe 2004</a>).
+        distance is ≥ threshold. Lower = stricter. The 0.80 default comes
+        from image matching (<a href="https://doi.org/10.1023/B:VISI.0000029664.99615.94" target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Lowe 2004</a>)
+        and has not been calibrated for tabular data.
       </p>
+    </div>
+  );
+}
+
+function MaxDistanceControl({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  const enabled = value != null;
+  return (
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
+      <div className="mb-2 flex items-baseline justify-between">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onChange(e.target.checked ? 1.0 : null)}
+          />
+          Reject matches beyond a distance cutoff
+        </label>
+        {enabled && (
+          <span className="font-mono text-sm text-gray-700">
+            {value.toFixed(2)}
+          </span>
+        )}
+      </div>
+      {enabled && (
+        <input
+          type="range"
+          min={0.25}
+          max={3.0}
+          step={0.05}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="w-full"
+        />
+      )}
+      <p className="mt-2 text-xs text-gray-500">
+        {enabled
+          ? "A row is reported as “no match” instead of being assigned its nearest supplemental row when the match’s distance, averaged per matching variable used (distance ÷ √features used), exceeds this cutoff. Roughly: 1.0 ≈ the rows differ by about one standard deviation on every variable compared. Missing variables add a fixed penalty to the distance, so rows with many missing values are rejected more readily."
+          : "Off (default): every target row is assigned its nearest supplemental row, however far away, and the quality signals flag doubtful ones. Enable to report “no match” instead when nothing genuinely similar exists."}
+      </p>
+    </div>
+  );
+}
+
+function MinConfidenceControl({
+  value,
+  onChange,
+}: {
+  value: "medium" | "high" | null;
+  onChange: (v: "medium" | "high" | null) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">
+            Minimum confidence to report a link
+          </h3>
+          <p className="mt-0.5 max-w-md text-xs text-gray-500">
+            {value == null
+              ? "Off: every link is reported and the quality signals flag doubtful ones. Set a minimum for large runs where you only want links that meet a standard — rows below it are written unlinked instead of flagged."
+              : `Links below ${value === "high" ? "High" : "Medium"} confidence are withheld: those rows appear unlinked in the linked dataset, with the nearest row and full diagnostics kept in the detail file for review.`}
+          </p>
+        </div>
+        <select
+          value={value ?? ""}
+          onChange={(e) =>
+            onChange(
+              e.target.value === "" ? null : (e.target.value as "medium" | "high")
+            )
+          }
+          className="rounded border border-gray-300 bg-surface px-2 py-1 text-sm"
+        >
+          <option value="">Off — report all links</option>
+          <option value="medium">Medium or better</option>
+          <option value="high">High only</option>
+        </select>
+      </div>
     </div>
   );
 }

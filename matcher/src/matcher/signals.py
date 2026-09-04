@@ -16,6 +16,8 @@ from matcher.distance import MISSING_PENALTY, brute_find_best_match, euclidean_d
 
 import numpy as np
 
+from .standardize import SCALE_RATIO_LIMIT, observed_column_std
+
 def cascading_nndr(sorted_dists, threshold=0.8):
     """
     Cascading nearest-neighbor distance ratio (Lowe 2004, extended).
@@ -164,24 +166,235 @@ def dataset_smd(std_rows_1, matched_indices, std_rows_2):
     return smd
 
 
+# Per-variable input diagnostics. offset SMD compares the two files' raw
+# marginal distributions per shared column BEFORE matching — the check that
+# catches a column defined or coded differently in the two files (e.g. a
+# poverty rate computed against 100% of the poverty line in one file and
+# 180% in the other: similar spread, systematically shifted mean, invisible
+# to the spread-ratio scale check and silently absorbed by joint z-scoring).
+OFFSET_SMD_WARN = 0.5          # heuristic; ~half a pooled SD of systematic shift
+HIGH_MISSING_PCT = 50.0        # note threshold, matches the UI's red badge
+VARIABLE_WARN_MIN_OBSERVED = 30  # both sides need this many observed values
+                                 # before a dataset-level warning fires —
+                                 # tiny fixtures shift means by chance
+
+
+def _column_observed_stats(rows):
+    """
+    Per-column mean, sample variance (ddof=1), and observed count over raw
+    parsed rows (None = missing -> NaN). Vectorized — _prepare runs this in
+    every pool worker, so per-cell Python loops would multiply across the
+    pool. Conventions mirror dataset_smd: variance 0.0 below two observed
+    values, mean NaN when none.
+    """
+    a = np.asarray(rows, dtype=float)  # None -> NaN
+    counts = (~np.isnan(a)).sum(axis=0)
+    safe = np.maximum(counts, 1)
+    mean = np.where(counts > 0, np.nansum(a, axis=0) / safe, np.nan)
+    ss = np.nansum((a - np.where(np.isnan(mean), 0.0, mean)) ** 2, axis=0)
+    var = np.where(counts > 1, ss / np.maximum(counts - 1, 1), 0.0)
+    return mean, var, counts
+
+
+def variable_report(filtered_rs1, filtered_rs2, feature_names):
+    """
+    Pre-matching diagnostics for every linked variable.
+
+    filtered_rs1, filtered_rs2 : rows of parsed shared-column values
+                                 (float, or None when missing), target and
+                                 supplemental respectively.
+    feature_names              : shared column names, matching column order.
+
+    Returns a list of dicts (one per feature, in feature order), all values
+    JSON-safe (float / int / str / None):
+
+        feature            — column name
+        target_missing     / supp_missing      — missing cell counts
+        target_missing_pct / supp_missing_pct  — as % of rows
+        target_observed    / supp_observed     — observed cell counts
+        target_mean / supp_mean                — over observed (None if none)
+        target_std  / supp_std                 — SD over observed values, in
+                       the scale check's convention (population SD; rounding
+                       dust counts as constant) — see standardize.
+        offset_smd   — |target_mean − supp_mean| / pooled SD (sample SD,
+                       mirroring dataset_smd); the definition-shift check.
+                       None when either side has no observed values, or
+                       when both sides are constant with different values
+                       (shift real but not scalable).
+        spread_ratio — target_std / supp_std (None when either is 0 or not
+                       finite). The note fires outside [1/limit, limit] with
+                       the SAME limit as scale_compatibility_warnings, so the
+                       per-variable note and the dataset warning agree.
+        notes        — "; "-joined short observations, "" when clean.
+                       Pre-rendered here so every consumer (CLI CSV, webapp
+                       panel, zip diagnostics) shows identical wording.
+    """
+    n1 = len(filtered_rs1)
+    n2 = len(filtered_rs2)
+    a1 = np.asarray(filtered_rs1, dtype=float)  # None -> NaN
+    a2 = np.asarray(filtered_rs2, dtype=float)
+    means1, vars1, counts1 = _column_observed_stats(a1)
+    means2, vars2, counts2 = _column_observed_stats(a2)
+    stds1, _ = observed_column_std(a1)
+    stds2, _ = observed_column_std(a2)
+    report = []
+    for f, name in enumerate(feature_names):
+        obs1, obs2 = int(counts1[f]), int(counts2[f])
+        mean1 = float(means1[f]) if obs1 > 0 else None
+        mean2 = float(means2[f]) if obs2 > 0 else None
+        var1, var2 = float(vars1[f]), float(vars2[f])
+        miss1 = n1 - obs1
+        miss2 = n2 - obs2
+        miss1_pct = (miss1 / n1) * 100.0 if n1 else 0.0
+        miss2_pct = (miss2 / n2) * 100.0 if n2 else 0.0
+        std1 = float(stds1[f])
+        std2 = float(stds2[f])
+
+        offset_smd = None
+        if mean1 is not None and mean2 is not None:
+            pooled_sd = float(np.sqrt((var1 + var2) / 2.0))
+            if pooled_sd > 0:
+                offset_smd = abs(mean1 - mean2) / pooled_sd
+            elif mean1 == mean2:
+                offset_smd = 0.0
+            # else: two different constants — a real shift with no scale to
+            # express it in; offset_smd stays None and the note below fires.
+
+        spread_ratio = (
+            (std1 / std2)
+            if (np.isfinite(std1) and np.isfinite(std2) and std1 > 0 and std2 > 0)
+            else None
+        )
+
+        notes = []
+        if offset_smd is not None and offset_smd >= OFFSET_SMD_WARN:
+            notes.append(
+                f"possible definition/coding difference (offset SMD {offset_smd:.2f})"
+            )
+        if (offset_smd is None and mean1 is not None and mean2 is not None
+                and mean1 != mean2):
+            notes.append(
+                "constant in both files but with different values — "
+                "possible definition/coding difference"
+            )
+        if miss1_pct > HIGH_MISSING_PCT:
+            notes.append(f"high missingness (target {miss1_pct:.0f}%)")
+        if miss2_pct > HIGH_MISSING_PCT:
+            notes.append(f"high missingness (supplemental {miss2_pct:.0f}%)")
+        if spread_ratio is not None and not (
+            1.0 / SCALE_RATIO_LIMIT <= spread_ratio <= SCALE_RATIO_LIMIT
+        ):
+            notes.append(f"scale mismatch (spread ratio {spread_ratio:.3g})")
+        elif obs1 > 0 and obs2 > 0 and (std1 == 0) != (std2 == 0):
+            # The most extreme spread mismatch there is; the ratio cannot
+            # express it. Same case scale_compatibility_warnings reports.
+            const_side = "target" if std1 == 0 else "supplemental"
+            notes.append(
+                f"constant in the {const_side} file but varies in the other "
+                f"— possible unit or coding difference"
+            )
+
+        report.append({
+            "feature": name,
+            "target_missing": int(miss1),
+            "target_missing_pct": float(miss1_pct),
+            "supp_missing": int(miss2),
+            "supp_missing_pct": float(miss2_pct),
+            "target_observed": int(obs1),
+            "supp_observed": int(obs2),
+            "target_mean": (float(mean1) if mean1 is not None else None),
+            "supp_mean": (float(mean2) if mean2 is not None else None),
+            "target_std": std1,
+            "supp_std": std2,
+            "offset_smd": (float(offset_smd) if offset_smd is not None else None),
+            "spread_ratio": (float(spread_ratio) if spread_ratio is not None else None),
+            "notes": "; ".join(notes),
+        })
+    return report
+
+
+def variable_warnings(report, min_n=VARIABLE_WARN_MIN_OBSERVED,
+                      offset_warn=OFFSET_SMD_WARN):
+    """
+    Dataset-level warning strings for variables whose raw distributions
+    differ systematically between the two files.
+
+    Gated on both sides having at least min_n observed values: on tiny
+    datasets the means differ by chance and the warning would be noise
+    (and would fire on every small test fixture).
+    """
+    warnings = []
+    for row in report:
+        if row["target_observed"] < min_n or row["supp_observed"] < min_n:
+            continue
+        offset = row["offset_smd"]
+        if offset is None or offset < offset_warn:
+            continue
+        warnings.append(
+            f"column '{row['feature']}' differs systematically between the "
+            f"files (offset SMD {offset:.2f}: target mean "
+            f"{row['target_mean']:.4g} vs supplemental mean "
+            f"{row['supp_mean']:.4g}) — check that both files define and "
+            f"code it the same way (e.g. poverty measured against 100% vs "
+            f"180% of the poverty line)"
+        )
+    return warnings
+
+
 # SMD thresholds are fixed by literature (Austin, PMC3472075).
 # NNDR threshold is intentionally absent — it is run-configurable and
 # passed explicitly so the flag reflects the same threshold used during matching.
 _FLAG_RULES = {
     "no_match":      {"message": "WARNING: no valid match — target shares no observed features with any supplemental row"},
+    "no_match_cutoff": {"message": "WARNING: no match — nearest supplemental row exceeded the distance cutoff ({d:.2f} per-feature vs cutoff {c:.2f})"},
     "nndr":          {"message": "ambiguous match — NNDR {nndr:.2f} (>= {threshold:.2f})"},
     "near_miss":     {"message": "{n} near-miss row(s) within distance ratio threshold"},
     "repeat":        {"message": "{n} exact-distance tie(s)"},
     "mnn":           {"message": "MNN not confirmed — supplemental row is closer to a different target; this record may have no valid match"},
+    "withheld":      {"message": "link withheld — confidence {tier} is below your minimum ({min_tier}); nearest row kept in the detail file"},
     "target_missing": {"message": "target row missing {k} of {n} shared feature(s); match uses observed features only"},
+    # No-match variant: the "match uses observed features only" tail would be
+    # contradictory when no match was assigned at all.
+    "target_missing_no_match": {"message": "target row missing {k} of {n} shared feature(s)"},
     "match_missing": {"message": "matched supplemental row missing {k} of {n} shared feature(s)"},
     "smd_poor":      {"threshold": 0.25, "message": "poor feature balance — {features} (|SMD| > 0.25)"},
     "smd_warn":      {"threshold": 0.10, "message": "feature imbalance — {features} (|SMD| > 0.10)"},
 }
 
 
+# Tiers a given minimum-confidence setting withholds from the linked output.
+# "Low" as a minimum is rejected by validate_min_confidence: it would
+# withhold nothing ("No match" rows have no link to withhold).
+_TIERS_WITHHELD = {"Medium": {"Low"}, "High": {"Low", "Medium"}}
+
+
+def validate_min_confidence(min_confidence):
+    """
+    Optional reporting filter, shared by every public entry point.
+    Accepts None (off), "medium", or "high" (case-insensitive) and returns
+    the canonical tier spelling (None / "Medium" / "High").
+    """
+    if min_confidence is None:
+        return None
+    if isinstance(min_confidence, str):
+        canonical = min_confidence.strip().capitalize()
+        if canonical in _TIERS_WITHHELD:
+            return canonical
+        if canonical == "Low":
+            raise ValueError(
+                'min_confidence "low" would withhold nothing — every '
+                'assigned link is at least Low; use "medium" or "high", '
+                "or None to disable the filter"
+            )
+    raise ValueError(
+        f'min_confidence must be None, "medium", or "high", got {min_confidence!r}'
+    )
+
+
 def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature, feature_names,
-                mnn_confirmed=True, target_missing=0, match_missing=0, no_match=False):
+                mnn_confirmed=True, target_missing=0, match_missing=0, no_match=False,
+                rejected=False, rejected_distance=None, cutoff=None,
+                withheld=False, tier=None, min_tier=None):
     """
     Assembles a plain-English flag string for one matched row.
 
@@ -197,6 +410,21 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
     no_match        : bool     — True when no valid match exists (all distances inf);
                                  suppresses the per-match flags, which would be
                                  meaningless without a match.
+    rejected        : bool     — True when the nearest row was discarded by the
+                                 user's max-distance cutoff; like no_match it
+                                 suppresses the per-match flags, but reports the
+                                 per-feature distance that tripped the cutoff.
+    rejected_distance : float  — per-feature distance (d1/sqrt(features_used))
+                                 of the rejected nearest row; required with rejected.
+    cutoff          : float    — the max-distance cutoff in force; required with rejected.
+    withheld        : bool     — True when the link is withheld by the user's
+                                 minimum-confidence filter. Unlike rejected,
+                                 this only PREPENDS a withheld notice — the
+                                 normal per-match flags still follow, because
+                                 they are the reasons the row fell below the
+                                 minimum.
+    tier            : str      — the row's true confidence tier; required with withheld.
+    min_tier        : str      — the minimum tier in force; required with withheld.
 
     Returns: str. Empty string if no flags raised; " | "-joined messages otherwise.
     """
@@ -206,8 +434,17 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
     if no_match:
         flags.append(_FLAG_RULES["no_match"]["message"])
         if target_missing > 0:
-            flags.append(_FLAG_RULES["target_missing"]["message"].format(k=target_missing, n=n_features))
+            flags.append(_FLAG_RULES["target_missing_no_match"]["message"].format(k=target_missing, n=n_features))
         return " | ".join(flags)
+
+    if rejected:
+        flags.append(_FLAG_RULES["no_match_cutoff"]["message"].format(d=rejected_distance, c=cutoff))
+        if target_missing > 0:
+            flags.append(_FLAG_RULES["target_missing_no_match"]["message"].format(k=target_missing, n=n_features))
+        return " | ".join(flags)
+
+    if withheld:
+        flags.append(_FLAG_RULES["withheld"]["message"].format(tier=tier, min_tier=min_tier))
 
     if nndr >= threshold:
         flags.append(_FLAG_RULES["nndr"]["message"].format(nndr=nndr, threshold=threshold))
@@ -242,3 +479,37 @@ def build_flags(nndr, near_miss_count, threshold, repeat_count, smd_per_feature,
         flags.append(_FLAG_RULES["smd_warn"]["message"].format(features=", ".join(warn_features)))
 
     return " | ".join(flags)
+
+
+def confidence_tier(no_match, rejected, nndr, threshold, repeat_count,
+                    mnn_confirmed, near_miss_count, features_used, n_features):
+    """
+    Synthesizes the per-row signals into one plain verdict. Rule table
+    (first matching row wins, top to bottom):
+
+        No match — no_match (zero shared observed features) OR rejected
+                   (nearest row discarded by the max-distance cutoff).
+        Low      — exact-distance tie at the minimum (repeat_count > 1), OR
+                   MNN not confirmed, OR nndr >= threshold, OR the match
+                   rests on a single feature when more were linked
+                   (features_used == 1 and n_features > 1).
+        Medium   — competitors within the near-miss cutoff, OR at least one
+                   linked feature was missing on either side of the winning
+                   pair (features_used < n_features — the missing-data
+                   penalty contributed to this distance).
+        High     — otherwise: unique minimum, MNN confirmed, no near
+                   misses, nndr below threshold, all linked features
+                   observed on both sides.
+
+    exact_on_observed is deliberately not an input: a full-coverage exact
+    match is already High, and an exact match on 1 of 4 features must stay
+    Low — the presentation layer uses it for explanation, not the verdict.
+    """
+    if no_match or rejected:
+        return "No match"
+    if (repeat_count > 1 or not mnn_confirmed or nndr >= threshold
+            or (features_used == 1 and n_features > 1)):
+        return "Low"
+    if near_miss_count > 0 or features_used < n_features:
+        return "Medium"
+    return "High"

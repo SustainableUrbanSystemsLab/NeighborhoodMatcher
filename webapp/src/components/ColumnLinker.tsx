@@ -1,5 +1,25 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { columnMissingStats, type ColumnMissingStats } from "@/lib/missing";
 import type { ColumnLink, ParsedDataset, PIIWarning } from "@/types";
+
+function MissingBadge({ stats }: { stats: ColumnMissingStats }) {
+  if (stats.missing === 0) return null;
+  const pct = stats.total ? (stats.missing / stats.total) * 100 : 0;
+  const cls =
+    pct > 50
+      ? "bg-red-100 text-red-700"
+      : pct > 20
+        ? "bg-amber-100 text-amber-700"
+        : "bg-gray-100 text-gray-500";
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[11px] ${cls}`}
+      title="Missing cells never match on this variable; the distance uses the missing-data penalty for them instead."
+    >
+      {stats.missing} missing ({pct.toFixed(0)}%)
+    </span>
+  );
+}
 
 interface ColumnLinkerProps {
   target: ParsedDataset;
@@ -18,6 +38,41 @@ export function ColumnLinker({
 }: ColumnLinkerProps) {
   const [manualTarget, setManualTarget] = useState<string>("");
   const [manualSupplemental, setManualSupplemental] = useState<string>("");
+
+  // Per-column missing counts + sentinel scan, one pass per dataset —
+  // surfaced here so missingness is visible BEFORE the run, not only in
+  // the results flags.
+  const targetStats = useMemo(
+    () => target.headers.map((_, i) => columnMissingStats(target.rows, i)),
+    [target]
+  );
+  const suppStats = useMemo(
+    () =>
+      supplemental.headers.map((_, i) =>
+        columnMissingStats(supplemental.rows, i)
+      ),
+    [supplemental]
+  );
+
+  const sentinelNotes = useMemo(() => {
+    const notes: string[] = [];
+    for (const link of links) {
+      if (link.excluded) continue;
+      const t = targetStats[link.targetIndex];
+      const s = suppStats[link.supplementalIndex];
+      if (t?.suspectSentinel != null) {
+        notes.push(
+          `${link.headerName} (target): repeated extreme value ${t.suspectSentinel}`
+        );
+      }
+      if (s?.suspectSentinel != null) {
+        notes.push(
+          `${supplemental.headers[link.supplementalIndex]} (supplemental): repeated extreme value ${s.suspectSentinel}`
+        );
+      }
+    }
+    return notes;
+  }, [links, targetStats, suppStats, supplemental.headers]);
 
   const linkedTargetIndices = new Set(links.map((l) => l.targetIndex));
   const linkedSupIndices = new Set(links.map((l) => l.supplementalIndex));
@@ -78,7 +133,7 @@ export function ColumnLinker({
         <p className="text-sm font-medium text-blue-800">
           Column Linking
         </p>
-        <p className="mt-1 text-xs text-blue-700">
+        <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">
           Columns with matching names are auto-linked. Use <strong>Exclude</strong> to
           keep a column linked but skip it during matching (e.g., ID columns you
           want in the output but not used for distance calculation). Use{" "}
@@ -126,7 +181,7 @@ export function ColumnLinker({
                   link.excluded ? "bg-gray-50 opacity-60" : ""
                 }`}
               >
-                <div className="col-span-4 flex items-center gap-2">
+                <div className="col-span-4 flex flex-wrap items-center gap-2">
                   <span className="text-sm text-gray-900">
                     {link.headerName}
                   </span>
@@ -138,9 +193,15 @@ export function ColumnLinker({
                       PII
                     </span>
                   )}
+                  {targetStats[link.targetIndex] && (
+                    <MissingBadge stats={targetStats[link.targetIndex]!} />
+                  )}
                 </div>
-                <div className="col-span-4 text-sm text-gray-600">
-                  {supplemental.headers[link.supplementalIndex]}
+                <div className="col-span-4 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                  <span>{supplemental.headers[link.supplementalIndex]}</span>
+                  {suppStats[link.supplementalIndex] && (
+                    <MissingBadge stats={suppStats[link.supplementalIndex]!} />
+                  )}
                 </div>
                 <div className="col-span-2 text-center">
                   {link.excluded ? (
@@ -152,7 +213,7 @@ export function ColumnLinker({
                 <div className="col-span-2 flex justify-end gap-2">
                   <button
                     onClick={() => toggleExclude(idx)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800"
                   >
                     {link.excluded ? "Include" : "Exclude"}
                   </button>
@@ -175,12 +236,38 @@ export function ColumnLinker({
         </div>
       </div>
 
-      {unmatchedTarget.length > 0 && unmatchedSupplemental.length > 0 && (
-        <div className="rounded-lg border border-gray-200 p-4">
-          <p className="mb-3 text-sm font-medium text-gray-700">
-            Manual Column Linking
+      {sentinelNotes.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <p className="font-medium">
+            Possible missing-data codes in linked columns
           </p>
-          <div className="flex items-end gap-3">
+          <ul className="mt-1 list-disc pl-4">
+            {sentinelNotes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+          <p className="mt-1">
+            The matcher treats these as real numbers. If they mean
+            &ldquo;missing&rdquo;, recode them as blank or NA in the source
+            file before matching.
+          </p>
+        </div>
+      )}
+
+      {unmatchedTarget.length > 0 && unmatchedSupplemental.length > 0 && (
+        <details className="group rounded-lg border border-gray-200 p-4">
+          <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-gray-700 [&::-webkit-details-marker]:hidden">
+            <span>Manual Column Linking</span>
+            <span className="text-xs font-normal text-gray-500">
+              {unmatchedTarget.length} target / {unmatchedSupplemental.length}{" "}
+              supplemental column{unmatchedSupplemental.length === 1 ? "" : "s"}{" "}
+              unlinked
+              <span className="ml-2 inline-block transition-transform group-open:rotate-90">
+                ▸
+              </span>
+            </span>
+          </summary>
+          <div className="mt-3 flex items-end gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-gray-500">
                 Target Column
@@ -223,7 +310,7 @@ export function ColumnLinker({
               Link
             </button>
           </div>
-        </div>
+        </details>
       )}
 
       <div className="flex gap-4 text-xs text-gray-500">

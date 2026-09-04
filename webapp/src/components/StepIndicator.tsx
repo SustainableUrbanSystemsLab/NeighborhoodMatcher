@@ -24,7 +24,7 @@ export function StepIndicator({ currentStep }: { currentStep: AppStep }) {
                 isActive
                   ? "bg-blue-600 text-white"
                   : isComplete
-                    ? "bg-blue-100 text-blue-700"
+                    ? "bg-blue-100 text-blue-700 dark:text-blue-300"
                     : "bg-gray-100 text-gray-400"
               }`}
             >

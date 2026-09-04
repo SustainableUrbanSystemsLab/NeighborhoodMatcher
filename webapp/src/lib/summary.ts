@@ -2,29 +2,20 @@
 // All work is client-side; no dataset contents leave the browser.
 
 import Papa from "papaparse";
-import type { MatchOutput, ParsedDataset } from "@/types";
+import { isMissingCell, parseNumeric } from "@/lib/missing";
+import type { AblationReport, MatchOutput, ParsedDataset, ColumnLink } from "@/types";
+import {
+  AUTHORS_LINE,
+  ORGANIZATION,
+  TOOL_NAME,
+  REPO_URL,
+  buildLabel,
+  localTimestamp,
+  utcTimestamp,
+} from "@/lib/about";
 
 const SMD_WARN = 0.10;
 const SMD_POOR = 0.25;
-
-// Must agree with matcher.io.MISSING_TOKENS — the data_stats.csv this file
-// produces sits next to the match flags in the same zip, and a cell the
-// matcher treats as missing must not be counted as observed here.
-const MISSING_TOKENS = new Set([
-  "", "na", "n/a", "null", "none", "-", ".", "nan", "#n/a",
-]);
-
-function isMissingCell(cell: string | undefined): boolean {
-  if (cell === undefined) return true;
-  return MISSING_TOKENS.has(cell.replace(/,/g, "").replace(/\$/g, "").trim().toLowerCase());
-}
-
-function parseNumeric(cell: string): number | null {
-  if (isMissingCell(cell)) return null;
-  const cleaned = cell.replace(/,/g, "").replace(/\$/g, "").trim();
-  const n = parseFloat(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
 
 function columnStats(rows: string[][], colIdx: number) {
   let count = 0;
@@ -131,9 +122,21 @@ export function buildMatchStatsCsv(output: MatchOutput): string {
 
   const pct = (n: number) => (total ? ((n / total) * 100).toFixed(2) : "0.00");
 
+  const tiers = summary.tiers ?? {};
   const metrics: [string, string | number][] = [
     ["total_rows", total],
     ["no_match_count", summary.no_match],
+    ["rejected_by_cutoff_count", summary.rejected ?? 0],
+    [
+      "max_distance_cutoff",
+      summary.max_distance != null ? summary.max_distance.toFixed(4) : "off",
+    ],
+    ["withheld_below_min_confidence", summary.withheld ?? 0],
+    ["min_confidence_filter", summary.min_confidence ?? "off"],
+    ["confidence_high", tiers["High"] ?? 0],
+    ["confidence_medium", tiers["Medium"] ?? 0],
+    ["confidence_low", tiers["Low"] ?? 0],
+    ["confidence_no_match", tiers["No match"] ?? 0],
     ["flagged_count", summary.flagged],
     ["flagged_pct", pct(summary.flagged)],
     ["mnn_confirmed_count", summary.mnn_confirmed],
@@ -165,6 +168,67 @@ export function buildMatchStatsCsv(output: MatchOutput): string {
   return Papa.unparse({
     fields: ["metric", "value"],
     data: metrics,
+  });
+}
+
+const fmt = (v: number | null | undefined, digits = 6): string =>
+  v == null ? "" : v.toFixed(digits);
+
+/**
+ * Per-variable diagnostics: the always-on input report (missingness,
+ * definition-shift check, distance share) plus — when the variable check
+ * has run — the leave-one-variable-out columns and verdict.
+ */
+export function buildVariableDiagnosticsCsv(
+  output: MatchOutput,
+  ablation: AblationReport | null
+): string {
+  const byFeature = new Map(
+    (ablation?.variables ?? []).map((v) => [v.feature, v])
+  );
+  const rows = (output.variables ?? []).map((v) => {
+    const abl = byFeature.get(v.feature);
+    return [
+      v.feature,
+      fmt(v.target_missing_pct, 2),
+      fmt(v.supp_missing_pct, 2),
+      fmt(v.offset_smd),
+      fmt(v.spread_ratio),
+      fmt(v.distance_share),
+      ablation ? ablation.sample_size : "",
+      ablation ? (ablation.sampled ? 1 : 0) : "",
+      abl ? fmt(ablation!.baseline.mnn_confirmed_pct, 2) : "",
+      abl ? fmt(abl.metrics.mnn_confirmed_pct, 2) : "",
+      abl ? fmt(abl.delta_mnn_pct, 2) : "",
+      abl ? fmt(ablation!.baseline.high_pct, 2) : "",
+      abl ? fmt(abl.metrics.high_pct, 2) : "",
+      abl ? fmt(abl.delta_high_pct, 2) : "",
+      abl ? fmt(abl.metrics.median_nndr, 4) : "",
+      abl ? abl.verdict : "",
+      v.notes,
+    ];
+  });
+  return Papa.unparse({
+    fields: [
+      "feature",
+      "target_missing_pct",
+      "supp_missing_pct",
+      "offset_smd",
+      "spread_ratio",
+      "distance_share",
+      "ablation_sample_size",
+      "ablation_sampled",
+      "baseline_mnn_pct",
+      "mnn_pct_without",
+      "delta_mnn_pct",
+      "baseline_high_pct",
+      "high_pct_without",
+      "delta_high_pct",
+      "median_nndr_without",
+      "ablation_verdict",
+      "notes",
+    ],
+    data: rows,
   });
 }
 
@@ -211,25 +275,141 @@ is pending.
 
 export const CONTACT_TEXT = `Contact information
 
-TBD — placeholder. Replace before distributing the tool externally.
+${TOOL_NAME} is developed by ${AUTHORS_LINE}
+(${ORGANIZATION}).
+
+Source code, issues, and releases:
+${REPO_URL}
+
+Direct contact details: TBD — placeholder. Add before distributing the
+tool externally.
 `;
 
-export const README_TEXT = `Dataset Matcher — Results Package
+/**
+ * Report metadata: who made the tool, which engine version processed this
+ * data, when the package was generated, and the settings in force. Written
+ * at the zip root (not diagnostics/) — it describes the report itself.
+ *
+ * The tool identity comes from `output.provenance`, i.e. the engine that
+ * actually ran, not the page build; the page build is recorded separately
+ * so a bug can be traced to either side.
+ */
+export function buildRunInfoCsv(
+  output: MatchOutput,
+  target: ParsedDataset,
+  supplemental: ParsedDataset,
+  links: ColumnLink[],
+  generatedAt: Date,
+  ablation: AblationReport | null = null
+): string {
+  // Which target column was matched to which supplemental column. A restore
+  // needs this to re-create manual links between differently named columns
+  // — `matching_variables` names only the target side.
+  const columnLinks = links
+    .filter((l) => !l.excluded)
+    .map((l) => [
+      target.headers[l.targetIndex] ?? l.headerName,
+      supplemental.headers[l.supplementalIndex] ?? l.headerName,
+    ]);
+  const p = output.provenance;
+  const { summary } = output;
+  const rows: [string, string | number][] = [
+    ["tool", p?.tool ?? "NeighborhoodMatcher"],
+    ["tool_version", p?.version ?? "unknown"],
+    ["authors", (p?.authors ?? []).join("; ") || AUTHORS_LINE],
+    ["organization", p?.organization ?? ORGANIZATION],
+    ["repository", p?.repo_url ?? REPO_URL],
+    ["generated_at_utc", utcTimestamp(generatedAt)],
+    ["generated_at_local", localTimestamp(generatedAt)],
+    ["run_environment", "browser (client-side; data never left this device)"],
+    ["webapp_build", buildLabel()],
+    ["target_file", target.fileName],
+    ["supplemental_file", supplemental.fileName],
+    ["target_rows", target.rows.length],
+    ["supplemental_rows", supplemental.rows.length],
+    ["target_label_row", target.labelRowSkipped ? "line 2 skipped (label row)" : "none"],
+    [
+      "supplemental_label_row",
+      supplemental.labelRowSkipped ? "line 2 skipped (label row)" : "none",
+    ],
+    ["matching_variables", output.feature_names.join("; ")],
+    ["column_links", JSON.stringify(columnLinks)],
+    ["nndr_threshold", summary.threshold],
+    [
+      "max_distance_cutoff",
+      summary.max_distance != null ? summary.max_distance : "off",
+    ],
+    ["min_confidence_filter", summary.min_confidence ?? "off"],
+    [
+      "variable_ablation",
+      ablation
+        ? ablation.sampled
+          ? `on (sampled ${ablation.sample_size} of ${ablation.n_targets} rows)`
+          : `on (all ${ablation.n_targets} rows)`
+        : "not run",
+    ],
+  ];
+  return Papa.unparse({ fields: ["key", "value"], data: rows });
+}
 
+/** README.txt: provenance header followed by the folder guide. */
+export function buildReadmeText(
+  output: MatchOutput,
+  generatedAt: Date
+): string {
+  const p = output.provenance;
+  const header = [
+    `${p?.tool ?? "NeighborhoodMatcher"} — Results Package`,
+    "",
+    `Tool version:  ${p?.version ?? "unknown"} (matching engine)`,
+    `Webapp build:  ${buildLabel()}`,
+    `Generated:     ${localTimestamp(generatedAt)}  /  ${utcTimestamp(generatedAt)}`,
+    `Authors:       ${p?.authors_line ?? AUTHORS_LINE}`,
+    `Organization:  ${p?.organization ?? ORGANIZATION}`,
+    `Source:        ${p?.repo_url ?? REPO_URL}`,
+    "",
+    "Machine-readable copy of the above, plus the settings this run used:",
+    "run_info.csv.",
+    "",
+  ].join("\n");
+  return header + README_LAYOUT;
+}
+
+const README_LAYOUT = `
 Folder layout:
 
+  run_info.csv              Tool version, authors, generation timestamp,
+                            and the settings this run used.
+
   linked_dataset.csv        Primary output. Target rows with matched
-                            supplemental columns appended.
+                            supplemental columns appended, plus per-row
+                            quality columns: confidence (High / Medium /
+                            Low / No match), features_used,
+                            exact_on_observed, filled_from_match (shared
+                            columns whose missing target value was filled
+                            from the matched row), and flags.
 
   results/
-    match_detail.csv        Per-row diagnostics: distance, NNDR, MNN
-                            confirmation, flags, near-miss count, missing-feature counts.
+    match_detail.csv        Row diagnostics: distance, NNDR, MNN
+                            confirmation, confidence, features used,
+                            flags, near-miss count, missing-feature counts.
 
   diagnostics/
     data_stats.csv          Per-column summary stats for both inputs.
     match_stats.csv         Dataset-level match quality metrics.
     feature_smd.csv         Standardized mean difference per feature,
                             with balance flag (ok / warning / poor).
+    variable_diagnostics.csv  Per matching variable: missingness on each
+                            side, offset SMD (definition/coding-shift
+                            check), share of total match distance, and —
+                            when the variable check ran — the
+                            leave-one-variable-out columns: how MNN
+                            confirmation and High-confidence rates change
+                            without the variable, plus a verdict
+                            (consider_excluding / load_bearing / neutral).
+    warnings.txt            Dataset-level warnings raised for this run
+                            (scale mismatch, definition shift, header
+                            near-misses), one per line.
 
   inputs/
     original_target.csv         Unmodified bytes of the uploaded target.

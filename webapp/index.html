@@ -5,6 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <title>NeighborhoodMatcher — Dataset Matcher</title>
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      // Paint the right theme on the FIRST frame. Anything that waits for the
+      // React bundle flashes a white page at dark-mode viewers. Mirrors
+      // src/lib/theme.ts (same key, same "system" fallback); kept inline and
+      // tiny on purpose — a blocking script here costs less than the flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem("nbhdmatch:theme");
+          var theme =
+            saved === "light" || saved === "dark"
+              ? saved
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
