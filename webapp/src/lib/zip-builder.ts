@@ -7,6 +7,7 @@ import Papa from "papaparse";
 import type {
   AblationReport,
   ColumnLink,
+  IdentifierBlock,
   MatchOutput,
   ParsedDataset,
 } from "@/types";
@@ -40,7 +41,9 @@ export async function buildResultsZip(
   links: ColumnLink[],
   ablation: AblationReport | null = null,
   /** when the package was generated; injected for deterministic tests */
-  generatedAt: Date = new Date()
+  generatedAt: Date = new Date(),
+  /** shared identifier columns kept out of the run (recorded in run_info) */
+  blocked: IdentifierBlock[] = []
 ): Promise<Blob> {
   const zip = new JSZip();
 
@@ -50,7 +53,7 @@ export async function buildResultsZip(
   zip.file(
     "run_info.csv",
     withBom(
-      buildRunInfoCsv(output, target, supplemental, links, generatedAt, ablation)
+      buildRunInfoCsv(output, target, supplemental, links, generatedAt, ablation, blocked)
     )
   );
 

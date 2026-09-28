@@ -31,6 +31,7 @@ const MATCHER_MODULES = [
   "distance",
   "merge",
   "signals",
+  "identifiers",
   "ablation",
   "pipeline",
   "web_api",

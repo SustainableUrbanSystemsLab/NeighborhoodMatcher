@@ -3,7 +3,14 @@
 
 import Papa from "papaparse";
 import { isMissingCell, parseNumeric } from "@/lib/missing";
-import type { AblationReport, MatchOutput, ParsedDataset, ColumnLink } from "@/types";
+import type {
+  AblationReport,
+  ColumnLink,
+  IdentifierBlock,
+  MatchOutput,
+  ParsedDataset,
+} from "@/types";
+import { blockedSentence } from "@/lib/identifier-guard";
 import {
   AUTHORS_LINE,
   ORGANIZATION,
@@ -300,7 +307,9 @@ export function buildRunInfoCsv(
   supplemental: ParsedDataset,
   links: ColumnLink[],
   generatedAt: Date,
-  ablation: AblationReport | null = null
+  ablation: AblationReport | null = null,
+  /** shared identifier columns (ZIP, tract, GEOID, …) kept out of the run */
+  blocked: IdentifierBlock[] = []
 ): string {
   // Which target column was matched to which supplemental column. A restore
   // needs this to re-create manual links between differently named columns
@@ -334,6 +343,10 @@ export function buildRunInfoCsv(
     ],
     ["matching_variables", output.feature_names.join("; ")],
     ["column_links", JSON.stringify(columnLinks)],
+    [
+      "identifier_columns_blocked",
+      blocked.length ? blocked.map(blockedSentence).join("; ") : "none",
+    ],
     ["nndr_threshold", summary.threshold],
     [
       "max_distance_cutoff",
@@ -379,7 +392,11 @@ const README_LAYOUT = `
 Folder layout:
 
   run_info.csv              Tool version, authors, generation timestamp,
-                            and the settings this run used.
+                            the settings this run used, and any shared
+                            identifier columns (ZIP, census tract, GEOID,
+                            coordinates, address) that were kept out of
+                            the matching — such columns are never
+                            matching variables.
 
   linked_dataset.csv        Primary output. Target rows with matched
                             supplemental columns appended, plus per-row

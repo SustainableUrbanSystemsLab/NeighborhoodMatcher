@@ -156,6 +156,30 @@ function PictoFewer() {
   );
 }
 
+function PictoNoIdentifier() {
+  // A ZIP / tract code column, crossed out: identifiers never match.
+  return (
+    <svg viewBox="0 0 120 90" className="h-full w-full" aria-hidden="true">
+      <rect x={10} y={12} width={44} height={13} rx={3} fill={BLUE_LIGHT} />
+      <text x={32} y={22} fontSize={8} fill={SLATE_DARK} textAnchor="middle" fontWeight={600}>
+        ZIP
+      </text>
+      {[32, 50, 68].map((y) => (
+        <rect key={y} x={10} y={y} width={44} height={11} rx={3} fill={RULE} />
+      ))}
+      <rect x={66} y={12} width={44} height={13} rx={3} fill={BLUE_LIGHT} />
+      <text x={88} y={22} fontSize={8} fill={SLATE_DARK} textAnchor="middle" fontWeight={600}>
+        income
+      </text>
+      {[32, 50, 68].map((y) => (
+        <rect key={y} x={66} y={y} width={44} height={11} rx={3} fill={BLUE_LIGHT} />
+      ))}
+      <Cross x={32} y={50} />
+      <Check x={88} y={50} />
+    </svg>
+  );
+}
+
 interface Item {
   Icon: () => JSX.Element;
   title: string;
@@ -197,6 +221,12 @@ const ITEMS: Item[] = [
     title: "Fewer well-measured variables beat many spotty ones.",
     detail:
       "Missing values are never imputed — each adds a fixed distance penalty. Exclude weak variables at Link Columns; the results page tells you if one is hurting the linkage.",
+  },
+  {
+    Icon: PictoNoIdentifier,
+    title: "No ZIP codes, census tracts or other geographic identifiers as matching variables.",
+    detail:
+      "Columns named zip, tract, GEOID, lat/lon or address — or holding such codes — are blocked at Link Columns with no override (HIPAA / PII). They still pass through to your output unchanged.",
   },
 ];
 

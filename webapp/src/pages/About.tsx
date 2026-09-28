@@ -213,7 +213,8 @@ export default function About() {
           <p className="mb-3 text-sm text-gray-500">
             For each row in your target file, the tool finds the most similar
             row in the supplemental file, using the characteristics you
-            choose and never ZIP code or any other identifier.
+            choose — never ZIP codes, census tract IDs or other geographic
+            identifiers, which the tool refuses to use as matching variables.
           </p>
           <ol className="space-y-2">
             {ALGORITHM_STEPS.map((step, i) => {
