@@ -115,12 +115,21 @@ jobs:
       # through the Pyodide worker loaded from the app bundle, saves the
       # results package through the app, confirms the network is blocked,
       # and writes PASS/FAIL to the report file (webapp/src/lib/desktop-selftest.ts).
+      # Runs the app from inside the shipped .dmg (tauri build deletes the
+      # intermediate .app after packing it), so the distributable itself is
+      # what gets tested.
       - name: Self-test the app (macOS, WKWebView)
         if: matrix.platform == 'macos'
         shell: bash
         run: |
-          app=$(ls -d webapp/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app | head -1)
+          dmg=$(ls webapp/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg | head -1)
+          mnt=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          trap 'hdiutil detach "$mnt" -force >/dev/null 2>&1 || true' EXIT
+          app=$(ls -d "$mnt"/*.app | head -1)
           bin=$(ls "$app"/Contents/MacOS/* | head -1)
+          echo "running $bin"
+          codesign -dv "$app" 2>&1 | head -3 || true
           export NBHDMATCH_SELFTEST="$RUNNER_TEMP/selftest.txt"
           export NBHDMATCH_DOWNLOAD_DIR="$RUNNER_TEMP/selftest-downloads"
           mkdir -p "$NBHDMATCH_DOWNLOAD_DIR"
