@@ -36,6 +36,12 @@ on:
 permissions:
   contents: write
 
+# A newer push to the same pull request supersedes a running build; tag
+# (release) builds always finish.
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     strategy:
@@ -163,6 +169,31 @@ jobs:
           Get-Content $env:NBHDMATCH_SELFTEST
           if (-not (Select-String -Path $env:NBHDMATCH_SELFTEST -Pattern '^PASS' -Quiet)) { exit 1 }
           Get-ChildItem $env:NBHDMATCH_DOWNLOAD_DIR
+
+      # The installer users download: silent install (/S, into a temp folder),
+      # then the same self-test on the installed app. The runner already has
+      # the WebView2 runtime, so the embedded offline installer is skipped
+      # here; it is what makes a machine without it work.
+      - name: Install with the NSIS installer and self-test the installed app (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem webapp/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP "nbhdmatch-installed"
+          Write-Host "installing $($setup.Name) ($([math]::Round($setup.Length / 1MB)) MB) into $dir"
+          $install = Start-Process -FilePath $setup.FullName -ArgumentList "/S", "/D=$dir" -PassThru -Wait
+          if ($install.ExitCode -ne 0) { Write-Error "installer exit code $($install.ExitCode)"; exit 1 }
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notmatch '^uninstall' } | Select-Object -First 1
+          if (-not $exe) { Get-ChildItem -Recurse $dir; Write-Error "no installed app found"; exit 1 }
+          $env:NBHDMATCH_SELFTEST = Join-Path $env:RUNNER_TEMP "selftest-installed.txt"
+          $env:NBHDMATCH_DOWNLOAD_DIR = Join-Path $env:RUNNER_TEMP "selftest-installed-downloads"
+          New-Item -ItemType Directory -Force -Path $env:NBHDMATCH_DOWNLOAD_DIR | Out-Null
+          Write-Host "running $($exe.FullName)"
+          $p = Start-Process -FilePath $exe.FullName -PassThru
+          if (-not $p.WaitForExit(360000)) { Stop-Process -Id $p.Id -Force }
+          if (-not (Test-Path $env:NBHDMATCH_SELFTEST)) { Write-Error "the installed app wrote no self-test report"; exit 1 }
+          Get-Content $env:NBHDMATCH_SELFTEST
+          if (-not (Select-String -Path $env:NBHDMATCH_SELFTEST -Pattern '^PASS' -Quiet)) { exit 1 }
 
       # Unit tests of the Rust side (file-name sanitizing, no-overwrite
       # saving). After the build, because generate_context! embeds ../dist.
