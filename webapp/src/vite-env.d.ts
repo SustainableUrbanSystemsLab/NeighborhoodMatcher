@@ -6,3 +6,5 @@
 declare const __APP_VERSION__: string;
 declare const __APP_COMMIT__: string;
 declare const __BUILD_TIME__: string;
+/** Version of the self-hosted Pyodide runtime under /pyodide/v<version>/. */
+declare const __PYODIDE_VERSION__: string;

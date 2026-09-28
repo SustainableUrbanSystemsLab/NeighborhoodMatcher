@@ -1,14 +1,26 @@
 // HIPAA NOTE: This worker runs Pyodide + the matcher off the main thread.
 // Dataset contents are passed in over postMessage (structured-cloned within
 // the tab) and never leave the browser.
+//
+// OFFLINE NOTE: everything this worker fetches — the Pyodide runtime, the
+// numpy wheel and the matcher sources — is served from the app's own origin
+// (see scripts/sync-assets.mjs). No CDN is contacted at runtime, so the app
+// works on networks that block CDNs, offline after a first visit (service
+// worker precache), and inside the desktop app with no network at all.
 
 /// <reference lib="webworker" />
 
 import { loadPyodide, type PyodideInterface } from "pyodide";
 import type { AblationReport, MatchOutput } from "@/types";
 
-const PYODIDE_VERSION = "0.29.3";
-const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+// Same-origin copy of the runtime; the version is injected at build time
+// from the installed pyodide package so the path can never drift from it.
+// Absolute, because Pyodide builds package URLs with `new URL(name, base)`,
+// which rejects a bare path as a base.
+const PYODIDE_INDEX_URL = new URL(
+  `/pyodide/v${__PYODIDE_VERSION__}/`,
+  self.location.href
+).href;
 
 const MATCHER_MODULES = [
   "__init__",
@@ -189,7 +201,7 @@ async function init(): Promise<void> {
     try {
       await initInner();
     } catch (err) {
-      // Do not cache a failed init: a transient CDN/network failure would
+      // Do not cache a failed init: a transient fetch failure would
       // otherwise make every later run fail instantly until page reload.
       initPromise = null;
       pyodide = null;
@@ -202,7 +214,13 @@ async function init(): Promise<void> {
 async function initInner(): Promise<void> {
   {
     send({ type: "status", phase: "loading-runtime" });
-    pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
+    // packageBaseUrl/lockFileURL are what indexURL already implies; naming
+    // them keeps Pyodide's built-in CDN fallback out of the resolution path.
+    pyodide = await loadPyodide({
+      indexURL: PYODIDE_INDEX_URL,
+      packageBaseUrl: PYODIDE_INDEX_URL,
+      lockFileURL: `${PYODIDE_INDEX_URL}pyodide-lock.json`,
+    });
 
     send({ type: "status", phase: "loading-numpy" });
     await pyodide.loadPackage("numpy");

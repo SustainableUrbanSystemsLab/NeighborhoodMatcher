@@ -6,6 +6,12 @@ import { readFileSync } from "fs";
 import path from "path";
 
 const pkg = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "utf-8"));
+// The Pyodide runtime is served from this origin under /pyodide/v<version>/
+// (copied there by scripts/sync-assets.mjs), so the worker's indexURL must
+// name the exact version that was installed.
+const pyodideVersion: string = JSON.parse(
+  readFileSync(path.resolve(__dirname, "node_modules/pyodide/package.json"), "utf-8")
+).version;
 
 // Which build is serving the site. Netlify exposes COMMIT_REF; locally we
 // ask git; neither is available in a bare tarball build, hence "unknown".
@@ -24,8 +30,12 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commitRef()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString().replace(/\.\d+Z$/, "Z")),
+    __PYODIDE_VERSION__: JSON.stringify(pyodideVersion),
   },
   plugins: [react(), tailwindcss()],
+  // Pyodide's loader resolves its own files at runtime relative to indexURL;
+  // pre-bundling it would rewrite those paths (Pyodide's bundler guide).
+  optimizeDeps: { exclude: ["pyodide"] },
   // Respect PORT when a harness assigns one (e.g. preview tooling).
   server: process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : undefined,
   resolve: {

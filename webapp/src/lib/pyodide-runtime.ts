@@ -1,7 +1,8 @@
 // HIPAA NOTE: The matcher runs inside Web Workers in the same tab.
 // Dataset contents travel via structured-clone postMessage and never leave
-// the browser. Only the Pyodide runtime (WASM + stdlib) and numpy wheel are
-// fetched from a public CDN — no user data is transmitted.
+// the browser. The Pyodide runtime (WASM + stdlib) and the numpy wheel are
+// served from this app's own origin — no user data is transmitted, and no
+// third-party host is contacted.
 //
 // Parallelism: WASM is single-threaded, so one Pyodide can use one core.
 // For larger target files we run a POOL of workers, each matching a slice

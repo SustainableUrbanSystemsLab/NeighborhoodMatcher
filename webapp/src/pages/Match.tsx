@@ -60,7 +60,7 @@ function formatComparisons(n: number): string {
 function statusLabel(status: PyodideStatus): string {
   switch (status.phase) {
     case "loading-runtime":
-      return "Downloading Python runtime (first-time only)…";
+      return "Loading Python runtime…";
     case "loading-numpy":
       return "Loading numpy…";
     case "loading-matcher":
