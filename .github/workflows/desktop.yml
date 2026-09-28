@@ -110,6 +110,12 @@ jobs:
           releaseAssetNamePattern: "NeighborhoodMatcher-[platform]-[arch][setup][ext]"
           args: ${{ matrix.args }}
 
+      # Unit tests of the Rust side (file-name sanitizing, no-overwrite
+      # saving). After the build, because generate_context! embeds ../dist.
+      - name: Rust unit tests
+        if: matrix.platform == 'macos'
+        run: cargo test --manifest-path webapp/src-tauri/Cargo.toml --lib
+
       - name: Upload installers as workflow artifacts
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4
