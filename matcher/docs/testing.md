@@ -35,6 +35,7 @@ discovers everything below `tests/`.
 | `tests/test_min_confidence.py` | Minimum-confidence filter — off ≡ base run, exact withheld set per tier, run-level statistics invariant, precedence vs the distance cutoff, no fill on withheld rows, validation, sharded ≡ single, CLI↔web parity. |
 | `tests/test_ablation.py` | Leave-one-variable-out — re-slice ≡ fresh-run anchor equivalence, deterministic sampling arithmetic, recommendation margins/veto/floor, MNN-collapse reproduction (harmful variable flagged, clean ones not), load-bearing detection, assembly validation + order independence, CLI table + CSV. Sampling: exact budgeted size (regression for the stride form that halved it). |
 | `tests/test_label_row.py` | Second header / label rows (NDA/ABCD exports put descriptions on line 2) — detection rule (name echo, text in an otherwise-numeric column, any number = data, numeric-share threshold), `drop_label_row` line-number shift + note, CLI skips loudly and records it in `run_info`, `skip_label_row=False` opt-out, web-path parse errors explain the line, the web app's empty-line placeholder keeps original line numbers, TS mirror constants pinned. |
+| `tests/test_identifiers.py` | Geographic-identifier guard — name normalization (camelCase, separators), identifier names by family and ordinary variables that must pass (`median_income`, `long_term_unemployment`, `street_connectivity`), value shapes (10/11-digit tract GEOIDs incl. mixed, block group/block, ZIP+4, five-digit only with a leading zero, share / minimum-observed / distinct / sample rules), `blocked_links` side reporting, CLI drop + warning + pass-through on the real ACS files, `identifier_columns_blocked` in `run_info`, web auto-link drop vs explicit-link `IdentifierColumnError` (incl. `match_shard`), TS mirror (`identifier-guard.ts`) pinned to the Python lists and thresholds. |
 
 ## Conventions
 
@@ -57,3 +58,14 @@ discovers everything below `tests/`.
 3. If the signal raises a flag, add cases to `tests/signals/test_build_flags.py`.
 4. Document the signal under `docs/signals/<signal>.md` and link it from
    `docs/signals/README.md` and `docs/output_format.md`.
+
+## Webapp end-to-end (Playwright)
+
+`webapp/tests/` runs against the production build (`pnpm build`, then `pnpm test:e2e`; CI does both):
+
+| File | What it pins |
+|------|--------------|
+| `offline.spec.ts` | A full run issues no request outside the origin; after one visit the site reloads and runs a full match with the network off; a shared `census tract` column is blocked at Link Columns and recorded in `run_info.csv` while still passing through to `linked_dataset.csv`. Chromium. |
+| `desktop-csp.spec.ts` | The app under the desktop app's exact CSP (from `src-tauri/tauri.conf.json`, with Tauri's inline-script hashes): full match, no violations, remote fetch blocked. Chromium (WebView2's engine) and WebKit (WKWebView's). |
+
+`pnpm run check:offline` (`webapp/scripts/check-offline-build.mjs`) is the static counterpart: no CDN reference in `dist/`, runtime and wheel present, precache complete, self-host zip built.

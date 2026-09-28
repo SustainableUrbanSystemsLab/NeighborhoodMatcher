@@ -28,7 +28,15 @@ and missing-data flags.
 
 Privacy is a design constraint: the search is deliberately brute-force (no
 spatial indexes), and all matching runs client-side in your browser — data
-never leaves your machine, even on the hosted site.
+never leaves your machine, even on the hosted site. **ZIP codes, census tract
+IDs and other geographic identifiers are never matching variables**: columns
+named or shaped like them are blocked, with no override, in the web app and
+the Python engine alike (they still pass through to the output).
+
+**No Internet needed.** The site serves its own Python runtime and keeps
+working offline after one visit; a [desktop app](#use-it-without-internet)
+covers machines that never go online, and a zip of the site can be hosted
+inside an institution.
 
 ## Using it
 
@@ -40,6 +48,17 @@ never leaves your machine, even on the hosted site.
    `-`, …) are fine. Upload raw values — never pre-standardized (z-scored)
    columns.
 3. Review the per-row diagnostics and download the results zip.
+
+## Use it without Internet
+
+| Situation | Use |
+|-----------|-----|
+| Online once, offline later | Open the site once; the footer shows *Available offline on this device* when the whole app is cached. Install it from the browser menu for an app icon. |
+| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). Not code-signed yet: macOS right-click → Open; Windows SmartScreen → More info → Run anyway. |
+| Host it inside an institution | Download *nbhdmatch-site-v&lt;version&gt;.zip* from the site's [About page](https://nbhdmatch.netlify.app/about#offline) and serve the folder from any static server (HOSTING.txt inside lists the two settings that matter). |
+
+In every case the runtime, the engine and all assets are local: nothing is
+fetched from a CDN, and no data leaves the machine.
 
 No data handy? Grab the benchmark pair from this repo:
 [`simulated_data/dataset_A100.csv`](simulated_data/dataset_A100.csv) (target) ×
@@ -59,8 +78,17 @@ pnpm dev          # http://localhost:5173
 The dev/build step copies the Python matcher sources from
 [`matcher/`](matcher/) into `webapp/public/` (see
 `webapp/scripts/sync-assets.mjs`), so the app always runs the same code the
-tests cover. Matching runs in a pool of Pyodide Web Workers sized to the
-job — all CPU cores but one for anything non-trivial.
+tests cover, together with the Pyodide runtime and the numpy wheel
+(checksum-verified; the only build-time download). Matching runs in a pool of
+Pyodide Web Workers sized to the job — all CPU cores but one for anything
+non-trivial.
+
+```bash
+pnpm build                 # dist/ + dist/offline/nbhdmatch-site-v<version>.zip
+pnpm run check:offline     # fails if the build could need the Internet
+pnpm test:e2e              # Playwright: offline run, no foreign requests, identifier guard, desktop CSP
+pnpm desktop:build         # desktop app (needs Rust; CI builds the installers)
+```
 
 </details>
 
@@ -97,7 +125,7 @@ Input format, missing-value handling, and column-linking rules:
 
 ```bash
 cd matcher
-uv run --project . pytest                                        # 340 tests
+uv run --project . pytest                                        # 443 tests
 uv run --project . python analysis/benchmark_simulated.py --check # scored vs ground truth
 ```
 
@@ -152,7 +180,8 @@ all show it, so two runs can always be told apart.
 
 Bump with `python scripts/bump_version.py patch|minor|major`, which rewrites
 every declaration (`matcher/about.py`, `webapp/src/lib/about.ts`,
-`webapp/package.json`, both `pyproject.toml`) and keeps them in agreement;
+`webapp/package.json`, both `pyproject.toml`, `webapp/src-tauri/Cargo.toml`)
+and keeps them in agreement;
 `--check` verifies. Add a line to `CHANGELOG.md`. CI fails a pull request that
 changes `matcher/src`, `webapp/src` or `webapp/public/matcher` without a bump.
 
@@ -161,7 +190,7 @@ changes `matcher/src`, `webapp/src` or `webapp/public/matcher` without a bump.
 | Folder | What it is |
 |--------|------------|
 | [`matcher/`](matcher/) | The matcher: matching core, quality signals, missing-data-aware distances, explanatory-PDF pipeline, and the Pyodide-loadable `web_api` the frontend uses. Docs in [`matcher/docs/`](matcher/docs/). |
-| [`webapp/`](webapp/) | React + Vite webapp running the matcher in the browser via a pool of Pyodide workers. Deployed to [nbhdmatch.netlify.app](https://nbhdmatch.netlify.app/). |
+| [`webapp/`](webapp/) | React + Vite webapp running the matcher in the browser via a pool of Pyodide workers, offline-capable. Deployed to [nbhdmatch.netlify.app](https://nbhdmatch.netlify.app/). `webapp/src-tauri/` wraps the same build as the desktop app. |
 | [`simulated_data/`](simulated_data/) | Benchmark: fake participants generated from real ACS 2010–2014 tracts with known ground truth. Drives the regression floors in CI. |
 
 <details>

@@ -10,7 +10,9 @@
 4. A **run-provenance file** at `<output_basename>_run_info.csv` — `key,value`
    rows naming the tool, its version, the authors, the repository, the run
    timestamp (UTC and local), and the settings this run used (linked
-   variables, NNDR threshold, distance cutoff, minimum-confidence filter).
+   variables, NNDR threshold, distance cutoff, minimum-confidence filter),
+   plus `identifier_columns_blocked`: the shared geographic-identifier
+   columns kept out of the matching (`none` when there were none).
    Input files are recorded by name only, never by path, so a results folder
    can be shared without leaking a directory tree. Written on every run —
    provenance is not optional: months later it is the only thing that says
@@ -22,6 +24,29 @@ report ([signals/ablation.md](signals/ablation.md)).
 
 `coordinate_in_memory(...)` returns the same data as a Python dict; the browser
 frontend serializes it to JS via Pyodide.
+
+### Geographic identifiers are never matching variables
+
+A shared column is blocked when either file's header names a geographic
+identifier (ZIP / ZCTA / postal code, census tract / TRACTCE / CT20xx,
+GEOID / FIPS / block group, latitude / longitude / coordinates, address —
+after lowercasing, camelCase splitting and `_-./` → space) or when at least
+90 % of its ≥ 20 observed cells look like one (10–11-digit tract GEOIDs,
+12- or 15-digit block-group / block GEOIDs, ZIP+4, or five-digit codes with
+at least one leading zero). There is no override (`matcher/identifiers.py`).
+
+- Auto-linked (the default): the column is dropped from matching and the run
+  warns `excluded '<column>' from matching: <reason> — geographic identifiers
+  (HIPAA / PII) can never be matching variables. The column still passes
+  through to the output unchanged; …`. When nothing else is shared, the
+  "No shared columns" error says so.
+- Explicit links (`links=[...]`, what the webapp sends): a link touching an
+  identifier raises `IdentifierColumnError` (a `ValueError`) naming the column
+  and the reason.
+
+Blocked columns are never removed from the files: the target's copy stays
+in the linked row, and a supplemental copy is appended like any other
+non-matching column.
 
 ## Linked dataset (`<output>.csv`)
 
