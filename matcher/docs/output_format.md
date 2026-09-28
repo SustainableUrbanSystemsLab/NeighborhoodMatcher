@@ -30,7 +30,13 @@ frontend serializes it to JS via Pyodide.
 A shared column is blocked when either file's header names a geographic
 identifier (ZIP / ZCTA / postal code, census tract / TRACTCE / CT20xx,
 GEOID / FIPS / block group, latitude / longitude / coordinates, address —
-after lowercasing, camelCase splitting and `_-./` → space) or when at least
+after lowercasing, camelCase splitting and `_-./` → space). Words that can
+also describe a quantity (zip, tract, postal, block group, lat/lon) count
+only as the name's last word, optionally followed by an ID suffix (`id`,
+`code`, `fips`, `geoid`, `2010`, …): `home_zip`, `census tract 2010` and
+`tract_id` are blocked, `tract_poverty_rate`, `zip_median_rent` and
+`pct_lat` are not. Code-only words (GEOID, FIPS, ZCTA, TIGER field names
+such as `TRACTCE10`) count anywhere. A column is also blocked when at least
 90 % of its ≥ 20 observed cells look like one (10–11-digit tract GEOIDs,
 12- or 15-digit block-group / block GEOIDs, ZIP+4, or five-digit codes with
 at least one leading zero). There is no override (`matcher/identifiers.py`).

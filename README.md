@@ -125,7 +125,7 @@ Input format, missing-value handling, and column-linking rules:
 
 ```bash
 cd matcher
-uv run --project . pytest                                        # 443 tests
+uv run --project . pytest                                        # 460 tests
 uv run --project . python analysis/benchmark_simulated.py --check # scored vs ground truth
 ```
 

@@ -10,7 +10,9 @@ Columns are judged two ways, and a link is blocked when EITHER side fails
 either test:
 
 - by NAME: the header, normalized (case, camelCase, _-./ separators), matches
-  one of IDENTIFIER_NAME_PATTERNS;
+  one of IDENTIFIER_NAME_PATTERNS — ambiguous words (zip, tract, block
+  group, lat) only as the name's last word, so tract-level VARIABLES such as
+  "tract_poverty_rate" stay usable;
 - by VALUE SHAPE: at least VALUE_SHAPE_SHARE of the observed cells are
   digit strings of an identifier's length — 10- or 11-digit tract GEOIDs
   (10 where a leading zero was lost, and real files mix the two), 12-digit
@@ -26,7 +28,7 @@ unchanged, and the warning / error text says so.
 The webapp mirrors this module in webapp/src/lib/identifier-guard.ts;
 tests/test_identifiers.py pins the two pattern lists to each other, so the
 regexes here use only the dialect both `re` and JavaScript share
-(\\b | ? \\d {n} ( ) and literal words).
+(\\b \\d \\w | ? * ^ $ {n} ( ) and literal words).
 """
 import re
 
@@ -37,17 +39,24 @@ from .io import MISSING_TOKENS
 # ---------------------------------------------------------------------------
 
 # (pattern, kind, what the values are). `kind` groups the families for the UI.
+#
+# Words that also describe QUANTITIES ("tract_poverty_rate", "zip_median_rent",
+# "pct_lat" = percent Latino) count only as the column's LAST word, optionally
+# followed by an ID suffix ("home_zip", "zip code", "census tract 2010",
+# "tract id", "block group geoid"). Words that only ever name a code (GEOID,
+# FIPS, ZCTA, TIGER field names like TRACTCE10 / BLKGRPCE10) count anywhere.
+_ID_SUFFIX = r"( (id|code|number|no|num|fips|geoid|ce|5|10|20|2000|2010|2020))?"
 IDENTIFIER_NAME_PATTERNS = [
-    (r"\bzip ?code\b|\bzip\b|\bzcta\d*\b|\bpostal ?code\b|\bpostal\b|\bpostcode\b",
+    (r"\b(zip|zip ?code|zipcode|zip5|zip ?5|postal|postal ?code|post ?code|postcode)"
+     + _ID_SUFFIX + r"$|\bzcta\w*\b",
      "zip", "ZIP / postal codes"),
-    (r"\bcensus ?tract\b|\btract\b|\btractce\b|\btract ?id\b|\bct ?20\d\d\b",
+    (r"\b(census ?tract|tract|tractce\d*|tractfp\d*|ct ?(19|20)\d\d)" + _ID_SUFFIX + r"$",
      "tract", "census tract identifiers"),
-    (r"\bgeoid\d*\b|\bgisjoin\b|\bfips\b|\bstatefp\b|\bcountyfp\b|\btractfp\b"
-     r"|\bblkgrp\b|\bblock ?group\b|\bbg ?id\b|\bcounty (code|id|fips)\b"
-     r"|\bstate (code|id|fips)\b|\bblock (code|id)\b",
+    (r"\b(geo ?id\d*|gisjoin|fips|statefp\d*|countyfp\d*|blkgrpce\d*|blkgrp)\b"
+     r"|\bblock ?group" + _ID_SUFFIX + r"$|\b(county|state|block) (code|id|fips|geoid)$",
      "geoid", "GEOID / FIPS codes"),
-    (r"\blat\b|\blatitude\b|\blon\b|\blng\b|\blongitude\b|\bx ?coord(inate)?\b"
-     r"|\by ?coord(inate)?\b|\beasting\b|\bnorthing\b",
+    (r"^(lat|lon|lng|long)( (dd|deg|degrees))?$|\blatitude\b|\blongitude\b"
+     r"|\blat ?(lon|lng|long)\b|\b(x|y) ?coord(inate)?s?\b|\beasting\b|\bnorthing\b",
      "coordinate", "geographic coordinates"),
     (r"\baddress\b|\baddr\b",
      "address", "street addresses"),

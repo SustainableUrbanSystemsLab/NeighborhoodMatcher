@@ -62,6 +62,12 @@ def test_normalize_name(header, expected):
     ("lat", "coordinate"), ("Latitude", "coordinate"), ("lon", "coordinate"),
     ("lng", "coordinate"), ("longitude", "coordinate"), ("x_coord", "coordinate"),
     ("address", "address"), ("home_addr", "address"),
+    # identifier word last, with or without a qualifier or ID suffix
+    ("home_zip", "zip"), ("patient_zip_code", "zip"), ("zip5", "zip"),
+    ("census_tract_2010", "tract"), ("TRACTCE10", "tract"),
+    # TIGER / NHGIS field names and code words count anywhere
+    ("ZCTA5CE10", "zip"), ("GeoID", "geoid"), ("BLKGRPCE10", "geoid"),
+    ("lat_lon", "coordinate"),
 ])
 def test_identifier_names(header, kind):
     got = identifier_by_name(header)
@@ -74,6 +80,10 @@ def test_identifier_names(header, kind):
     "street_connectivity",      # a walkability variable, not an address
     "Median age in years", "pctBuilt1970_1979", "HHFElectric_moe",
     "county_population", "state_rank", "blockbuster_stores",
+    # tract- / ZIP-level VARIABLES are what the tool matches on
+    "tract_poverty_rate", "tract_median_income", "zip_poverty_rate",
+    "pct_lat", "lat_pop",       # percent Latino, not latitude
+    "postal_service_jobs", "block_count", "geo_identity",
 ])
 def test_ordinary_variable_names_pass(header):
     assert identifier_by_name(header) is None

@@ -11,17 +11,18 @@
 // The pattern lists below are plain strings in JSON form, byte-identical to
 // the Python module — matcher/tests/test_identifiers.py parses this file
 // and fails if the two drift. Keep the regex dialect to what `re` and
-// JavaScript share (\b | ? \d {n} ( ) and literal words).
+// JavaScript share (\b \d \w | ? * ^ $ {n} ( ) and literal words).
 
 import { MISSING_TOKENS } from "@/lib/missing";
 import type { ColumnLink, IdentifierBlock, IdentifierKind, ParsedDataset } from "@/types";
 
-// [pattern, kind, what the values are]
+// [pattern, kind, what the values are] — see identifiers.py for why
+// ambiguous words (zip, tract, block group, lat) must be the LAST word.
 export const IDENTIFIER_NAME_PATTERNS: ReadonlyArray<[string, IdentifierKind, string]> = [
-  ["\\bzip ?code\\b|\\bzip\\b|\\bzcta\\d*\\b|\\bpostal ?code\\b|\\bpostal\\b|\\bpostcode\\b", "zip", "ZIP / postal codes"],
-  ["\\bcensus ?tract\\b|\\btract\\b|\\btractce\\b|\\btract ?id\\b|\\bct ?20\\d\\d\\b", "tract", "census tract identifiers"],
-  ["\\bgeoid\\d*\\b|\\bgisjoin\\b|\\bfips\\b|\\bstatefp\\b|\\bcountyfp\\b|\\btractfp\\b|\\bblkgrp\\b|\\bblock ?group\\b|\\bbg ?id\\b|\\bcounty (code|id|fips)\\b|\\bstate (code|id|fips)\\b|\\bblock (code|id)\\b", "geoid", "GEOID / FIPS codes"],
-  ["\\blat\\b|\\blatitude\\b|\\blon\\b|\\blng\\b|\\blongitude\\b|\\bx ?coord(inate)?\\b|\\by ?coord(inate)?\\b|\\beasting\\b|\\bnorthing\\b", "coordinate", "geographic coordinates"],
+  ["\\b(zip|zip ?code|zipcode|zip5|zip ?5|postal|postal ?code|post ?code|postcode)( (id|code|number|no|num|fips|geoid|ce|5|10|20|2000|2010|2020))?$|\\bzcta\\w*\\b", "zip", "ZIP / postal codes"],
+  ["\\b(census ?tract|tract|tractce\\d*|tractfp\\d*|ct ?(19|20)\\d\\d)( (id|code|number|no|num|fips|geoid|ce|5|10|20|2000|2010|2020))?$", "tract", "census tract identifiers"],
+  ["\\b(geo ?id\\d*|gisjoin|fips|statefp\\d*|countyfp\\d*|blkgrpce\\d*|blkgrp)\\b|\\bblock ?group( (id|code|number|no|num|fips|geoid|ce|5|10|20|2000|2010|2020))?$|\\b(county|state|block) (code|id|fips|geoid)$", "geoid", "GEOID / FIPS codes"],
+  ["^(lat|lon|lng|long)( (dd|deg|degrees))?$|\\blatitude\\b|\\blongitude\\b|\\blat ?(lon|lng|long)\\b|\\b(x|y) ?coord(inate)?s?\\b|\\beasting\\b|\\bnorthing\\b", "coordinate", "geographic coordinates"],
   ["\\baddress\\b|\\baddr\\b", "address", "street addresses"],
 ];
 
