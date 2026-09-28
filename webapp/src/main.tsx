@@ -4,7 +4,8 @@ import App from "@/App";
 import { registerRuntimeCache } from "@/lib/runtime-cache";
 import "./main.css";
 
-// Cache the Pyodide runtime after the first visit (public CDN assets only).
+// Precache the whole build so the app works offline after this visit
+// (production only; skipped in the desktop app).
 registerRuntimeCache();
 
 createRoot(document.getElementById("root")!).render(

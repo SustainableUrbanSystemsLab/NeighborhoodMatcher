@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 // Build-time constants injected by vite.config.ts (see `define`). They
 // identify the deployed site — the ENGINE's version travels with each run
