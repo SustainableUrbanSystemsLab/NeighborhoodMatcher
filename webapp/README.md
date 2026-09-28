@@ -102,6 +102,20 @@ Internet; `pnpm test:e2e` (Playwright) runs a full match with the network
 off, checks that no request leaves the origin, exercises the identifier guard,
 and runs the app under the desktop CSP in Chromium and WebKit.
 
+The desktop build is also tested for real: CI starts the built app with
+`NBHDMATCH_SELFTEST=<report file>` (and `NBHDMATCH_DOWNLOAD_DIR`), and the
+page (`src/lib/desktop-selftest.ts`) parses two small CSVs, checks the
+identifier guard, runs a full match through the Pyodide worker loaded from
+the app bundle, saves the results package through the app, and confirms the
+network is blocked; the app writes PASS/FAIL and exits. Same command locally
+after `pnpm desktop:build`, e.g. on macOS:
+
+```bash
+NBHDMATCH_SELFTEST=/tmp/selftest.txt NBHDMATCH_DOWNLOAD_DIR=/tmp \
+  src-tauri/target/release/bundle/macos/NeighborhoodMatcher.app/Contents/MacOS/neighborhood-matcher
+cat /tmp/selftest.txt
+```
+
 ## Key properties
 
 - **Client-side only** — all computation runs in the browser; data never

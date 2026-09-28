@@ -69,3 +69,5 @@ discovers everything below `tests/`.
 | `desktop-csp.spec.ts` | The app under the desktop app's exact CSP (from `src-tauri/tauri.conf.json`, with Tauri's inline-script hashes): full match, no violations, remote fetch blocked. Chromium (WebView2's engine) and WebKit (WKWebView's). |
 
 `pnpm run check:offline` (`webapp/scripts/check-offline-build.mjs`) is the static counterpart: no CDN reference in `dist/`, runtime and wheel present, precache complete, self-host zip built.
+
+The desktop installers are exercised by `.github/workflows/desktop.yml`: the built app runs its self-test (`webapp/src/lib/desktop-selftest.ts`, enabled by `NBHDMATCH_SELFTEST`) on macOS and Windows runners — full match through the real WKWebView / WebView2, results saved through the app, network blocked — and the Rust unit tests (`cargo test --lib` in `webapp/src-tauri`) cover file-name sanitizing and the no-overwrite rule.
