@@ -1,4 +1,5 @@
-import { Link } from "react-router";
+import { useEffect } from "react";
+import { Link, useLocation } from "react-router";
 import { ScenarioExplainer, type ScenarioData } from "@/components/ScenarioExplainer";
 import { STEP_VISUALS } from "@/components/AlgorithmSteps";
 import { DataChecklist } from "@/components/DataChecklist";
@@ -195,6 +196,13 @@ const SIGNALS: Array<{
 
 export default function About() {
   const theme = useTheme();
+  // Client-side navigation does not scroll to a #fragment (the home page
+  // links to #offline): do it once the section has rendered.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (!hash) return;
+    document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView();
+  }, [hash]);
   return (
     <div className="min-h-screen bg-canvas">
       <div className="mx-auto max-w-4xl p-4">

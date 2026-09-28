@@ -75,6 +75,16 @@ test("keeps working with the network off after one visit", async ({ page, contex
   await context.setOffline(false);
 });
 
+test("the home page's offline link lands on the offline section", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Use it without Internet" }).click();
+  await expect(page).toHaveURL(/\/about#offline$/);
+  await expect(page.getByRole("heading", { name: "Use it without Internet" })).toBeInViewport();
+  // A direct visit to the fragment too.
+  await page.goto("/about#offline");
+  await expect(page.getByRole("heading", { name: "Use it without Internet" })).toBeInViewport();
+});
+
 test("ZIP / census-tract columns are blocked from matching and recorded", async ({ page }) => {
   const dir = mkdtempSync(join(tmpdir(), "nbhdmatch-"));
   const target = join(dir, "participants.csv");
