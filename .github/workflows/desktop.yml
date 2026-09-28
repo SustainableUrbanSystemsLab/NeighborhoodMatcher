@@ -179,4 +179,3 @@ jobs:
           path: |
             webapp/src-tauri/target/**/bundle/dmg/*.dmg
             webapp/src-tauri/target/**/bundle/nsis/*.exe
-            webapp/src-tauri/Cargo.lock
