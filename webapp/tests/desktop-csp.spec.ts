@@ -5,54 +5,22 @@
 // lists style-src — leaves style-src alone so 'unsafe-inline' keeps working
 // for React style attributes. Workers get no CSP (their scripts are not HTML).
 //
-// This test reproduces exactly that on the production build and runs a full
-// match: in Chromium (the engine of WebView2, Windows) and WebKit (the engine
-// of WKWebView, macOS). A policy that blocked Pyodide, the worker, or any
-// style would fail here instead of on a researcher's machine.
+// These tests reproduce exactly that on the production build: in Chromium
+// (the engine of WebView2, Windows) and WebKit (the engine of WKWebView,
+// macOS). The real apps are also run in CI (desktop.yml self-test); these
+// catch a broken policy or desktop code path in seconds, locally.
 
 import { expect, test } from "@playwright/test";
-import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyDesktopCsp, cspViolations, emulateTauri } from "./desktop-env";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const APP = resolve(HERE, "..");
-const REPO = resolve(APP, "..");
-
-function desktopCsp(): string {
-  const conf = JSON.parse(readFileSync(resolve(APP, "src-tauri/tauri.conf.json"), "utf-8"));
-  const csp: string = conf.app.security.csp;
-  const html = readFileSync(resolve(APP, "dist/index.html"), "utf-8");
-  const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
-    .map((m) => `'sha256-${createHash("sha256").update(m[1]!).digest("base64")}'`);
-  return csp
-    .split(";")
-    .map((d) => d.trim())
-    .map((d) => (d.startsWith("script-src ") ? `${d} ${hashes.join(" ")}` : d))
-    .join("; ");
-}
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 test.use({ serviceWorkers: "block" }); // the desktop app has none
 
 test("@desktop the app runs a full match under the desktop CSP", async ({ page }) => {
-  const csp = desktopCsp();
-  await page.route("**/*", async (route) => {
-    if (route.request().resourceType() !== "document") return route.continue();
-    const response = await route.fetch();
-    await route.fulfill({
-      response,
-      headers: { ...response.headers(), "content-security-policy": csp },
-    });
-  });
-  await page.addInitScript(() => {
-    (window as unknown as { __csp: string[] }).__csp = [];
-    document.addEventListener("securitypolicyviolation", (e) => {
-      (window as unknown as { __csp: string[] }).__csp.push(
-        `${e.violatedDirective} ${e.blockedURI}`
-      );
-    });
-  });
+  await applyDesktopCsp(page);
 
   await page.goto("/match");
   const inputs = page.locator('input[type="file"]');
@@ -72,10 +40,7 @@ test("@desktop the app runs a full match under the desktop CSP", async ({ page }
   await page.getByRole("button", { name: "Run Matching" }).click();
   await expect(page.getByText("Rows matched")).toBeVisible({ timeout: 150_000 });
 
-  const violations = await page.evaluate(
-    () => (window as unknown as { __csp: string[] }).__csp
-  );
-  expect(violations).toEqual([]);
+  expect(await cspViolations(page)).toEqual([]);
   // The policy really was in force (a typo would make this test vacuous).
   const blocked = await page.evaluate(async () => {
     try {
@@ -86,4 +51,62 @@ test("@desktop the app runs a full match under the desktop CSP", async ({ page }
     }
   });
   expect(blocked).toBe(true);
+});
+
+test("@desktop the self-test passes in the page (emulated Tauri IPC)", async ({ page }) => {
+  await applyDesktopCsp(page);
+  await emulateTauri(page, { selftest: true });
+  await page.goto("/");
+
+  const report = await page.waitForFunction(
+    () =>
+      (window as unknown as { __ipc: { cmd: string; args: unknown }[] }).__ipc.find(
+        (c) => c.cmd === "selftest_report"
+      ),
+    undefined,
+    { timeout: 120_000 }
+  );
+  const call = (await report.jsonValue()) as { args: { ok: boolean; detail: string } };
+  expect(call.args.detail).toContain("matched 30 rows on pct_poverty, median_income");
+  expect(call.args.ok).toBe(true);
+
+  const save = await page.evaluate(() =>
+    (window as unknown as { __ipc: { cmd: string; headers?: Record<string, string>; bytes?: number }[] }).__ipc.find(
+      (c) => c.cmd === "save_download"
+    )
+  );
+  expect(save?.headers?.["x-filename"]).toBe("selftest-results.zip");
+  expect(save?.bytes ?? 0).toBeGreaterThan(1000);
+  // The only violation is the self-test's own probe of the network.
+  const violations = await cspViolations(page);
+  expect(violations.length).toBe(1);
+  expect(violations[0]).toMatch(/^connect-src https:\/\/example\.com/);
+});
+
+test("@desktop outside self-test mode the app never reports", async ({ page }) => {
+  await emulateTauri(page, { selftest: false });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Get Started" })).toBeVisible();
+  await page.waitForTimeout(1500);
+  const cmds = await page.evaluate(() =>
+    (window as unknown as { __ipc: { cmd: string }[] }).__ipc.map((c) => c.cmd)
+  );
+  expect(cmds).toEqual(["selftest_mode"]);
+  await expect(page.locator("footer")).toContainText("Desktop app");
+});
+
+test("@desktop links to other sites open in the system browser", async ({ page }) => {
+  await emulateTauri(page, { selftest: false });
+  await page.goto("/about#offline");
+  const release = page.getByRole("link", { name: "All releases" });
+  await release.click();
+  await expect(page).toHaveURL(/\/about/); // the window stayed on the app
+  const opened = await page.evaluate(() =>
+    (window as unknown as { __ipc: { cmd: string; args: { url?: string } }[] }).__ipc
+      .filter((c) => c.cmd === "plugin:opener|open_url")
+      .map((c) => c.args.url)
+  );
+  expect(opened).toEqual([
+    "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest",
+  ]);
 });
