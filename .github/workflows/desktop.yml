@@ -7,6 +7,14 @@
 # - `workflow_dispatch` builds the same installers as workflow artifacts
 #   (no release), for testing a branch.
 #
+# CSP (webapp/src-tauri/tauri.conf.json): 'self' only, 'wasm-unsafe-eval'
+# for Pyodide, blob: workers, connect-src limited to the app and Tauri's IPC
+# — the window cannot reach the network even if code tried. Tauri adds
+# hashes/nonces to script-src; style-src modification is disabled because a
+# nonce there would switch off 'unsafe-inline', which React style attributes
+# need. webapp/tests/desktop-csp.spec.ts runs the app under this exact CSP
+# in Chromium (WebView2's engine) and WebKit (WKWebView's).
+#
 # The apps are unsigned: macOS shows "unidentified developer" (right-click →
 # Open, or `xattr -d com.apple.quarantine`), Windows SmartScreen shows "More
 # info → Run anyway". Signing needs certificates in repository secrets; see
@@ -17,6 +25,12 @@ name: Desktop app
 on:
   push:
     tags: ["v*"]
+  # Pull requests that touch the desktop wrapper build both installers as
+  # artifacts (no release), so a broken Tauri config never reaches a tag.
+  pull_request:
+    paths:
+      - "webapp/src-tauri/**"
+      - ".github/workflows/desktop.yml"
   workflow_dispatch:
 
 permissions:

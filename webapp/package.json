@@ -10,6 +10,8 @@
     "build:web": "pnpm run sync-assets && tsc -b && vite build",
     "build": "pnpm run build:web && node scripts/pack-site.mjs",
     "preview": "vite preview",
+    "check:offline": "node scripts/check-offline-build.mjs",
+    "test:e2e": "playwright test",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build"
@@ -25,6 +27,7 @@
     "react-router": "^7.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/oxide-darwin-arm64": "^4.2.1",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2",

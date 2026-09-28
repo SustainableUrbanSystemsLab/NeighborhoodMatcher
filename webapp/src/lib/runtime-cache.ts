@@ -50,27 +50,42 @@ export function registerRuntimeCache(): void {
   if (isDesktopApp()) return;
 
   let updateSW: ((reload?: boolean) => Promise<void>) | null = null;
+  const updateAvailable = () =>
+    setStatus({
+      kind: "update-available",
+      apply: () => {
+        void updateSW?.(true);
+      },
+    });
   updateSW = registerSW({
     immediate: true,
     onRegisteredSW(_url, registration) {
-      // A controller already present means this device was precached by an
-      // earlier visit; otherwise the first install is in progress.
-      if (navigator.serviceWorker.controller && !registration?.installing) {
-        setStatus({ kind: "ready" });
-      } else {
-        setStatus({ kind: "installing" });
+      // A build that was already waiting when this page loaded (the browser
+      // found it on an earlier navigation) fires no `waiting` event now.
+      if (registration?.waiting) {
+        updateAvailable();
+      } else if (status.kind !== "update-available") {
+        // A controller already present means this device was precached by
+        // an earlier visit; otherwise the first install is in progress.
+        if (navigator.serviceWorker.controller && !registration?.installing) {
+          setStatus({ kind: "ready" });
+        } else {
+          setStatus({ kind: "installing" });
+        }
+      }
+      // Browsers check for a new worker on navigation; a tab left open for
+      // hours would not, so ask once an hour.
+      if (registration) {
+        window.setInterval(() => {
+          registration.update().catch(() => {});
+        }, 60 * 60 * 1000);
       }
     },
     onOfflineReady() {
-      setStatus({ kind: "ready" });
+      if (status.kind !== "update-available") setStatus({ kind: "ready" });
     },
     onNeedRefresh() {
-      setStatus({
-        kind: "update-available",
-        apply: () => {
-          void updateSW?.(true);
-        },
-      });
+      updateAvailable();
     },
     onRegisterError(err) {
       // Not fatal: without the worker the app simply needs the network.

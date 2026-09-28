@@ -239,6 +239,17 @@ def test_coordinator_real_acs_files_never_match_on_census_tract(tmp_path):
     var_headers, _ = _read_csv(str(tmp_path / "acs_variables.csv"))
     _, variables = _read_csv(str(tmp_path / "acs_variables.csv"))
     assert "census tract" not in {r[var_headers.index("feature")] for r in variables}
+    _, info = _read_csv(str(tmp_path / "acs_run_info.csv"))
+    blocked = dict(info)["identifier_columns_blocked"]
+    assert blocked.startswith("census tract: census tract identifiers (by column name)")
+
+
+def test_run_info_records_none_when_nothing_was_blocked(tmp_path):
+    target = _write_csv(tmp_path, "t.csv", ["pid", "a"], [["t1", "10"]])
+    supp = _write_csv(tmp_path, "s.csv", ["a", "b"], [["10", "1"]])
+    coordinator(target, supp, output=str(tmp_path / "o.csv"))
+    _, info = _read_csv(str(tmp_path / "o_run_info.csv"))
+    assert dict(info)["identifier_columns_blocked"] == "none"
 
 
 def test_coordinator_only_identifier_shared_is_an_explained_error(tmp_path):

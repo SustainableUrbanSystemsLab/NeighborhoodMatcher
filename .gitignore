@@ -168,3 +168,7 @@ out/
 # runtime copied from node_modules plus the downloaded numpy wheel (~15 MB).
 webapp/public/pyodide/
 webapp/.cache/
+
+# Playwright (webapp/tests)
+webapp/test-results/
+webapp/playwright-report/

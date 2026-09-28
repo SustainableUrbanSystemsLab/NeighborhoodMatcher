@@ -7,7 +7,7 @@ from .ablation import ablation_sample_indices, ablation_suite
 from .about import TOOL_NAME, VERSION, authors_line, provenance_rows
 from .io import MISSING_TOKENS, load_csv, clean_val, drop_label_row, dump_csv
 from .align import find_common_headers, header_warnings, no_shared_columns_error
-from .identifiers import blocked_links, blocked_warning, without_blocked
+from .identifiers import blocked_links, blocked_summary, blocked_warning, without_blocked
 from .standardize import dual_standardize, scale_compatibility_warnings
 from .distance import match_all, validate_threshold, validate_max_distance, winner_observed_stats
 from .merge import row_merge, new_header
@@ -416,6 +416,7 @@ skip_label_row=True):
             ("supplemental_rows", len(rs2)),
             ("label_rows_skipped",
              "; ".join(n.split(" looks like")[0] for n in label_notes) or "none"),
+            ("identifier_columns_blocked", blocked_summary(blocked)),
             ("matching_variables", "; ".join(feature_names)),
             ("nndr_threshold", threshold),
             ("max_distance_cutoff", "off" if max_distance is None else max_distance),

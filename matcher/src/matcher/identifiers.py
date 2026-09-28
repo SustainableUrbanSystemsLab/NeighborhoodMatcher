@@ -210,6 +210,21 @@ def blocked_warning(entry):
     )
 
 
+def blocked_summary(blocked):
+    """
+    run_info value: 'census tract: census tract identifiers (by column name);
+    …' — the same wording the webapp writes (identifier-guard.ts
+    blockedSentence), or 'none'.
+    """
+    if not blocked:
+        return "none"
+    parts = []
+    for b in blocked:
+        where = "" if b["side"] == "both" else f" ({b['side']} file)"
+        parts.append(f"{b['column']}{where}: {b['reason']}")
+    return "; ".join(parts)
+
+
 class IdentifierColumnError(ValueError):
     """Raised when explicitly requested column links include an identifier."""
 
