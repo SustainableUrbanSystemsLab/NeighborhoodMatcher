@@ -110,6 +110,51 @@ jobs:
           releaseAssetNamePattern: "NeighborhoodMatcher-[platform]-[arch][setup][ext]"
           args: ${{ matrix.args }}
 
+      # Run the built app on the runner: with NBHDMATCH_SELFTEST set, the page
+      # parses two small CSVs, checks the identifier guard, runs a full match
+      # through the Pyodide worker loaded from the app bundle, saves the
+      # results package through the app, confirms the network is blocked,
+      # and writes PASS/FAIL to the report file (webapp/src/lib/desktop-selftest.ts).
+      - name: Self-test the app (macOS, WKWebView)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          app=$(ls -d webapp/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app | head -1)
+          bin=$(ls "$app"/Contents/MacOS/* | head -1)
+          export NBHDMATCH_SELFTEST="$RUNNER_TEMP/selftest.txt"
+          export NBHDMATCH_DOWNLOAD_DIR="$RUNNER_TEMP/selftest-downloads"
+          mkdir -p "$NBHDMATCH_DOWNLOAD_DIR"
+          "$bin" &
+          pid=$!
+          for _ in $(seq 1 360); do
+            [ -s "$NBHDMATCH_SELFTEST" ] && break
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+          done
+          sleep 1
+          kill "$pid" 2>/dev/null || true
+          if [ ! -s "$NBHDMATCH_SELFTEST" ]; then echo "::error::the app wrote no self-test report"; exit 1; fi
+          cat "$NBHDMATCH_SELFTEST"
+          grep -q '^PASS' "$NBHDMATCH_SELFTEST"
+          unzip -l "$NBHDMATCH_DOWNLOAD_DIR/selftest-results.zip"
+          unzip -p "$NBHDMATCH_DOWNLOAD_DIR/selftest-results.zip" run_info.csv | grep 'identifier_columns_blocked'
+
+      - name: Self-test the app (Windows, WebView2)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $env:NBHDMATCH_SELFTEST = Join-Path $env:RUNNER_TEMP "selftest.txt"
+          $env:NBHDMATCH_DOWNLOAD_DIR = Join-Path $env:RUNNER_TEMP "selftest-downloads"
+          New-Item -ItemType Directory -Force -Path $env:NBHDMATCH_DOWNLOAD_DIR | Out-Null
+          $exe = Get-ChildItem webapp/src-tauri/target/release/*.exe | Select-Object -First 1
+          Write-Host "running $($exe.FullName)"
+          $p = Start-Process -FilePath $exe.FullName -PassThru
+          if (-not $p.WaitForExit(360000)) { Stop-Process -Id $p.Id -Force }
+          if (-not (Test-Path $env:NBHDMATCH_SELFTEST)) { Write-Error "the app wrote no self-test report"; exit 1 }
+          Get-Content $env:NBHDMATCH_SELFTEST
+          if (-not (Select-String -Path $env:NBHDMATCH_SELFTEST -Pattern '^PASS' -Quiet)) { exit 1 }
+          Get-ChildItem $env:NBHDMATCH_DOWNLOAD_DIR
+
       # Unit tests of the Rust side (file-name sanitizing, no-overwrite
       # saving). After the build, because generate_context! embeds ../dist.
       - name: Rust unit tests

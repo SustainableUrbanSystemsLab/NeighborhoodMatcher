@@ -49,6 +49,18 @@ fn unique_path(dir: &Path, name: &str) -> PathBuf {
     dir.join(format!("{stem} ({}){ext}", std::process::id()))
 }
 
+/// Where the page's files go: the Downloads folder (home as a fallback), or
+/// NBHDMATCH_DOWNLOAD_DIR when set (the CI self-test).
+fn download_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(dir) = std::env::var_os("NBHDMATCH_DOWNLOAD_DIR") {
+        return Ok(PathBuf::from(dir));
+    }
+    app.path()
+        .download_dir()
+        .or_else(|_| app.path().home_dir())
+        .map_err(|e| format!("no Downloads folder: {e}"))
+}
+
 /// Saves a file produced by the page (the results zip) into the user's
 /// Downloads folder and returns its full path, which the page shows.
 ///
@@ -67,15 +79,37 @@ fn save_download(app: AppHandle, request: Request<'_>) -> Result<String, String>
         .and_then(|v| v.to_str().ok())
         .unwrap_or("matcher_results.zip");
     let name = sanitize_file_name(requested);
-    let dir = app
-        .path()
-        .download_dir()
-        .or_else(|_| app.path().home_dir())
-        .map_err(|e| format!("no Downloads folder: {e}"))?;
+    let dir = download_dir(&app)?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
     let path = unique_path(&dir, &name);
     std::fs::write(&path, bytes).map_err(|e| format!("could not save {}: {e}", path.display()))?;
     Ok(path.display().to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Self-test (CI): start the app with NBHDMATCH_SELFTEST=<report file> and the
+// page runs a full match through the real webview — worker, Pyodide from the
+// app bundle, identifier guard, results package saved through save_download
+// — then reports here; the app writes PASS/FAIL to the file and exits.
+// Nothing happens without the variable. See webapp/src/lib/desktop-selftest.ts.
+// ---------------------------------------------------------------------------
+
+fn selftest_report_path() -> Option<PathBuf> {
+    std::env::var_os("NBHDMATCH_SELFTEST").map(PathBuf::from)
+}
+
+#[tauri::command]
+fn selftest_mode() -> bool {
+    selftest_report_path().is_some()
+}
+
+#[tauri::command]
+fn selftest_report(app: AppHandle, ok: bool, detail: String) {
+    if let Some(path) = selftest_report_path() {
+        let verdict = if ok { "PASS" } else { "FAIL" };
+        let _ = std::fs::write(&path, format!("{verdict} {detail}\n"));
+    }
+    app.exit(if ok { 0 } else { 1 });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -84,8 +118,21 @@ pub fn run() {
         // Citation and repository links open in the system browser instead
         // of navigating the app window (see webapp/src/lib/platform.ts).
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![save_download])
+        .invoke_handler(tauri::generate_handler![
+            save_download,
+            selftest_mode,
+            selftest_report
+        ])
         .setup(|app| {
+            // A page that never reports (worker or runtime failed to start)
+            // must still end the self-test.
+            if let Some(path) = selftest_report_path() {
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(300));
+                    let _ = std::fs::write(&path, "FAIL timeout: the page never reported\n");
+                    std::process::exit(2);
+                });
+            }
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

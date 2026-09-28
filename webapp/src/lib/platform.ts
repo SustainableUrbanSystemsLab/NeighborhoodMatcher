@@ -3,7 +3,7 @@
 // straight into the Downloads folder, and links to other sites handed to the
 // system browser instead of navigating the app window.
 
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export function isDesktopApp(): boolean {
   try {
@@ -23,7 +23,6 @@ export function isDesktopApp(): boolean {
  */
 export async function saveFile(blob: Blob, filename: string): Promise<string | null> {
   if (isDesktopApp()) {
-    const { invoke } = await import("@tauri-apps/api/core");
     const bytes = new Uint8Array(await blob.arrayBuffer());
     return invoke<string>("save_download", bytes, { headers: { "x-filename": filename } });
   }
