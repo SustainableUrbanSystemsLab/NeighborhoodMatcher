@@ -14,7 +14,8 @@ import {
 } from "@/components/SignalIcons";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { MATCHER_VERSION, REPO_URL } from "@/lib/about";
+import { MATCHER_VERSION, REPO_URL, SITE_URL } from "@/lib/about";
+import { isDesktopApp } from "@/lib/platform";
 import { useTheme } from "@/lib/use-theme";
 import scenariosJson from "@/data/scenarios.json";
 
@@ -315,7 +316,11 @@ export default function About() {
                 type).
               </p>
               <p className="mt-2 text-xs">
-                <a href={`/offline/nbhdmatch-site-v${MATCHER_VERSION}.zip`} className={LINK}>
+                {/* The desktop app does not embed the zip: link the website's copy. */}
+                <a
+                  href={`${isDesktopApp() ? SITE_URL : "/"}offline/nbhdmatch-site-v${MATCHER_VERSION}.zip`}
+                  className={LINK}
+                >
                   Download the site (v{MATCHER_VERSION}, ~11 MB)
                 </a>
               </p>

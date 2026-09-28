@@ -3,6 +3,7 @@
 // All work is client-side; the zip blob is handed to the browser for download.
 
 import JSZip from "jszip";
+import { saveFile } from "@/lib/platform";
 import Papa from "papaparse";
 import type {
   AblationReport,
@@ -100,12 +101,10 @@ export async function buildResultsZip(
   });
 }
 
-export function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  // Release the object URL on the next tick so the click completes first.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+/**
+ * Hands the package to the user: a browser download on the web, a file in
+ * the Downloads folder in the desktop app (returns its path, null on the web).
+ */
+export function triggerDownload(blob: Blob, filename: string): Promise<string | null> {
+  return saveFile(blob, filename);
 }

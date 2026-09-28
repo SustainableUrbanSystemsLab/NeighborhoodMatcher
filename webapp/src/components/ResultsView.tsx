@@ -85,10 +85,13 @@ export function ResultsView({
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // Desktop app only: where the package was written (Downloads folder).
+  const [savedPath, setSavedPath] = useState<string | null>(null);
 
   async function handleDownload() {
     setDownloading(true);
     setDownloadError(null);
+    setSavedPath(null);
     try {
       const blob = await buildResultsZip(
         output,
@@ -99,7 +102,9 @@ export function ResultsView({
         completedAt,
         blocked
       );
-      triggerDownload(blob, `${filenameTimestamp(completedAt)}-matcher_results.zip`);
+      setSavedPath(
+        await triggerDownload(blob, `${filenameTimestamp(completedAt)}-matcher_results.zip`)
+      );
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -524,6 +529,11 @@ export function ResultsView({
           </button>
           {downloadError && (
             <span className="text-xs text-red-600">{downloadError}</span>
+          )}
+          {savedPath && (
+            <span className="text-xs text-green-700" title={savedPath}>
+              Saved to {savedPath}
+            </span>
           )}
           <span className="text-[11px] text-gray-400">
             Linked CSV, match detail, run info, data + match stats, SMD,
