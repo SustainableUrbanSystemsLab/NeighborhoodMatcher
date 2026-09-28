@@ -1,0 +1,29 @@
+[package]
+name = "neighborhood-matcher"
+version = "0.8.8"
+description = "Match participant-level data to neighborhood-scale records, entirely on this computer"
+authors = ["Dr. Benson Ku", "Dr. Patrick Kastner"]
+license = ""
+repository = "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"
+edition = "2024"
+rust-version = "1.90"
+
+# The desktop app is the built webapp (../dist) inside a Tauri window: no
+# Rust logic of its own beyond the opener plugin for external links. The
+# version above is kept in step with the others by scripts/bump_version.py;
+# the app's own version comes from ../package.json via tauri.conf.json.
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2" }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2" }
+tauri-plugin-log = "2"
+tauri-plugin-opener = "2"

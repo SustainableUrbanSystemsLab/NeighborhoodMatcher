@@ -28,6 +28,7 @@ DECLARATIONS = [
     ("webapp/src/lib/about.ts", r'^export const MATCHER_VERSION = "(' + SEMVER + r')";$'),
     ("webapp/package.json", r'^  "version": "(' + SEMVER + r')",$'),
     ("matcher/pyproject.toml", r'^version = "(' + SEMVER + r')"$'),
+    ("webapp/src-tauri/Cargo.toml", r'^version = "(' + SEMVER + r')"$'),
     ("pyproject.toml", r'^version = "(' + SEMVER + r')"$'),
 ]
 

@@ -26,7 +26,23 @@ function commitRef(): string {
   }
 }
 
+// Building for the desktop app (`tauri build` / `tauri dev` set these):
+// target the system webview each platform ships instead of a browser list.
+const tauriPlatform = process.env.TAURI_ENV_PLATFORM;
+
 export default defineConfig({
+  // Never clear the terminal: Rust compiler errors from `tauri dev` would go
+  // with it.
+  clearScreen: false,
+  // TAURI_ENV_* variables are exposed to the bundle (platform, debug flag).
+  envPrefix: ["VITE_", "TAURI_ENV_*"],
+  build: tauriPlatform
+    ? {
+        target: tauriPlatform === "windows" ? "chrome105" : "safari13",
+        minify: !process.env.TAURI_ENV_DEBUG,
+        sourcemap: !!process.env.TAURI_ENV_DEBUG,
+      }
+    : undefined,
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commitRef()),
@@ -77,8 +93,12 @@ export default defineConfig({
   // Pyodide's loader resolves its own files at runtime relative to indexURL;
   // pre-bundling it would rewrite those paths (Pyodide's bundler guide).
   optimizeDeps: { exclude: ["pyodide"] },
-  // Respect PORT when a harness assigns one (e.g. preview tooling).
-  server: process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : undefined,
+  server: {
+    // Respect PORT when a harness assigns one (e.g. preview tooling).
+    ...(process.env.PORT ? { port: Number(process.env.PORT), strictPort: true } : {}),
+    // The Rust crate has its own watcher (`tauri dev`).
+    watch: { ignored: ["**/src-tauri/**"] },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -1,0 +1,107 @@
+# Builds the desktop app (Tauri) for macOS (Apple Silicon) and Windows (x64,
+# with the WebView2 runtime embedded so it installs on air-gapped machines).
+#
+# - On a version tag (v0.9.0 …) the installers are attached to a GitHub
+#   Release under STABLE names, which the About page links to via
+#   .../releases/latest/download/<name>.
+# - `workflow_dispatch` builds the same installers as workflow artifacts
+#   (no release), for testing a branch.
+#
+# The apps are unsigned: macOS shows "unidentified developer" (right-click →
+# Open, or `xattr -d com.apple.quarantine`), Windows SmartScreen shows "More
+# info → Run anyway". Signing needs certificates in repository secrets; see
+# https://v2.tauri.app/distribute/sign/ when they exist.
+
+name: Desktop app
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos
+            args: --target aarch64-apple-darwin
+            rust_targets: aarch64-apple-darwin
+          - os: windows-latest
+            platform: windows
+            args: ""
+            rust_targets: ""
+    runs-on: ${{ matrix.os }}
+    env:
+      # package.json pins pnpm via packageManager; corepack must not phone
+      # home for "latest" (stale signing keys break the fetch).
+      COREPACK_DEFAULT_TO_LATEST: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable corepack (pnpm)
+        run: corepack enable
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "webapp/src-tauri -> target"
+
+      - name: Tag matches the shipped version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          v=$(node -p "require('./webapp/package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $v — run scripts/bump_version.py and tag v$v"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: webapp
+        run: pnpm install --frozen-lockfile
+
+      # `tauri build` runs `pnpm build:web` (sync-assets: Pyodide runtime +
+      # numpy wheel into public/, then vite build) and bundles ../dist.
+      - name: Build the app (and release it on a tag)
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: webapp
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && 'v__VERSION__' || '' }}
+          releaseName: "NeighborhoodMatcher v__VERSION__"
+          releaseBody: |
+            Desktop app for machines without Internet access. The same matching engine as https://nbhdmatch.netlify.app/, with the Python runtime included — nothing is downloaded and no data leaves the computer.
+
+            - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg`. The app is not signed: on first launch, right-click the app → Open (or run `xattr -d com.apple.quarantine /Applications/NeighborhoodMatcher.app`).
+            - **Windows (x64):** `NeighborhoodMatcher-windows-x64-setup.exe`, with the WebView2 runtime embedded so it installs offline. SmartScreen: "More info → Run anyway".
+
+            A zip of the website for hosting inside an institution is at https://nbhdmatch.netlify.app/about#offline.
+          releaseDraft: false
+          prerelease: false
+          # tauri-action substitutes [platform] = darwin | windows | linux,
+          # [arch] = aarch64 | x64 | universal, [setup] = "-setup" for NSIS,
+          # [ext] = the file extension: stable names the About page links to.
+          releaseAssetNamePattern: "NeighborhoodMatcher-[platform]-[arch][setup][ext]"
+          args: ${{ matrix.args }}
+
+      - name: Upload installers as workflow artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeighborhoodMatcher-${{ matrix.platform }}
+          if-no-files-found: error
+          path: |
+            webapp/src-tauri/target/**/bundle/dmg/*.dmg
+            webapp/src-tauri/target/**/bundle/nsis/*.exe

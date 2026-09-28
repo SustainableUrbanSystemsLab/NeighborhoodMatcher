@@ -1,0 +1,55 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "NeighborhoodMatcher",
+  "version": "../package.json",
+  "identifier": "com.sustainableurbansystems.nbhdmatch",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build:web"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NeighborhoodMatcher",
+        "width": 1120,
+        "height": 820,
+        "minWidth": 760,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "nsis"
+    ],
+    "publisher": "Sustainable Urban Systems Lab",
+    "copyright": "Emory University and Georgia Institute of Technology",
+    "category": "Utility",
+    "shortDescription": "Match participant-level data to neighborhood-scale records, entirely on this computer.",
+    "longDescription": "NeighborhoodMatcher links every row of a target CSV to its closest row in a supplemental CSV by standardized Euclidean distance and reports how trustworthy each link is. This desktop app runs the same engine as the website with no Internet access: nothing is downloaded and no data leaves the computer.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller"
+      }
+    }
+  }
+}
