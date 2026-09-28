@@ -14,6 +14,7 @@ import {
 } from "@/components/SignalIcons";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { MATCHER_VERSION, REPO_URL } from "@/lib/about";
 import { useTheme } from "@/lib/use-theme";
 import scenariosJson from "@/data/scenarios.json";
 
@@ -246,6 +247,80 @@ export default function About() {
             computed differently. That check is yours.
           </p>
           <DataChecklist />
+        </section>
+
+        <section
+          id="offline"
+          className="mb-6 scroll-mt-4 rounded-lg border border-gray-200 bg-surface p-5"
+        >
+          <h2 className="mb-1 text-lg font-semibold text-gray-900">
+            Use it without Internet
+          </h2>
+          <p className="mb-3 text-sm text-gray-500">
+            Nothing here needs a connection except the first visit: the
+            Python runtime, the matching engine and every asset are served by
+            this site itself and cached in your browser. Three ways to run the
+            tool where there is no Internet at all:
+          </p>
+          <div className="grid gap-3 text-sm text-gray-700 sm:grid-cols-3">
+            <div className="rounded-lg border border-gray-200 p-3">
+              <h3 className="font-semibold text-gray-900">Keep this site offline</h3>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                After one visit this device keeps working without a
+                connection — the footer says{" "}
+                <em>Available offline on this device</em> once everything is
+                cached. To get an app icon, use your browser&apos;s{" "}
+                <em>Install</em> option (address-bar icon or browser menu).
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3">
+              <h3 className="font-semibold text-gray-900">Desktop app</h3>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                For a computer that never goes online (a secure enclave or
+                VDI). Same engine, everything included, no download at run
+                time.
+              </p>
+              <ul className="mt-2 space-y-1 text-xs">
+                <li>
+                  <a href={`${REPO_URL}/releases/latest/download/NeighborhoodMatcher-darwin-aarch64.dmg`} className={LINK}>
+                    macOS (Apple Silicon) .dmg
+                  </a>
+                </li>
+                <li>
+                  <a href={`${REPO_URL}/releases/latest/download/NeighborhoodMatcher-windows-x64-setup.exe`} className={LINK}>
+                    Windows (x64) installer
+                  </a>
+                  <span className="text-gray-500"> — WebView2 runtime included (~150 MB)</span>
+                </li>
+                <li>
+                  <a href={`${REPO_URL}/releases/latest`} target="_blank" rel="noreferrer" className={LINK}>
+                    All releases
+                  </a>
+                </li>
+              </ul>
+              <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
+                The apps are not code-signed. macOS: right-click the app,
+                then <em>Open</em>. Windows SmartScreen: <em>More info</em>,
+                then <em>Run anyway</em>. Your IT department may need to
+                approve the installer first.
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-200 p-3">
+              <h3 className="font-semibold text-gray-900">Host it yourself</h3>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                A zip of this exact build for an institution&apos;s own web
+                server or intranet — a static folder with no external
+                dependencies. The included HOSTING.txt lists the two server
+                settings that matter (index.html fallback, .wasm content
+                type).
+              </p>
+              <p className="mt-2 text-xs">
+                <a href={`/offline/nbhdmatch-site-v${MATCHER_VERSION}.zip`} className={LINK}>
+                  Download the site (v{MATCHER_VERSION}, ~11 MB)
+                </a>
+              </p>
+            </div>
+          </div>
         </section>
 
         <details className="group mb-6 rounded-lg border border-gray-200 bg-surface">

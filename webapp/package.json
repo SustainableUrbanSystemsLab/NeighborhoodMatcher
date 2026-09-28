@@ -6,10 +6,13 @@
   "scripts": {
     "sync-assets": "node scripts/sync-assets.mjs",
     "predev": "pnpm run sync-assets",
-    "prebuild": "pnpm run sync-assets",
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "build:web": "pnpm run sync-assets && tsc -b && vite build",
+    "build": "pnpm run build:web && node scripts/pack-site.mjs",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
