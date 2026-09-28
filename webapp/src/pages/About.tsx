@@ -291,7 +291,7 @@ export default function About() {
                   <a href={`${REPO_URL}/releases/latest/download/NeighborhoodMatcher-windows-x64-setup.exe`} className={LINK}>
                     Windows (x64) installer
                   </a>
-                  <span className="text-gray-500"> — WebView2 runtime included (~150 MB)</span>
+                  <span className="text-gray-500"> — WebView2 runtime included (~220 MB)</span>
                 </li>
                 <li>
                   <a href={`${REPO_URL}/releases/latest`} target="_blank" rel="noreferrer" className={LINK}>
