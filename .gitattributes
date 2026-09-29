@@ -2,3 +2,6 @@
 # files); shell scripts need LF. Applies to these extensions only.
 *.bat text eol=crlf
 *.sh text eol=lf
+# The desktop app's CSP carries the hash of index.html's inline script; keep
+# the file byte-identical on every OS so each build hashes the same text.
+webapp/index.html text eol=lf

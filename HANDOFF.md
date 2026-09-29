@@ -218,8 +218,9 @@ collaborators; ordering after that is judgment.
 
 - **Code signing.** The desktop installers are unsigned (Gatekeeper /
   SmartScreen warnings). Signing needs an Apple Developer ID and a Windows
-  certificate as repository secrets, then the `tauri-action` signing inputs
-  in `.github/workflows/desktop.yml`.
+  certificate as repository secrets, passed to `tauri build` as its signing
+  environment variables in `.github/workflows/desktop.yml`
+  (https://v2.tauri.app/distribute/sign/).
 - **More platforms.** Linux (`.AppImage`/`.deb`) and Intel-mac builds are one
   matrix entry each in `desktop.yml`.
 - **Pyodide upgrades** must keep `sync-assets.mjs`'s wheel list complete

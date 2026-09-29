@@ -16,7 +16,10 @@ const APP = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export function desktopCsp(): string {
   const conf = JSON.parse(readFileSync(resolve(APP, "src-tauri/tauri.conf.json"), "utf-8"));
   const csp: string = conf.app.security.csp;
-  const html = readFileSync(resolve(APP, "dist/index.html"), "utf-8");
+  // The HTML parser turns CRLF into LF before a script's hash is taken, and
+  // git on Windows may check index.html out with CRLF: hash what the
+  // browser hashes.
+  const html = readFileSync(resolve(APP, "dist/index.html"), "utf-8").replace(/\r\n?/g, "\n");
   const hashes = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(
     (m) => `'sha256-${createHash("sha256").update(m[1]!).digest("base64")}'`
   );

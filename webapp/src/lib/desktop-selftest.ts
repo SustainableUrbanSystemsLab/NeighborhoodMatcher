@@ -14,7 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { parseCSVFile } from "@/lib/csv";
 import { columnVerdicts, guardLinks } from "@/lib/identifier-guard";
 import { findCommonHeaders, runMatching } from "@/lib/matching";
-import { saveFile } from "@/lib/platform";
+import { cspEvidence, saveFile } from "@/lib/platform";
 import { buildResultsZip } from "@/lib/zip-builder";
 
 function sampleCsvs(): { target: string; supplemental: string } {
@@ -100,10 +100,21 @@ export async function runSelftestIfRequested(): Promise<void> {
     }
     check(!reachedNetwork, "a request to https://example.com/ was not blocked");
 
+    // Nothing else may have tripped the CSP — in particular the inline theme
+    // script must have run, i.e. the hash the build put into the policy
+    // matches what this webview hashes.
+    check(
+      cspEvidence.themeScriptRan,
+      "index.html's inline theme script did not run under the CSP (script hash mismatch?)"
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100)); // let the probe's report arrive
+    const unexpected = cspEvidence.violations.filter((v) => !v.includes("example.com"));
+    check(unexpected.length === 0, `CSP violations: ${unexpected.join("; ")}`);
+
     const seconds = ((performance.now() - started) / 1000).toFixed(1);
     await invoke("selftest_report", {
       ok: true,
-      detail: `matched ${output.summary.total} rows on ${active.join(", ")} in ${seconds}s; blocked ${blocked[0]!.column}; saved ${savedTo}; network blocked`,
+      detail: `matched ${output.summary.total} rows on ${active.join(", ")} in ${seconds}s; blocked ${blocked[0]!.column}; saved ${savedTo}; network blocked; CSP clean`,
     });
   } catch (err) {
     const detail = err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);

@@ -94,8 +94,10 @@ the origin:
   the system browser, CSP `'self'`-only with `'wasm-unsafe-eval'` for Pyodide.
   `pnpm desktop:dev` / `pnpm desktop:build` need Rust
   ([prerequisites](https://v2.tauri.app/start/prerequisites/)); CI
-  (`.github/workflows/desktop.yml`) builds the macOS `.dmg` and the Windows
-  installer (WebView2 embedded) and releases them on a version tag.
+  (`.github/workflows/desktop.yml`) runs `build.sh --test` on macOS and
+  `build.bat --test` on Windows, requires both installers (the "Both
+  installers" job), publishes them together as one artifact, and attaches
+  them to a GitHub Release on a version tag.
 
 `pnpm run check:offline` fails the build if anything could still need the
 Internet; `pnpm test:e2e` (Playwright) runs a full match with the network

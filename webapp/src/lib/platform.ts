@@ -14,6 +14,22 @@ export function isDesktopApp(): boolean {
 }
 
 /**
+ * Evidence for the desktop self-test (desktop-selftest.ts), gathered from the
+ * first moment the bundle runs: whether index.html's inline theme script ran
+ * under the app's CSP (it sets data-theme before any of this code), and every
+ * CSP violation reported afterwards.
+ */
+export const cspEvidence = { themeScriptRan: false, violations: [] as string[] };
+
+export function watchCsp(): void {
+  if (!isDesktopApp()) return;
+  cspEvidence.themeScriptRan = document.documentElement.hasAttribute("data-theme");
+  document.addEventListener("securitypolicyviolation", (e) => {
+    cspEvidence.violations.push(`${e.violatedDirective} ${e.blockedURI}`);
+  });
+}
+
+/**
  * Saves a generated file. In the browser this is an ordinary download
  * (returns null — the browser shows where it went). In the desktop app the
  * bytes go to the Rust `save_download` command, which writes them to the
