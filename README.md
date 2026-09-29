@@ -67,6 +67,29 @@ No data handy? Grab the benchmark pair from this repo:
 [`simulated_data/truth_A100.csv`](simulated_data/truth_A100.csv).
 
 <details>
+<summary><strong>Build everything with one command</strong> (website, self-host zip, desktop app)</summary>
+
+```bash
+./build.sh              # macOS, Linux
+```
+
+```bat
+build.bat               :: Windows
+```
+
+Both run the same steps (`scripts/build-all.mjs`): install dependencies,
+build the website and its self-host zip, check that the build needs no
+Internet, and build the desktop app for this computer. The outputs land in
+`release/`: `nbhdmatch-site-v<version>.zip`, plus the `.dmg` on macOS or the
+`-setup.exe` installer on Windows. `--web-only` skips the desktop app;
+`--test` also runs the Python tests, the benchmark, the Playwright tests and
+the built app's self-test; `--help` lists the prerequisites. You need Node.js
+20+, which provides pnpm automatically, plus Rust for the desktop app and uv
+for `--test`. On Linux the desktop app is skipped.
+
+</details>
+
+<details>
 <summary><strong>Run the webapp locally</strong> (Node + pnpm)</summary>
 
 ```bash

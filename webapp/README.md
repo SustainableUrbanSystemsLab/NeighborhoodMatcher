@@ -144,6 +144,9 @@ pnpm install
 pnpm dev        # runs sync-assets, then Vite on :5173
 ```
 
+To build everything at once (website, self-host zip, desktop installer) use
+`../build.sh` or `..\build.bat` from the repository root.
+
 `pnpm build` type-checks (`tsc -b`), produces `dist/` and the self-host zip;
 `pnpm build:web` skips the zip. `pnpm run check:offline` and `pnpm test:e2e`
 verify the offline and identifier requirements (see [Offline](#offline)).

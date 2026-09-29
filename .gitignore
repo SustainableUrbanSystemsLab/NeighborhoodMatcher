@@ -169,6 +169,9 @@ out/
 webapp/public/pyodide/
 webapp/.cache/
 
+# build.sh / build.bat outputs
+/release/
+
 # Playwright (webapp/tests)
 webapp/test-results/
 webapp/playwright-report/

@@ -25,7 +25,9 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] }, grep: /@desktop/ },
   ],
   webServer: {
-    command: "pnpm exec vite preview --port 4173 --strictPort",
+    // Vite's own entry point: works however the tests were started
+    // (pnpm, npx, the build scripts, or node_modules/.bin directly).
+    command: "node node_modules/vite/bin/vite.js preview --port 4173 --strictPort",
     url: "http://localhost:4173",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
