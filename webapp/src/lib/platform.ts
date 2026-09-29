@@ -4,6 +4,7 @@
 // system browser instead of navigating the app window.
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 export function isDesktopApp(): boolean {
   try {
@@ -71,6 +72,8 @@ export function installExternalLinkHandler(): void {
     }
     if (!/^https?:$/.test(url.protocol) || url.origin === window.location.origin) return;
     event.preventDefault();
-    void import("@tauri-apps/plugin-opener").then(({ openUrl }) => openUrl(url.href));
+    // Static import: the request reaches the app in the same tick as the
+    // click, with no chunk to load first.
+    void openUrl(url.href);
   });
 }

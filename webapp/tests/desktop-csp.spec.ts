@@ -101,12 +101,14 @@ test("@desktop links to other sites open in the system browser", async ({ page }
   const release = page.getByRole("link", { name: "All releases" });
   await release.click();
   await expect(page).toHaveURL(/\/about/); // the window stayed on the app
-  const opened = await page.evaluate(() =>
-    (window as unknown as { __ipc: { cmd: string; args: { url?: string } }[] }).__ipc
-      .filter((c) => c.cmd === "plugin:opener|open_url")
-      .map((c) => c.args.url)
-  );
-  expect(opened).toEqual([
-    "https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest",
-  ]);
+  // The opener call is asynchronous: wait for it rather than read once.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as { __ipc: { cmd: string; args: { url?: string } }[] }).__ipc
+          .filter((c) => c.cmd === "plugin:opener|open_url")
+          .map((c) => c.args.url)
+      )
+    )
+    .toEqual(["https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest"]);
 });
