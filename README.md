@@ -54,7 +54,7 @@ inside an institution.
 | Situation | Use |
 |-----------|-----|
 | Online once, offline later | Open the site once; the footer shows *Available offline on this device* when the whole app is cached. Install it from the browser menu for an app icon. |
-| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). Not code-signed yet: macOS right-click → Open; Windows SmartScreen → More info → Run anyway. |
+| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). No developer certificate yet: macOS blocks the first launch — System Settings → Privacy & Security → Open Anyway; Windows SmartScreen → More info → Run anyway. |
 | Host it inside an institution | Download *nbhdmatch-site-v&lt;version&gt;.zip* from the site's [About page](https://nbhdmatch.netlify.app/about#offline) and serve the folder from any static server (HOSTING.txt inside lists the two settings that matter). |
 
 In every case the runtime, the engine and all assets are local: nothing is

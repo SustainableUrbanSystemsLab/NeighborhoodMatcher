@@ -24,10 +24,16 @@
 # in Chromium (WebView2's engine) and WebKit (WKWebView's); the self-test
 # checks it inside the real apps.
 #
-# The apps are unsigned: macOS shows "unidentified developer" (right-click →
-# Open, or `xattr -d com.apple.quarantine`), Windows SmartScreen shows "More
-# info → Run anyway". Signing needs certificates in repository secrets, passed
-# to `tauri build` as environment variables: https://v2.tauri.app/distribute/sign/
+# The apps carry no developer certificate. The macOS app is ad-hoc signed as
+# a whole (signingIdentity "-" in tauri.conf.json; the build checks it):
+# signed only by the linker, a downloaded copy is "damaged" and cannot be
+# opened at all. macOS still blocks its first launch ("Apple could not
+# verify…"): System Settings → Privacy & Security → Open Anyway (right-click
+# → Open stopped working in macOS 15), or `xattr -dr com.apple.quarantine
+# /Applications/NeighborhoodMatcher.app`. Windows SmartScreen shows "More
+# info → Run anyway". Signing needs certificates in repository secrets,
+# passed to `tauri build` as environment variables:
+# https://v2.tauri.app/distribute/sign/
 
 name: Desktop app
 
@@ -215,7 +221,7 @@ jobs:
           cat > notes.md <<'NOTES'
           Desktop app for machines without Internet access. The same matching engine as https://nbhdmatch.netlify.app/, with the Python runtime included — nothing is downloaded and no data leaves the computer.
 
-          - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg`. The app is not signed: on first launch, right-click the app → Open (or run `xattr -d com.apple.quarantine /Applications/NeighborhoodMatcher.app`).
+          - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg`. Drag the app to Applications. It is not notarized by Apple, so macOS blocks the first launch: open System Settings → Privacy & Security, click **Open Anyway** and confirm (or run `xattr -dr com.apple.quarantine /Applications/NeighborhoodMatcher.app`).
           - **Windows (x64):** `NeighborhoodMatcher-windows-x64-setup.exe`, with the WebView2 runtime embedded so it installs offline. SmartScreen: "More info → Run anyway".
           - **Self-hosting:** `nbhdmatch-site-v*.zip` is the website as a static folder for an institution's own server (see HOSTING.txt inside).
           NOTES

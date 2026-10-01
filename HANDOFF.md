@@ -216,10 +216,15 @@ collaborators; ordering after that is judgment.
 
 ### Offline / desktop (0.9.0 follow-ups)
 
-- **Code signing.** The desktop installers are unsigned (Gatekeeper /
-  SmartScreen warnings). Signing needs an Apple Developer ID and a Windows
-  certificate as repository secrets, passed to `tauri build` as its signing
-  environment variables in `.github/workflows/desktop.yml`
+- **Code signing.** The desktop installers carry no developer certificate.
+  The macOS app is ad-hoc signed as a whole (`signingIdentity: "-"` in
+  `tauri.conf.json`; `scripts/build-all.mjs` fails the build otherwise —
+  signed only by the linker, a downloaded copy is "damaged" and cannot be
+  opened), so Gatekeeper blocks only its first launch (Privacy & Security →
+  Open Anyway); Windows shows SmartScreen. Removing the prompts needs an
+  Apple Developer ID (plus notarization) and a Windows certificate as
+  repository secrets, passed to `tauri build` as its signing environment
+  variables in `.github/workflows/desktop.yml`
   (https://v2.tauri.app/distribute/sign/).
 - **More platforms.** Linux (`.AppImage`/`.deb`) and Intel-mac builds are one
   matrix entry each in `desktop.yml`.

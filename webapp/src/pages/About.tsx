@@ -308,10 +308,12 @@ export default function About() {
                 </li>
               </ul>
               <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
-                The apps are not code-signed. macOS: right-click the app,
-                then <em>Open</em>. Windows SmartScreen: <em>More info</em>,
-                then <em>Run anyway</em>. Your IT department may need to
-                approve the installer first.
+                The apps carry no developer certificate yet. macOS blocks
+                the first launch: open <em>System Settings</em> →{" "}
+                <em>Privacy &amp; Security</em> and click <em>Open
+                Anyway</em>. Windows SmartScreen: <em>More info</em>, then{" "}
+                <em>Run anyway</em>. Your IT department may need to approve
+                the installer first.
               </p>
             </div>
             <div className="rounded-lg border border-gray-200 p-3">

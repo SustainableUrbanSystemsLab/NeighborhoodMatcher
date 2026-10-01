@@ -308,6 +308,19 @@ function builtFiles(dir, pattern) {
     .map((name) => join(dir, name));
 }
 
+/** Mounts a .dmg read-only, passes the .app inside to fn, and unmounts it again. */
+async function withAppInDmg(dmg, fn) {
+  const mount = mkdtempSync(join(tmpdir(), "nbhdmatch-dmg-"));
+  run("hdiutil", ["attach", "-nobrowse", "-readonly", "-mountpoint", mount, dmg]);
+  try {
+    const app = readdirSync(mount).find((name) => name.endsWith(".app"));
+    if (!app) fail("no .app inside the .dmg");
+    return await fn(join(mount, app));
+  } finally {
+    spawnSync("hdiutil", ["detach", mount, "-force"], { stdio: "ignore" });
+  }
+}
+
 let installer = null;
 if (buildDesktop) {
   step("Building the desktop app");
@@ -318,6 +331,19 @@ if (buildDesktop) {
     : builtFiles(join(BUNDLE, "nsis"), /-setup\.exe$/);
   if (found.length === 0) fail(`the desktop build produced no installer in ${relative(ROOT, BUNDLE)}`);
   installer = found[0];
+  if (IS_MAC) {
+    // A downloaded app whose signature covers only its executable (all the
+    // linker signs on Apple Silicon) is "damaged" to macOS, with no way to
+    // open it. signingIdentity "-" in tauri.conf.json has tauri sign the whole
+    // app (ad hoc); this keeps it that way. The self-test cannot catch it: it
+    // runs a copy that was never downloaded, which Gatekeeper does not vet.
+    const problem = await withAppInDmg(installer, (app) => {
+      const check = spawnSync("codesign", ["--verify", "--deep", "--strict", app], { encoding: "utf-8" });
+      return check.status === 0 ? null : (check.stderr || `codesign exit code ${check.status}`).trim();
+    });
+    if (problem) fail(`the app in the .dmg is not signed as a whole, so macOS would call it damaged once downloaded:\n${problem}`);
+    console.log("Code signature: valid for the whole app (codesign --verify --deep --strict)");
+  }
   copyFileSync(installer, join(RELEASE, installer.split(/[\\/]/).pop()));
 }
 
@@ -358,16 +384,10 @@ if (buildDesktop && opts.test) {
   step("Self-testing the desktop app");
   if (IS_MAC) {
     // Test the app inside the .dmg that ships (the build deletes the loose .app).
-    const mount = mkdtempSync(join(tmpdir(), "nbhdmatch-dmg-"));
-    run("hdiutil", ["attach", "-nobrowse", "-readonly", "-mountpoint", mount, installer]);
-    try {
-      const app = readdirSync(mount).find((name) => name.endsWith(".app"));
-      if (!app) fail("no .app inside the .dmg");
-      const macos = join(mount, app, "Contents", "MacOS");
-      await selftest(join(macos, readdirSync(macos)[0]));
-    } finally {
-      spawnSync("hdiutil", ["detach", mount, "-force"], { stdio: "ignore" });
-    }
+    await withAppInDmg(installer, (app) => {
+      const macos = join(app, "Contents", "MacOS");
+      return selftest(join(macos, readdirSync(macos)[0]));
+    });
   } else {
     const release = join(WEBAPP, "src-tauri", "target", "release");
     const exe = readdirSync(release).find((name) => name.endsWith(".exe"));
