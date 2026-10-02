@@ -175,6 +175,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # the release, on version tags only
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }} # optional, see the last step
     steps:
       - name: macOS and Windows both built
         if: needs.build.result != 'success'
@@ -230,6 +232,7 @@ jobs:
 
           - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg` — drag the app to Applications and open it from there. The app has no Apple developer certificate, so macOS blocks its first launch: click **Done**, then open System Settings → Privacy & Security and click **Open Anyway**. Or install from Terminal, which skips that check (a download through curl is not quarantined):
             `curl -fsSL https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/install-macos.sh | sh`
+          - **Homebrew:** `brew install --cask SustainableUrbanSystemsLab/tap/neighborhoodmatcher` — no prompt either (the cask lifts the quarantine flag); the [tap](https://github.com/SustainableUrbanSystemsLab/homebrew-tap) picks this release up by itself, within six hours.
           - **Windows (x64):** `NeighborhoodMatcher-windows-x64-setup.exe`, with the WebView2 runtime embedded so it installs offline. SmartScreen: "More info → Run anyway".
           - **Self-hosting:** `nbhdmatch-site-v*.zip` is the website as a static folder for an institution's own server (see HOSTING.txt inside).
           NOTES
@@ -237,3 +240,13 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "NeighborhoodMatcher $GITHUB_REF_NAME" \
             --notes-file notes.md
+
+      # The Homebrew tap (SustainableUrbanSystemsLab/homebrew-tap) bumps its
+      # cask to the latest release on a schedule; this makes it do so at
+      # once. Needs HOMEBREW_TAP_TOKEN in this repository's secrets: a
+      # fine-grained token with "Contents: read and write" on the tap
+      # repository. Without it the step is skipped and the schedule applies.
+      - name: Tell the Homebrew tap (version tags, when HOMEBREW_TAP_TOKEN is set)
+        if: startsWith(github.ref, 'refs/tags/') && env.HOMEBREW_TAP_TOKEN != ''
+        run: |
+          GH_TOKEN="$HOMEBREW_TAP_TOKEN" gh api "repos/SustainableUrbanSystemsLab/homebrew-tap/dispatches" -f event_type=release

@@ -62,7 +62,7 @@ fetched from a CDN, and no data leaves the machine.
 
 ### Installing the desktop app
 
-**macOS (Apple Silicon)** — either of:
+**macOS (Apple Silicon)** — one of:
 
 - From Terminal, with no security prompt. A download through curl is not
   quarantined, so macOS does not vet the app on first launch:
@@ -72,6 +72,17 @@ fetched from a CDN, and no data leaves the machine.
   ```
 
   It puts the app in Applications (replacing an older copy) and opens it.
+- With [Homebrew](https://brew.sh), also without a prompt; later
+  `brew upgrade --cask neighborhoodmatcher`:
+
+  ```bash
+  brew install --cask SustainableUrbanSystemsLab/tap/neighborhoodmatcher
+  ```
+
+  The cask lifts the quarantine flag Homebrew puts on downloads (Homebrew 7
+  dropped `--no-quarantine`), and the
+  [tap](https://github.com/SustainableUrbanSystemsLab/homebrew-tap) follows
+  each release by itself.
 - By hand: open the .dmg, drag the app to Applications and open it from
   there. macOS says it "could not verify" the app: click **Done**, open
   System Settings → Privacy & Security, click **Open Anyway** and confirm.
