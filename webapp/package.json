@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "dmg:background": "node scripts/dmg-background.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

@@ -30,10 +30,12 @@
 # opened at all. macOS still blocks its first launch ("Apple could not
 # verify…"): System Settings → Privacy & Security → Open Anyway (right-click
 # → Open stopped working in macOS 15), or `xattr -dr com.apple.quarantine
-# /Applications/NeighborhoodMatcher.app`. Windows SmartScreen shows "More
-# info → Run anyway". Signing needs certificates in repository secrets,
-# passed to `tauri build` as environment variables:
-# https://v2.tauri.app/distribute/sign/
+# /Applications/NeighborhoodMatcher.app`. scripts/install-macos.sh, published
+# with the installers, avoids the block altogether: it downloads the .dmg
+# with curl, which sets no quarantine flag, so macOS never vets the app
+# (the macOS build tests it). Windows SmartScreen shows "More info → Run
+# anyway". Signing needs certificates in repository secrets, passed to
+# `tauri build` as environment variables: https://v2.tauri.app/distribute/sign/
 
 name: Desktop app
 
@@ -180,6 +182,7 @@ jobs:
           echo "::error::every build must succeed before the installers are published (build result: ${{ needs.build.result }})"
           exit 1
 
+      - uses: actions/checkout@v4 # for scripts/install-macos.sh
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -195,6 +198,9 @@ jobs:
           cp "$dmg" "out/NeighborhoodMatcher-darwin-$arch.dmg"
           cp "$exe" "out/NeighborhoodMatcher-windows-x64-setup.exe"
           cp "$zip" out/
+          # The Terminal installer for macOS (curl ... | sh): it downloads the
+          # .dmg above by its release name, so it is published next to it.
+          cp scripts/install-macos.sh out/
           ls -la out
           {
             echo "### Installers"
@@ -204,6 +210,7 @@ jobs:
             echo "| NeighborhoodMatcher-darwin-$arch.dmg | $(du -h "$dmg" | cut -f1) | $(basename "$dmg") |"
             echo "| NeighborhoodMatcher-windows-x64-setup.exe | $(du -h "$exe" | cut -f1) | $(basename "$exe") |"
             echo "| $(basename "$zip") | $(du -h "$zip" | cut -f1) | self-host website |"
+            echo "| install-macos.sh | $(du -h scripts/install-macos.sh | cut -f1) | Terminal installer, macOS (no Gatekeeper prompt) |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload both installers
@@ -221,7 +228,8 @@ jobs:
           cat > notes.md <<'NOTES'
           Desktop app for machines without Internet access. The same matching engine as https://nbhdmatch.netlify.app/, with the Python runtime included — nothing is downloaded and no data leaves the computer.
 
-          - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg`. Drag the app to Applications. It is not notarized by Apple, so macOS blocks the first launch: open System Settings → Privacy & Security, click **Open Anyway** and confirm (or run `xattr -dr com.apple.quarantine /Applications/NeighborhoodMatcher.app`).
+          - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg` — drag the app to Applications and open it from there. The app has no Apple developer certificate, so macOS blocks its first launch: click **Done**, then open System Settings → Privacy & Security and click **Open Anyway**. Or install from Terminal, which skips that check (a download through curl is not quarantined):
+            `curl -fsSL https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/install-macos.sh | sh`
           - **Windows (x64):** `NeighborhoodMatcher-windows-x64-setup.exe`, with the WebView2 runtime embedded so it installs offline. SmartScreen: "More info → Run anyway".
           - **Self-hosting:** `nbhdmatch-site-v*.zip` is the website as a static folder for an institution's own server (see HOSTING.txt inside).
           NOTES

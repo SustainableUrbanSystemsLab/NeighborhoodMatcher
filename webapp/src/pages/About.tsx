@@ -309,11 +309,18 @@ export default function About() {
               </ul>
               <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
                 The apps carry no developer certificate yet. macOS blocks
-                the first launch: open <em>System Settings</em> →{" "}
-                <em>Privacy &amp; Security</em> and click <em>Open
-                Anyway</em>. Windows SmartScreen: <em>More info</em>, then{" "}
-                <em>Run anyway</em>. Your IT department may need to approve
-                the installer first.
+                the first launch: click <em>Done</em>, open <em>System
+                Settings</em> → <em>Privacy &amp; Security</em> and click{" "}
+                <em>Open Anyway</em>. Or install from Terminal, with no
+                prompt at all:
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-700">
+                <code className="break-all">curl -fsSL {REPO_URL}/releases/latest/download/install-macos.sh | sh</code>
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
+                Windows SmartScreen: <em>More info</em>, then <em>Run
+                anyway</em>. Your IT department may need to approve the
+                installer first.
               </p>
             </div>
             <div className="rounded-lg border border-gray-200 p-3">

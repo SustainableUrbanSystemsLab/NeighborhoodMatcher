@@ -121,9 +121,9 @@ function spawnCommand(cmd, args, options) {
 }
 
 /** Runs a command with live output; exits the build if it fails. */
-function run(cmd, args, cwd = ROOT) {
+function run(cmd, args, cwd = ROOT, extraEnv = {}) {
   console.log(`$ ${[cmd, ...args].join(" ")}${cwd === ROOT ? "" : `   (in ${relative(ROOT, cwd)})`}`);
-  const result = spawnCommand(cmd, args, { cwd, env, stdio: "inherit" });
+  const result = spawnCommand(cmd, args, { cwd, env: { ...env, ...extraEnv }, stdio: "inherit" });
   if (result.error) fail(`could not run ${cmd}: ${result.error.message}`);
   if (result.status !== 0) fail(`${[cmd, ...args].join(" ")} failed (exit code ${result.status})`);
 }
@@ -156,6 +156,7 @@ const stepTitles = [
   opts.test && "Running the end-to-end tests (Playwright)",
   buildDesktop && "Building the desktop app",
   buildDesktop && opts.test && "Self-testing the desktop app",
+  buildDesktop && opts.test && IS_MAC && "Testing the Terminal installer",
 ].filter(Boolean);
 let stepIndex = 0;
 function step(title) {
@@ -394,6 +395,34 @@ if (buildDesktop && opts.test) {
     if (!exe) fail("no built .exe in webapp/src-tauri/target/release");
     await selftest(join(release, exe));
   }
+}
+
+// ---------------------------------------------------------------------------
+// 8. The Terminal installer (scripts/install-macos.sh, a release asset): the
+//    usual case is a .dmg downloaded with a browser, which carries the
+//    quarantine flag. The installed app must not, or macOS blocks it at
+//    first launch, and it must pass the signature check the script runs.
+// ---------------------------------------------------------------------------
+
+if (buildDesktop && opts.test && IS_MAC) {
+  step("Testing the Terminal installer");
+  const dir = mkdtempSync(join(tmpdir(), "nbhdmatch-install-"));
+  const dmg = join(dir, "NeighborhoodMatcher.dmg");
+  copyFileSync(installer, dmg);
+  run("xattr", ["-w", "com.apple.quarantine", "0083;00000000;Chrome;", dmg]);
+  const installDir = join(dir, "Applications");
+  run("sh", [join(ROOT, "scripts", "install-macos.sh")], ROOT, {
+    NBHDMATCH_DMG: dmg,
+    NBHDMATCH_INSTALL_DIR: installDir,
+    NBHDMATCH_NO_OPEN: "1",
+  });
+  const app = join(installDir, "NeighborhoodMatcher.app");
+  if (!existsSync(join(app, "Contents", "Info.plist"))) fail("the installer did not put the app in NBHDMATCH_INSTALL_DIR");
+  if (spawnSync("xattr", ["-p", "com.apple.quarantine", app], { stdio: "ignore" }).status === 0) {
+    fail("the installed app still carries the quarantine flag");
+  }
+  console.log(`Installed from a quarantined .dmg, no quarantine flag on the app: ${app}`);
+  rmSync(dir, { recursive: true, force: true });
 }
 
 // ---------------------------------------------------------------------------

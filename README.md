@@ -54,11 +54,30 @@ inside an institution.
 | Situation | Use |
 |-----------|-----|
 | Online once, offline later | Open the site once; the footer shows *Available offline on this device* when the whole app is cached. Install it from the browser menu for an app icon. |
-| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). No developer certificate yet: macOS blocks the first launch — System Settings → Privacy & Security → Open Anyway; Windows SmartScreen → More info → Run anyway. |
+| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). Neither carries a developer certificate, so each system asks once — see [Installing the desktop app](#installing-the-desktop-app). |
 | Host it inside an institution | Download *nbhdmatch-site-v&lt;version&gt;.zip* from the site's [About page](https://nbhdmatch.netlify.app/about#offline) and serve the folder from any static server (HOSTING.txt inside lists the two settings that matter). |
 
 In every case the runtime, the engine and all assets are local: nothing is
 fetched from a CDN, and no data leaves the machine.
+
+### Installing the desktop app
+
+**macOS (Apple Silicon)** — either of:
+
+- From Terminal, with no security prompt. A download through curl is not
+  quarantined, so macOS does not vet the app on first launch:
+
+  ```bash
+  curl -fsSL https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/install-macos.sh | sh
+  ```
+
+  It puts the app in Applications (replacing an older copy) and opens it.
+- By hand: open the .dmg, drag the app to Applications and open it from
+  there. macOS says it "could not verify" the app: click **Done**, open
+  System Settings → Privacy & Security, click **Open Anyway** and confirm.
+  Once per copy.
+
+**Windows** — run the installer; SmartScreen: **More info → Run anyway**.
 
 No data handy? Grab the benchmark pair from this repo:
 [`simulated_data/dataset_A100.csv`](simulated_data/dataset_A100.csv) (target) ×
