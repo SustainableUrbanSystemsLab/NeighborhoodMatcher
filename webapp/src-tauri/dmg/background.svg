@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="660" height="400" viewBox="0 0 660 400">
+  <!--
+    Background of the .dmg's Finder window (660 x 400 points). The window
+    shows the app icon centred at (180, 170) and the Applications link at
+    (480, 170), both 128 points wide, with their names underneath (set in
+    tauri.conf.json > bundle > macOS > dmg). Rendered to background.tiff by
+    `pnpm run dmg:background`; edit this file, then rerun that.
+  -->
+  <style>
+    text { font-family: system-ui, -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+  </style>
+  <rect width="660" height="400" fill="#f8f9fb"/>
+
+  <text x="330" y="52" text-anchor="middle" font-size="21" font-weight="600" fill="#111827">Install NeighborhoodMatcher</text>
+  <text x="330" y="78" text-anchor="middle" font-size="13.5" fill="#4b5563">Drag the app onto the Applications folder, then open it from Applications.</text>
+
+  <!-- arrow between the two icons -->
+  <line x1="262" y1="170" x2="386" y2="170" stroke="#2563eb" stroke-width="3" stroke-linecap="round"/>
+  <polygon points="384,160 400,170 384,180" fill="#2563eb"/>
+
+  <!-- first-launch note, below the icon labels -->
+  <rect x="30" y="286" width="600" height="88" rx="10" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="330" y="311" text-anchor="middle" font-size="12.5" fill="#374151">The app has no Apple developer certificate, so macOS blocks its first launch.</text>
+  <text x="330" y="333" text-anchor="middle" font-size="12.5" font-weight="600" fill="#111827">Click Done, then System Settings → Privacy &amp; Security → Open Anyway.</text>
+  <text x="330" y="358" text-anchor="middle" font-size="11.5" fill="#6b7280">No prompt at all: install from Terminal — see “Installing the desktop app” in the README.</text>
+</svg>

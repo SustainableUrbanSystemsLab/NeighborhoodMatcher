@@ -8,6 +8,13 @@
       "port": 5173,
       "autoPort": true,
       "env": { "COREPACK_DEFAULT_TO_LATEST": "0" }
+    },
+    {
+      "name": "dataset-merge-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "webapp", "preview", "--port", "4173", "--strictPort"],
+      "port": 4173,
+      "env": { "COREPACK_DEFAULT_TO_LATEST": "0" }
     }
   ]
 }

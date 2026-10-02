@@ -1,0 +1,252 @@
+# Builds the desktop app for BOTH macOS (Apple Silicon .dmg) and Windows (x64
+# NSIS installer, WebView2 runtime embedded so it installs on air-gapped
+# machines) with the same one-command builds people run locally —
+# `./build.sh --test` and `build.bat --test`: every test suite, the website
+# and its self-host zip, the offline check, the installer, and the built
+# app's self-test in its real webview. Linux runs `./build.sh --test` too
+# (website only).
+#
+# The "Both installers" job then fails unless macOS AND Windows built, and
+# publishes them together:
+#   - pull requests touching the app, pushes to main, workflow_dispatch:
+#     one workflow artifact, NeighborhoodMatcher-installers (both installers
+#     + the site zip, under the release names)
+#   - version tags (v0.9.0 …): the same files attached to a GitHub Release,
+#     created only once both installers exist. The About page links to the
+#     stable names via .../releases/latest/download/<name>.
+#
+# CSP (webapp/src-tauri/tauri.conf.json): 'self' only, 'wasm-unsafe-eval'
+# for Pyodide, blob: workers, connect-src limited to the app and Tauri's IPC
+# — the window cannot reach the network even if code tried. Tauri adds
+# hashes/nonces to script-src; style-src modification is disabled because a
+# nonce there would switch off 'unsafe-inline', which React style attributes
+# need. webapp/tests/desktop-csp.spec.ts runs the app under this exact CSP
+# in Chromium (WebView2's engine) and WebKit (WKWebView's); the self-test
+# checks it inside the real apps.
+#
+# The apps carry no developer certificate. The macOS app is ad-hoc signed as
+# a whole (signingIdentity "-" in tauri.conf.json; the build checks it):
+# signed only by the linker, a downloaded copy is "damaged" and cannot be
+# opened at all. macOS still blocks its first launch ("Apple could not
+# verify…"): System Settings → Privacy & Security → Open Anyway (right-click
+# → Open stopped working in macOS 15), or `xattr -dr com.apple.quarantine
+# /Applications/NeighborhoodMatcher.app`. scripts/install-macos.sh, published
+# with the installers, avoids the block altogether: it downloads the .dmg
+# with curl, which sets no quarantine flag, so macOS never vets the app
+# (the macOS build tests it). Windows SmartScreen shows "More info → Run
+# anyway". Signing needs certificates in repository secrets, passed to
+# `tauri build` as environment variables: https://v2.tauri.app/distribute/sign/
+
+name: Desktop app
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "webapp/**"
+      - "matcher/src/**"
+      - "build.sh"
+      - "build.bat"
+      - "scripts/build-all.mjs"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request supersedes a running build; main and
+# tag (release) builds always finish.
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            shell: bash
+            command: ./build.sh --test
+          - name: Windows (x64)
+            os: windows-latest
+            shell: cmd
+            command: call build.bat --test
+          - name: Linux (website only)
+            os: ubuntu-latest
+            shell: bash
+            command: ./build.sh --test
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+        if: runner.os != 'Linux'
+      - uses: swatinem/rust-cache@v2
+        if: runner.os != 'Linux'
+        with:
+          workspaces: "webapp/src-tauri -> target"
+      - uses: astral-sh/setup-uv@v3
+
+      - name: Tag matches the shipped version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          v=$(node -p "require('./webapp/package.json').version")
+          if [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $v — run scripts/bump_version.py and tag v$v"
+            exit 1
+          fi
+
+      # Everything, in order: Python tests + benchmark, website + self-host
+      # zip, offline check, Playwright, the installer, and the built app's
+      # self-test (a full match in its real webview, results saved through
+      # the app, network blocked; on macOS from inside the mounted .dmg).
+      # Outputs land in release/.
+      - name: Build and test (${{ matrix.command }})
+        run: ${{ matrix.command }}
+
+      # Unit tests of the Rust side (file-name sanitizing, no-overwrite
+      # saving). After the build, because generate_context! embeds ../dist.
+      - name: Rust unit tests
+        if: runner.os == 'macOS'
+        shell: bash
+        run: cargo test --manifest-path webapp/src-tauri/Cargo.toml --lib
+
+      # The installer users download: silent install (/S, into a temp folder),
+      # then the self-test on the installed app. The runner already has the
+      # WebView2 runtime, so the embedded offline installer is skipped here;
+      # it is what makes a machine without it work.
+      - name: Install with the NSIS installer and self-test the installed app
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release/*-setup.exe | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP "nbhdmatch-installed"
+          Write-Host "installing $($setup.Name) ($([math]::Round($setup.Length / 1MB)) MB) into $dir"
+          $install = Start-Process -FilePath $setup.FullName -ArgumentList "/S", "/D=$dir" -PassThru -Wait
+          if ($install.ExitCode -ne 0) { Write-Error "installer exit code $($install.ExitCode)"; exit 1 }
+          $exe = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notmatch '^uninstall' } | Select-Object -First 1
+          if (-not $exe) { Get-ChildItem -Recurse $dir; Write-Error "no installed app found"; exit 1 }
+          $env:NBHDMATCH_SELFTEST = Join-Path $env:RUNNER_TEMP "selftest-installed.txt"
+          $env:NBHDMATCH_DOWNLOAD_DIR = Join-Path $env:RUNNER_TEMP "selftest-installed-downloads"
+          New-Item -ItemType Directory -Force -Path $env:NBHDMATCH_DOWNLOAD_DIR | Out-Null
+          Write-Host "running $($exe.FullName)"
+          $p = Start-Process -FilePath $exe.FullName -PassThru
+          if (-not $p.WaitForExit(360000)) { Stop-Process -Id $p.Id -Force }
+          if (-not (Test-Path $env:NBHDMATCH_SELFTEST)) { Write-Error "the installed app wrote no self-test report"; exit 1 }
+          Get-Content $env:NBHDMATCH_SELFTEST
+          if (-not (Select-String -Path $env:NBHDMATCH_SELFTEST -Pattern '^PASS' -Quiet)) { exit 1 }
+
+      - name: Upload the installer
+        if: runner.os != 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*-setup.exe
+
+      - name: Upload the self-host site zip
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          if-no-files-found: error
+          path: release/nbhdmatch-site-v*.zip
+
+  installers:
+    name: Both installers
+    needs: build
+    # Runs even when a build failed, so a missing platform is a failure here
+    # (a skipped job would count as passing).
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the release, on version tags only
+    env:
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }} # optional, see the last step
+    steps:
+      - name: macOS and Windows both built
+        if: needs.build.result != 'success'
+        run: |
+          echo "::error::every build must succeed before the installers are published (build result: ${{ needs.build.result }})"
+          exit 1
+
+      - uses: actions/checkout@v4 # for scripts/install-macos.sh
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect both installers under their release names
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          dmg=$(ls artifacts/installer-macOS/*.dmg)
+          exe=$(ls artifacts/installer-Windows/*-setup.exe)
+          zip=$(ls artifacts/site/nbhdmatch-site-v*.zip)
+          arch=$(basename "$dmg" | sed -E 's/^.*_([A-Za-z0-9]+)\.dmg$/\1/')
+          cp "$dmg" "out/NeighborhoodMatcher-darwin-$arch.dmg"
+          cp "$exe" "out/NeighborhoodMatcher-windows-x64-setup.exe"
+          cp "$zip" out/
+          # The Terminal installer for macOS (curl ... | sh): it downloads the
+          # .dmg above by its release name, so it is published next to it.
+          cp scripts/install-macos.sh out/
+          ls -la out
+          {
+            echo "### Installers"
+            echo ""
+            echo "| File | Size | Built as |"
+            echo "|---|---|---|"
+            echo "| NeighborhoodMatcher-darwin-$arch.dmg | $(du -h "$dmg" | cut -f1) | $(basename "$dmg") |"
+            echo "| NeighborhoodMatcher-windows-x64-setup.exe | $(du -h "$exe" | cut -f1) | $(basename "$exe") |"
+            echo "| $(basename "$zip") | $(du -h "$zip" | cut -f1) | self-host website |"
+            echo "| install-macos.sh | $(du -h scripts/install-macos.sh | cut -f1) | Terminal installer, macOS (no Gatekeeper prompt) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload both installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: NeighborhoodMatcher-installers
+          if-no-files-found: error
+          path: out/*
+
+      - name: Publish the release (version tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Desktop app for machines without Internet access. The same matching engine as https://nbhdmatch.netlify.app/, with the Python runtime included — nothing is downloaded and no data leaves the computer.
+
+          - **macOS (Apple Silicon):** `NeighborhoodMatcher-darwin-aarch64.dmg` — drag the app to Applications and open it from there. The app has no Apple developer certificate, so macOS blocks its first launch: click **Done**, then open System Settings → Privacy & Security and click **Open Anyway**. Or install from Terminal, which skips that check (a download through curl is not quarantined):
+            `curl -fsSL https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/install-macos.sh | sh`
+          - **Homebrew:** `brew install --cask SustainableUrbanSystemsLab/tap/neighborhoodmatcher` — no prompt either (the cask lifts the quarantine flag); the [tap](https://github.com/SustainableUrbanSystemsLab/homebrew-tap) picks this release up by itself, within six hours.
+          - **Windows (x64):** `NeighborhoodMatcher-windows-x64-setup.exe`, with the WebView2 runtime embedded so it installs offline. SmartScreen: "More info → Run anyway".
+          - **Self-hosting:** `nbhdmatch-site-v*.zip` is the website as a static folder for an institution's own server (see HOSTING.txt inside).
+          NOTES
+          gh release create "$GITHUB_REF_NAME" out/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "NeighborhoodMatcher $GITHUB_REF_NAME" \
+            --notes-file notes.md
+
+      # The Homebrew tap (SustainableUrbanSystemsLab/homebrew-tap) bumps its
+      # cask to the latest release on a schedule; this makes it do so at
+      # once. Needs HOMEBREW_TAP_TOKEN in this repository's secrets: a
+      # fine-grained token with "Contents: read and write" on the tap
+      # repository. Without it the step is skipped and the schedule applies.
+      - name: Tell the Homebrew tap (version tags, when HOMEBREW_TAP_TOKEN is set)
+        if: startsWith(github.ref, 'refs/tags/') && env.HOMEBREW_TAP_TOKEN != ''
+        run: |
+          GH_TOKEN="$HOMEBREW_TAP_TOKEN" gh api "repos/SustainableUrbanSystemsLab/homebrew-tap/dispatches" -f event_type=release
