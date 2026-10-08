@@ -6,6 +6,31 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.9.0] - 2026-09-28
+
+### Added
+
+- **Works without Internet.** After one visit the site keeps running offline on that device: a precaching service worker stores the whole build — app shell, matcher sources, Python runtime, numpy — as one versioned unit, and the footer says "Available offline on this device". The site is installable (web manifest, icons). A new build waits for "Reload to update" so the interface and the engine never come from different versions.
+- **Desktop app for machines with no web access at all** (Tauri v2, `webapp/src-tauri/`): macOS Apple Silicon `.dmg` and Windows x64 installer with the WebView2 runtime embedded. Everything is inside the app; its CSP forbids any remote connection. The results package is saved straight into the Downloads folder (never overwriting a file) and the results page shows the path; links to other sites open in the system browser. Built by `.github/workflows/desktop.yml` and attached to a GitHub Release on a version tag, under stable names the About page links to. No developer certificate yet: the macOS app is ad-hoc signed as a whole (the build checks it; signed only by the linker, a downloaded copy would be "damaged"), so macOS blocks just the first launch — System Settings → Privacy & Security → Open Anyway.
+- **Self-host bundle.** Every build also produces `offline/nbhdmatch-site-v<version>.zip`, a static copy of the site with a HOSTING.txt, for an institution's own server or intranet.
+- **About → "Use it without Internet"** explains the three routes; the home page links to it.
+- **Geographic-identifier guard** (`matcher/identifiers.py`, mirrored in `webapp/src/lib/identifier-guard.ts`): ZIP codes, census tracts, GEOIDs/FIPS codes, coordinates and addresses can never be matching variables, detected by column name (`home_zip`, `census_tract`, `GEOID10`, `TRACTCE10`, `lat`, … — while tract- or ZIP-level variables such as `tract_poverty_rate` and `pct_lat` stay usable) and by value shape (10–11-digit tract GEOIDs, 12/15-digit block group/block GEOIDs, ZIP+4, five-digit codes with leading zeros). No override. The columns still pass through to the output.
+- `identifier_columns_blocked` in `run_info.csv` (web and CLI).
+- End-to-end tests (Playwright) and a build check (`pnpm run check:offline`) for the offline and identifier requirements, run in CI.
+- **One-command builds**: `./build.sh` (macOS, Linux) and `build.bat` (Windows) install dependencies, build the website and the self-host zip, check that the build needs no Internet, and build the desktop app for the current computer, collecting everything in `release/`. `--web-only` skips the desktop app, `--test` adds every test suite and the app's self-test. Both share `scripts/build-all.mjs`; pnpm is provided automatically through corepack or npx. The Desktop app workflow runs exactly these scripts (with `--test`) on macOS, Windows and Linux, on pull requests touching the app, on every push to `main` and on version tags; its "Both installers" job fails unless the macOS and Windows installers were both built, uploads them together, and on a tag creates the GitHub Release only then.
+
+### Changed
+
+- The Pyodide runtime and the numpy wheel are served from the app's own origin (`/pyodide/v<version>/`, copied and checksum-verified at build time by `sync-assets.mjs`) instead of jsDelivr. No request leaves the origin at run time.
+- Auto-linked identifier columns are dropped from matching with a warning (CLI and web); an explicit link to one raises `IdentifierColumnError`. The Link step shows them as "Blocked — identifier" with no Include button and does not offer them for manual linking; the results page names them; restoring an older results package that matched on one says so.
+- `pnpm build` = `build:web` + the self-host zip; `build:web` is used by the desktop build.
+- The Tests workflow runs on every pull request, whatever its base branch.
+
+### Removed
+
+- The CDN dependency (the old `public/sw.js` that cached jsDelivr files is replaced; its caches are cleared on update).
+- The soft "PII" warning for ZIP / tract / GEOID / address column names — replaced by the hard block. Direct-identifier names (name, SSN, date of birth, phone, email, MRN, patient) remain an advisory warning.
+
 ## [0.8.8] - 2026-09-04
 
 ### Changed

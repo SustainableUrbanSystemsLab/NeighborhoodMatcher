@@ -1,23 +1,96 @@
-// Registers the Pyodide-runtime service worker (public/sw.js).
+// Registers the precaching service worker (src/sw.ts) and exposes its state
+// to the UI: whether this device can now run the app offline, and whether a
+// newer build is waiting for a reload.
 //
 // Production only: in dev the worker would sit between Vite's HMR and the
-// page for no benefit, and the runtime is usually already warm there.
-//
-// The registration URL carries the build id so a deploy installs a fresh
-// worker, which then evicts the previous build's cache on activate.
+// page for no benefit. Skipped inside the desktop app, where everything is
+// local already and the tauri:// scheme has no service workers.
 
-import { BUILD } from "@/lib/about";
+import { useSyncExternalStore } from "react";
+import { registerSW } from "virtual:pwa-register";
+import { isDesktopApp } from "@/lib/platform";
+
+export type OfflineStatus =
+  /** no service worker here (dev build, desktop app, unsupported browser) */
+  | { kind: "unavailable" }
+  /** worker registered; the first precache is still downloading */
+  | { kind: "installing" }
+  /** every file the app needs is cached — works offline on this device */
+  | { kind: "ready" }
+  /** a newer build is waiting; `apply` reloads into it */
+  | { kind: "update-available"; apply: () => void };
+
+let status: OfflineStatus = { kind: "unavailable" };
+const listeners = new Set<() => void>();
+
+function setStatus(next: OfflineStatus): void {
+  status = next;
+  for (const fn of listeners) fn();
+}
+
+export function getOfflineStatus(): OfflineStatus {
+  return status;
+}
+
+/** React hook: the current offline/update state, re-rendering on change. */
+export function useOfflineStatus(): OfflineStatus {
+  return useSyncExternalStore(
+    (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    getOfflineStatus,
+    getOfflineStatus
+  );
+}
 
 export function registerRuntimeCache(): void {
   if (!import.meta.env.PROD) return;
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  if (isDesktopApp()) return;
 
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register(`/sw.js?v=${encodeURIComponent(BUILD.commit)}`, { scope: "/" })
-      .catch((err) => {
-        // Not fatal: without the worker the runtime simply downloads again.
-        console.warn("Runtime cache unavailable:", err);
-      });
+  let updateSW: ((reload?: boolean) => Promise<void>) | null = null;
+  const updateAvailable = () =>
+    setStatus({
+      kind: "update-available",
+      apply: () => {
+        void updateSW?.(true);
+      },
+    });
+  updateSW = registerSW({
+    immediate: true,
+    onRegisteredSW(_url, registration) {
+      // A build that was already waiting when this page loaded (the browser
+      // found it on an earlier navigation) fires no `waiting` event now.
+      if (registration?.waiting) {
+        updateAvailable();
+      } else if (status.kind !== "update-available") {
+        // A controller already present means this device was precached by
+        // an earlier visit; otherwise the first install is in progress.
+        if (navigator.serviceWorker.controller && !registration?.installing) {
+          setStatus({ kind: "ready" });
+        } else {
+          setStatus({ kind: "installing" });
+        }
+      }
+      // Browsers check for a new worker on navigation; a tab left open for
+      // hours would not, so ask once an hour.
+      if (registration) {
+        window.setInterval(() => {
+          registration.update().catch(() => {});
+        }, 60 * 60 * 1000);
+      }
+    },
+    onOfflineReady() {
+      if (status.kind !== "update-available") setStatus({ kind: "ready" });
+    },
+    onNeedRefresh() {
+      updateAvailable();
+    },
+    onRegisterError(err) {
+      // Not fatal: without the worker the app simply needs the network.
+      console.warn("Offline cache unavailable:", err);
+      setStatus({ kind: "unavailable" });
+    },
   });
 }

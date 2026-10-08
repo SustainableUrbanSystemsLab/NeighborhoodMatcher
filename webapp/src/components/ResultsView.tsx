@@ -13,6 +13,7 @@ import {
 import type {
   AblationState,
   ColumnLink,
+  IdentifierBlock,
   MatchOutput,
   ParsedDataset,
   PerTargetDetail,
@@ -28,6 +29,8 @@ interface ResultsViewProps {
   target: ParsedDataset;
   supplemental: ParsedDataset;
   links: ColumnLink[];
+  /** shared identifier columns (ZIP, tract, GEOID, …) kept out of the run */
+  blocked?: IdentifierBlock[];
   /** wall-clock duration of the matching run (null if unknown) */
   runDurationMs: number | null;
   /** Pyodide workers (≈ CPU cores) the run used (null if unknown) */
@@ -66,6 +69,7 @@ export function ResultsView({
   target,
   supplemental,
   links,
+  blocked = [],
   runDurationMs,
   workersUsed,
   completedAt,
@@ -81,10 +85,13 @@ export function ResultsView({
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  // Desktop app only: where the package was written (Downloads folder).
+  const [savedPath, setSavedPath] = useState<string | null>(null);
 
   async function handleDownload() {
     setDownloading(true);
     setDownloadError(null);
+    setSavedPath(null);
     try {
       const blob = await buildResultsZip(
         output,
@@ -92,9 +99,12 @@ export function ResultsView({
         supplemental,
         links,
         ablation.status === "done" ? ablation.report : null,
-        completedAt
+        completedAt,
+        blocked
       );
-      triggerDownload(blob, `${filenameTimestamp(completedAt)}-matcher_results.zip`);
+      setSavedPath(
+        await triggerDownload(blob, `${filenameTimestamp(completedAt)}-matcher_results.zip`)
+      );
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -244,6 +254,19 @@ export function ResultsView({
               <li key={i}>{w}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Identifier columns the guard kept out of this run (also in run_info.csv) */}
+      {blocked.length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+          <span className="font-semibold text-gray-800">Not used for matching:</span>{" "}
+          {blocked.map((b) => b.column).join(", ")} —{" "}
+          {blocked.length === 1 ? "a geographic identifier." : "geographic identifiers."}{" "}
+          ZIP codes, census tracts, GEOIDs, coordinates and addresses are never
+          matching variables (HIPAA / PII);{" "}
+          {blocked.length === 1 ? "the column passes" : "the columns pass"} through
+          to the output unchanged.
         </div>
       )}
 
@@ -506,6 +529,11 @@ export function ResultsView({
           </button>
           {downloadError && (
             <span className="text-xs text-red-600">{downloadError}</span>
+          )}
+          {savedPath && (
+            <span className="text-xs text-green-700" title={savedPath}>
+              Saved to {savedPath}
+            </span>
           )}
           <span className="text-[11px] text-gray-400">
             Linked CSV, match detail, run info, data + match stats, SMD,

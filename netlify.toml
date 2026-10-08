@@ -26,6 +26,25 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Self-hosted Pyodide runtime + numpy wheel (webapp/scripts/sync-assets.mjs).
+# The version is in the path, so the files are immutable.
+[[headers]]
+  for = "/pyodide/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The service worker and the web manifest must always be revalidated, or a
+# browser could keep an outdated precache list past a deploy.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 [[headers]]
   for = "/index.html"
   [headers.values]

@@ -28,6 +28,7 @@ load_csv ──► find_common_headers ──► clean_val ──► dual_standa
 |--------|------|
 | `io.py` | CSV parsing/writing, value cleanup (missing tokens, magnitude cap). |
 | `align.py` | Find columns shared between the two header lists (Unicode-normalized names, duplicate/case/delimiter diagnostics). |
+| `identifiers.py` | Geographic-identifier guard: ZIP / census tract / GEOID / coordinate / address columns (by name or value shape) are never matching variables — dropped from auto links with a warning, refused as explicit links (`IdentifierColumnError`). Mirrored by `webapp/src/lib/identifier-guard.ts`. |
 | `standardize.py` | Joint z-score across both datasets so the same raw value maps to the same standardized value in both; scale-compatibility warnings. |
 | `distance.py` | Standardized Euclidean distance; `match_all`, the chunked vectorized brute-force engine; per-row reference functions kept as the executable spec. |
 | `signals.py` | Match-quality signals. See [signals/](signals/). |

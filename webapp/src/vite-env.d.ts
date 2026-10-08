@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 // Build-time constants injected by vite.config.ts (see `define`). They
 // identify the deployed site — the ENGINE's version travels with each run
@@ -6,3 +7,5 @@
 declare const __APP_VERSION__: string;
 declare const __APP_COMMIT__: string;
 declare const __BUILD_TIME__: string;
+/** Version of the self-hosted Pyodide runtime under /pyodide/v<version>/. */
+declare const __PYODIDE_VERSION__: string;
