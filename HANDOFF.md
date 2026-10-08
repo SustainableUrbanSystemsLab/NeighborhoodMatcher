@@ -216,6 +216,19 @@ collaborators; ordering after that is judgment.
 
 ### Offline / desktop (0.9.0 follow-ups)
 
+- **Releasing.** Bump with `python scripts/bump_version.py patch|minor|major`,
+  merge to `main`, then push the tag `v<version>` from `main`.
+  `.github/workflows/desktop.yml` builds and tests both installers and only
+  then publishes the GitHub Release, marked Latest — the address behind
+  every `…/releases/latest/download/<name>` link (README buttons, About
+  page, `scripts/install-macos.sh`). Each push to `main` also refreshes the
+  `main-build` pre-release with the same files.
+- **Homebrew tap.** A cask with a self-testing update workflow is prepared
+  for `SustainableUrbanSystemsLab/homebrew-tap`, but that repository is not
+  published yet, so the README, the About page and the release notes in
+  `desktop.yml` leave Homebrew out. Once it exists, add the `brew install`
+  line back to all three (optional: a `HOMEBREW_TAP_TOKEN` secret makes the
+  tap update right after each release instead of within six hours).
 - **Code signing.** The desktop installers carry no developer certificate.
   The macOS app is ad-hoc signed as a whole (`signingIdentity: "-"` in
   `tauri.conf.json`; `scripts/build-all.mjs` fails the build otherwise —

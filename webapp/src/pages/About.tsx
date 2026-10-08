@@ -318,10 +318,6 @@ export default function About() {
                 <code className="break-all">curl -fsSL {REPO_URL}/releases/latest/download/install-macos.sh | sh</code>
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
-                Homebrew:{" "}
-                <code className="break-all">brew install --cask SustainableUrbanSystemsLab/tap/neighborhoodmatcher</code>
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
                 Windows SmartScreen: <em>More info</em>, then <em>Run
                 anyway</em>. Your IT department may need to approve the
                 installer first.

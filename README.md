@@ -13,7 +13,15 @@
 <p align="center">
   <a href="https://nbhdmatch.netlify.app/"><strong>▶ Use it in your browser — nbhdmatch.netlify.app</strong></a>
   <br /><br />
+  <strong>Offline desktop app:</strong>
+  <br />
+  <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/NeighborhoodMatcher-darwin-aarch64.dmg"><img src="https://img.shields.io/badge/Download-macOS%20%28Apple%20Silicon%29-0969da?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTExIDNoMnYxMC4xN2wzLjU5LTMuNThMMTggMTFsLTYgNi02LTYgMS40MS0xLjQxTDExIDEzLjE3ek01IDE5aDE0djJINXoiLz48L3N2Zz4=" alt="Download for macOS (Apple Silicon)" /></a>
+  <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/NeighborhoodMatcher-windows-x64-setup.exe"><img src="https://img.shields.io/badge/Download-Windows%20%28x64%29-0969da?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTExIDNoMnYxMC4xN2wzLjU5LTMuNThMMTggMTFsLTYgNi02LTYgMS40MS0xLjQxTDExIDEzLjE3ek01IDE5aDE0djJINXoiLz48L3N2Zz4=" alt="Download for Windows (x64)" /></a>
+  <br />
+  <sub>No developer certificate yet, so the first launch takes one extra click — see <a href="#installing-the-desktop-app">Installing the desktop app</a>.</sub>
+  <br /><br />
   <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"><img src="https://img.shields.io/badge/GitHub-NeighborhoodMatcher-181717?logo=github" alt="Source on GitHub" /></a>
+  <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest"><img src="https://img.shields.io/github/v/release/SustainableUrbanSystemsLab/NeighborhoodMatcher?label=desktop%20app" alt="Latest desktop release" /></a>
   <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml"><img src="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml/badge.svg" alt="Python tests" /></a>
   <a href="https://app.netlify.com/projects/nbhdmatch/deploys"><img src="https://api.netlify.com/api/v1/badges/f2fe942a-24a9-41d3-9ed6-29dac67da9b3/deploy-status" alt="Netlify Status" /></a>
 </p>
@@ -54,7 +62,7 @@ inside an institution.
 | Situation | Use |
 |-----------|-----|
 | Online once, offline later | Open the site once; the footer shows *Available offline on this device* when the whole app is cached. Install it from the browser menu for an app icon. |
-| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). Neither carries a developer certificate, so each system asks once — see [Installing the desktop app](#installing-the-desktop-app). |
+| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): [`NeighborhoodMatcher-darwin-aarch64.dmg`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/NeighborhoodMatcher-darwin-aarch64.dmg) (macOS, Apple Silicon) or [`NeighborhoodMatcher-windows-x64-setup.exe`](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/NeighborhoodMatcher-windows-x64-setup.exe) (Windows, WebView2 included). Neither carries a developer certificate, so each system asks once — see [Installing the desktop app](#installing-the-desktop-app). |
 | Host it inside an institution | Download *nbhdmatch-site-v&lt;version&gt;.zip* from the site's [About page](https://nbhdmatch.netlify.app/about#offline) and serve the folder from any static server (HOSTING.txt inside lists the two settings that matter). |
 
 In every case the runtime, the engine and all assets are local: nothing is
@@ -72,23 +80,16 @@ fetched from a CDN, and no data leaves the machine.
   ```
 
   It puts the app in Applications (replacing an older copy) and opens it.
-- With [Homebrew](https://brew.sh), also without a prompt; later
-  `brew upgrade --cask neighborhoodmatcher`:
-
-  ```bash
-  brew install --cask SustainableUrbanSystemsLab/tap/neighborhoodmatcher
-  ```
-
-  The cask lifts the quarantine flag Homebrew puts on downloads (Homebrew 7
-  dropped `--no-quarantine`), and the
-  [tap](https://github.com/SustainableUrbanSystemsLab/homebrew-tap) follows
-  each release by itself.
 - By hand: open the .dmg, drag the app to Applications and open it from
   there. macOS says it "could not verify" the app: click **Done**, open
   System Settings → Privacy & Security, click **Open Anyway** and confirm.
   Once per copy.
 
 **Windows** — run the installer; SmartScreen: **More info → Run anyway**.
+
+To try changes before they are released, the
+[main-build](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/tag/main-build)
+pre-release has the same files, rebuilt on every push to `main`.
 
 No data handy? Grab the benchmark pair from this repo:
 [`simulated_data/dataset_A100.csv`](simulated_data/dataset_A100.csv) (target) ×
