@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { columnMissingStats, type ColumnMissingStats } from "@/lib/missing";
+import { blockedSentence, type IdentifierVerdict } from "@/lib/identifier-guard";
 import type { ColumnLink, ParsedDataset, PIIWarning } from "@/types";
 
 function MissingBadge({ stats }: { stats: ColumnMissingStats }) {
@@ -26,6 +27,9 @@ interface ColumnLinkerProps {
   supplemental: ParsedDataset;
   links: ColumnLink[];
   piiWarnings: PIIWarning[];
+  /** per-column geographic-identifier verdicts (lib/identifier-guard.ts) */
+  targetVerdicts: (IdentifierVerdict | null)[];
+  suppVerdicts: (IdentifierVerdict | null)[];
   onLinksChange: (links: ColumnLink[]) => void;
 }
 
@@ -34,6 +38,8 @@ export function ColumnLinker({
   supplemental,
   links,
   piiWarnings,
+  targetVerdicts,
+  suppVerdicts,
   onLinksChange,
 }: ColumnLinkerProps) {
   const [manualTarget, setManualTarget] = useState<string>("");
@@ -77,14 +83,21 @@ export function ColumnLinker({
   const linkedTargetIndices = new Set(links.map((l) => l.targetIndex));
   const linkedSupIndices = new Set(links.map((l) => l.supplementalIndex));
 
+  // Identifier columns are not offered for manual linking either — the
+  // guard would only block the link again.
   const unmatchedTarget = target.headers
     .map((h, i) => ({ name: h, index: i }))
-    .filter((h) => !linkedTargetIndices.has(h.index));
+    .filter((h) => !linkedTargetIndices.has(h.index) && !targetVerdicts[h.index]);
 
   const unmatchedSupplemental = supplemental.headers
     .map((h, i) => ({ name: h, index: i }))
-    .filter((h) => !linkedSupIndices.has(h.index));
+    .filter((h) => !linkedSupIndices.has(h.index) && !suppVerdicts[h.index]);
 
+  const hiddenIdentifierColumns =
+    target.headers.filter((_, i) => !linkedTargetIndices.has(i) && targetVerdicts[i]).length +
+    supplemental.headers.filter((_, i) => !linkedSupIndices.has(i) && suppVerdicts[i]).length;
+
+  const blockedLinks = links.filter((l) => l.blocked);
   const hasPIIWarnings = piiWarnings.length > 0;
 
   function getPIIWarning(columnName: string): PIIWarning | undefined {
@@ -125,7 +138,7 @@ export function ColumnLinker({
   }
 
   const activeCount = links.filter((l) => !l.excluded).length;
-  const excludedCount = links.filter((l) => l.excluded).length;
+  const excludedCount = links.filter((l) => l.excluded && !l.blocked).length;
 
   return (
     <div className="space-y-4">
@@ -141,6 +154,35 @@ export function ColumnLinker({
           columns available for re-linking.
         </p>
       </div>
+
+      {blockedLinks.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-800">
+            {blockedLinks.length === 1
+              ? "One shared column is a geographic identifier and cannot be matched on"
+              : `${blockedLinks.length} shared columns are geographic identifiers and cannot be matched on`}
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {blockedLinks.map((l) => (
+              <li
+                key={`blocked-${l.targetIndex}-${l.supplementalIndex}`}
+                className="text-xs text-red-700"
+              >
+                <span className="font-medium">{l.blocked!.column}</span>
+                {l.blocked!.side !== "both" && ` (${l.blocked!.side} file)`} —{" "}
+                {l.blocked!.reason}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-red-700">
+            ZIP codes, census tracts, GEOIDs, coordinates and addresses are
+            never used for matching (HIPAA / PII); there is no override. The
+            columns still pass through to your output unchanged. If one of
+            them is not an identifier, rename it (matched by name) or rescale
+            it (matched by its values) in the source file.
+          </p>
+        </div>
+      )}
 
       {hasPIIWarnings && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -178,7 +220,11 @@ export function ColumnLinker({
               <div
                 key={`${link.targetIndex}-${link.supplementalIndex}`}
                 className={`grid grid-cols-12 items-center px-4 py-2 ${
-                  link.excluded ? "bg-gray-50 opacity-60" : ""
+                  link.blocked
+                    ? "bg-red-50/40"
+                    : link.excluded
+                      ? "bg-gray-50 opacity-60"
+                      : ""
                 }`}
               >
                 <div className="col-span-4 flex flex-wrap items-center gap-2">
@@ -204,19 +250,28 @@ export function ColumnLinker({
                   )}
                 </div>
                 <div className="col-span-2 text-center">
-                  {link.excluded ? (
+                  {link.blocked ? (
+                    <span
+                      className="text-xs font-medium text-red-600"
+                      title={blockedSentence(link.blocked)}
+                    >
+                      Blocked — identifier
+                    </span>
+                  ) : link.excluded ? (
                     <span className="text-xs text-amber-500">Excluded</span>
                   ) : (
                     <span className="text-xs text-green-600">Active</span>
                   )}
                 </div>
                 <div className="col-span-2 flex justify-end gap-2">
-                  <button
-                    onClick={() => toggleExclude(idx)}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800"
-                  >
-                    {link.excluded ? "Include" : "Exclude"}
-                  </button>
+                  {!link.blocked && (
+                    <button
+                      onClick={() => toggleExclude(idx)}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800"
+                    >
+                      {link.excluded ? "Include" : "Exclude"}
+                    </button>
+                  )}
                   <button
                     onClick={() => removeLink(idx)}
                     className="text-xs text-red-500 hover:text-red-700"
@@ -310,12 +365,24 @@ export function ColumnLinker({
               Link
             </button>
           </div>
+          {hiddenIdentifierColumns > 0 && (
+            <p className="mt-2 text-xs text-gray-500">
+              {hiddenIdentifierColumns === 1
+                ? "One identifier column (ZIP, tract, GEOID, coordinates or address) is not offered here — such columns are never matching variables."
+                : `${hiddenIdentifierColumns} identifier columns (ZIP, tract, GEOID, coordinates or address) are not offered here — such columns are never matching variables.`}
+            </p>
+          )}
         </details>
       )}
 
       <div className="flex gap-4 text-xs text-gray-500">
         <span>{activeCount} columns linked</span>
         {excludedCount > 0 && <span>{excludedCount} excluded</span>}
+        {blockedLinks.length > 0 && (
+          <span className="text-red-600">
+            {blockedLinks.length} blocked (identifier)
+          </span>
+        )}
         {piiWarnings.length > 0 && (
           <span className="text-amber-600">
             {piiWarnings.length} PII warnings

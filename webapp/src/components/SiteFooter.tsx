@@ -15,6 +15,8 @@ import {
   TOOL_NAME,
   buildLabel,
 } from "@/lib/about";
+import { useOfflineStatus } from "@/lib/runtime-cache";
+import { isDesktopApp } from "@/lib/platform";
 
 const FOOTER_LINK = "underline decoration-gray-300 underline-offset-2 hover:text-gray-700 dark:decoration-gray-600";
 
@@ -70,6 +72,44 @@ function GitHubMark() {
   );
 }
 
+/**
+ * One line about where this copy runs: the desktop app, a device that has
+ * the full build cached (works without Internet), a first install in
+ * progress, or a newer build waiting for a reload. Nothing when the page has
+ * no service worker (dev build, unsupported browser).
+ */
+function OfflineStatusLine() {
+  const status = useOfflineStatus();
+  if (isDesktopApp()) {
+    return <p>Desktop app — runs entirely on this computer, no Internet needed.</p>;
+  }
+  switch (status.kind) {
+    case "ready":
+      return (
+        <p title="Every file the app needs is stored in this browser; it opens and runs without a connection.">
+          Available offline on this device.
+        </p>
+      );
+    case "installing":
+      return <p>Preparing offline use on this device…</p>;
+    case "update-available":
+      return (
+        <p>
+          A newer version is available.{" "}
+          <button
+            onClick={status.apply}
+            className={`${FOOTER_LINK} text-blue-600 dark:text-blue-400`}
+            title="Reloads the page so the interface and the matching engine switch to the new version together."
+          >
+            Reload to update
+          </button>
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
 export function SiteFooter({ className = "" }: { className?: string }) {
   return (
     <footer
@@ -94,6 +134,7 @@ export function SiteFooter({ className = "" }: { className?: string }) {
         <p>
           <AuthorCredit />
         </p>
+        <OfflineStatusLine />
       </div>
     </footer>
   );

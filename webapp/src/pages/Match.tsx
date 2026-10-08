@@ -25,6 +25,7 @@ import {
   type PyodideStatus,
 } from "@/lib/matching";
 import { detectPII } from "@/lib/pii-detector";
+import { columnVerdicts, guardLinks } from "@/lib/identifier-guard";
 import { StepIndicator } from "@/components/StepIndicator";
 import { AgreementModal } from "@/components/AgreementModal";
 import {
@@ -60,7 +61,7 @@ function formatComparisons(n: number): string {
 function statusLabel(status: PyodideStatus): string {
   switch (status.phase) {
     case "loading-runtime":
-      return "Downloading Python runtime (first-time only)…";
+      return "Loading Python runtime…";
     case "loading-numpy":
       return "Loading numpy…";
     case "loading-matcher":
@@ -129,6 +130,32 @@ export default function Match() {
   // results to a later run.
   useEffect(() => () => terminatePool(), []);
 
+  // Geographic-identifier verdicts per column (name + value shape), once per
+  // dataset: the guard below runs on every link change and must not rescan
+  // the rows each time.
+  const targetVerdicts = useMemo(
+    () => (target ? columnVerdicts(target) : []),
+    [target]
+  );
+  const suppVerdicts = useMemo(
+    () => (supplemental ? columnVerdicts(supplemental) : []),
+    [supplemental]
+  );
+
+  // Every link change passes through the identifier guard, so a ZIP / tract /
+  // GEOID column can never become a matching variable by any route (auto
+  // link, Include toggle, manual link). Blocked links are always excluded.
+  const updateLinks = useCallback(
+    (next: ColumnLink[]) => {
+      if (!target || !supplemental) {
+        setLinks(next);
+        return;
+      }
+      setLinks(guardLinks(next, target, supplemental, targetVerdicts, suppVerdicts));
+    },
+    [target, supplemental, targetVerdicts, suppVerdicts]
+  );
+
   // Auto-links and PII warnings derive from the DATASETS, not from step
   // transitions: recomputing on every entry to the link step would wipe the
   // user's manual links/exclusions after Back→Next or agreement review.
@@ -140,13 +167,27 @@ export default function Match() {
     ]);
     // A restored run already carries its own column selection (including the
     // exclusions that shaped it); re-deriving links here would silently undo
-    // them and reproduce a DIFFERENT run.
+    // them and reproduce a DIFFERENT run. (restore.ts applies the guard.)
     if (restoredRef.current) {
       restoredRef.current = false;
       return;
     }
-    setLinks(findCommonHeaders(target.headers, supplemental.headers));
-  }, [target, supplemental]);
+    setLinks(
+      guardLinks(
+        findCommonHeaders(target.headers, supplemental.headers),
+        target,
+        supplemental,
+        targetVerdicts,
+        suppVerdicts
+      )
+    );
+  }, [target, supplemental, targetVerdicts, suppVerdicts]);
+
+  // Identifier columns kept out of this run — recorded in run_info.csv.
+  const blockedColumns = useMemo(
+    () => links.flatMap((l) => (l.blocked ? [l.blocked] : [])),
+    [links]
+  );
 
   const ambiguousHeaders = useMemo(
     () =>
@@ -394,8 +435,9 @@ export default function Match() {
                 For each row in your <strong>target</strong> dataset, the tool
                 finds the most similar row in the <strong>supplemental</strong>{" "}
                 dataset based on the shared characteristics you choose —
-                linking new information without matching on ZIP code or any
-                other identifier.
+                linking new information without ever matching on ZIP codes,
+                census tract IDs or other geographic identifiers, which the
+                tool refuses to use as matching variables.
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <FileUpload
@@ -454,6 +496,15 @@ export default function Match() {
                   ) are loaded
                   {restored.generatedAt && ` from the run of ${restored.generatedAt}`}
                   .{" "}
+                  {restored.blockedFeatures.length > 0 && (
+                    <span className="font-medium text-amber-800">
+                      This package matched on{" "}
+                      {restored.blockedFeatures.map((f) => `"${f}"`).join(", ")},{" "}
+                      {restored.blockedFeatures.length === 1
+                        ? "which is a geographic identifier and is no longer a permitted matching variable. It is excluded now, so running will differ from the original."
+                        : "which are geographic identifiers and are no longer permitted matching variables. They are excluded now, so running will differ from the original."}{" "}
+                    </span>
+                  )}
                   {restored.unlinked.length > 0 ? (
                     <span className="font-medium text-amber-800">
                       {restored.unlinked.length === 1
@@ -464,9 +515,9 @@ export default function Match() {
                       column is missing. Re-create the link below before
                       running, or the result will differ from the original.
                     </span>
-                  ) : (
+                  ) : restored.blockedFeatures.length === 0 ? (
                     "Matching is deterministic, so running now reproduces that run exactly."
-                  )}
+                  ) : null}
                   {restored.toolVersion &&
                     restored.toolVersion !== MATCHER_VERSION && (
                       <>
@@ -504,7 +555,9 @@ export default function Match() {
                 supplemental={supplemental}
                 links={links}
                 piiWarnings={piiWarnings}
-                onLinksChange={setLinks}
+                targetVerdicts={targetVerdicts}
+                suppVerdicts={suppVerdicts}
+                onLinksChange={updateLinks}
               />
 
               <ThresholdControl threshold={threshold} onChange={setThreshold} />
@@ -626,6 +679,7 @@ export default function Match() {
                 target={target}
                 supplemental={supplemental}
                 links={links.filter((l) => !l.excluded)}
+                blocked={blockedColumns}
                 runDurationMs={runDurationMs}
                 workersUsed={workersUsed}
                 completedAt={completedAt ?? new Date()}

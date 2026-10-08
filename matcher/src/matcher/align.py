@@ -74,10 +74,13 @@ def find_common_headers(headers1, headers2, exclude=None):
     ]
 
 
-def no_shared_columns_error(headers1, headers2):
+def no_shared_columns_error(headers1, headers2, blocked=None):
     """
     Builds the 'No shared columns to match on.' ValueError, enriched with
-    the two hints that solve almost every real occurrence:
+    the hints that solve almost every real occurrence:
+    - `blocked` (identifiers.blocked_links entries): the files DID share
+      columns, but every one of them is a geographic identifier, which can
+      never be a matching variable;
     - shared-except-for-case pairs ('Rent' vs 'rent'): matching is
       case-sensitive by design, but the user should hear WHY nothing linked;
     - a single header containing ';' or tab: the classic sign the file is
@@ -86,6 +89,16 @@ def no_shared_columns_error(headers1, headers2):
     names1 = [normalize_header(h) for h in headers1]
     names2 = [normalize_header(h) for h in headers2]
     hints = []
+
+    if blocked:
+        names = sorted({b["column"] for b in blocked})
+        noun = "column" if len(names) == 1 else "columns"
+        hints.append(
+            f"the only shared {noun} ({', '.join(names)}) "
+            f"{'is a' if len(names) == 1 else 'are'} geographic identifier"
+            f"{'' if len(names) == 1 else 's'} (ZIP / tract / GEOID), which can "
+            "never be matching variables — add shared numeric variables to both files"
+        )
 
     by_lower2 = {n.lower(): n for n in names2 if n}
     case_pairs = [

@@ -1,3 +1,9 @@
+// Direct-identifier column names (names, SSNs, dates of birth, contact
+// details, record numbers) — advisory only: these are not matching
+// variables in any sane run, and the data-use agreement already excludes
+// them. Geographic identifiers (ZIP, census tract, GEOID, coordinates,
+// address) are HARD-BLOCKED instead — see lib/identifier-guard.ts.
+
 import type { PIIWarning } from "@/types";
 
 const PII_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
@@ -6,14 +12,10 @@ const PII_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\bname\b/i, reason: "May contain personal names" },
   { pattern: /\bssn\b/i, reason: "May contain Social Security Numbers" },
   { pattern: /\bdob\b|\bbirth/i, reason: "May contain dates of birth" },
-  { pattern: /\baddress\b/i, reason: "May contain street addresses" },
   { pattern: /\bphone\b/i, reason: "May contain phone numbers" },
   { pattern: /\bemail\b/i, reason: "May contain email addresses" },
-  { pattern: /\bzip\b/i, reason: "May contain ZIP codes" },
   { pattern: /\bpatient\b/i, reason: "May contain patient identifiers" },
   { pattern: /\bmrn\b/i, reason: "May contain medical record numbers" },
-  { pattern: /\bgeoid\b/i, reason: "May contain geographic identifiers" },
-  { pattern: /\btract\b/i, reason: "May contain census tract IDs" },
 ];
 
 export function detectPII(

@@ -18,6 +18,23 @@ export interface ColumnLink {
   targetIndex: number;
   supplementalIndex: number;
   excluded: boolean;
+  /**
+   * Set when the link touches a geographic identifier (ZIP, census tract,
+   * GEOID, coordinates, address) on either side. Such a link is always
+   * `excluded` and cannot be re-included — see lib/identifier-guard.ts.
+   */
+  blocked?: IdentifierBlock;
+}
+
+export type IdentifierKind = "zip" | "tract" | "geoid" | "coordinate" | "address";
+
+export interface IdentifierBlock {
+  kind: IdentifierKind;
+  side: "target" | "supplemental" | "both";
+  /** the offending header as written in its file */
+  column: string;
+  /** e.g. "census tract identifiers (by column name)" */
+  reason: string;
 }
 
 export interface PIIWarning {

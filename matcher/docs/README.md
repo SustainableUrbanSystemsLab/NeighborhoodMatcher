@@ -22,6 +22,7 @@ by an in-browser frontend (Pyodide-loaded `web_api`).
   - `pipeline.py` — file-based entry point (`coordinator`).
   - `web_api.py` — in-memory entry point used by the browser frontend (loaded via Pyodide by [`webapp/`](../../webapp/)).
   - `io.py`, `align.py`, `standardize.py`, `distance.py`, `merge.py` — stages.
+  - `identifiers.py` — the geographic-identifier guard (ZIP, tract, GEOID, … never match).
   - `signals.py` — match-quality signals. See [signals/](signals/).
 - `tests/` — pytest suite. Mirror of the package layout; see [testing.md](testing.md).
 - `analysis/` — researcher-facing scripts (e.g., dataset perturbation).

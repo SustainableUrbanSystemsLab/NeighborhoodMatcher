@@ -28,7 +28,15 @@ and missing-data flags.
 
 Privacy is a design constraint: the search is deliberately brute-force (no
 spatial indexes), and all matching runs client-side in your browser — data
-never leaves your machine, even on the hosted site.
+never leaves your machine, even on the hosted site. **ZIP codes, census tract
+IDs and other geographic identifiers are never matching variables**: columns
+named or shaped like them are blocked, with no override, in the web app and
+the Python engine alike (they still pass through to the output).
+
+**No Internet needed.** The site serves its own Python runtime and keeps
+working offline after one visit; a [desktop app](#use-it-without-internet)
+covers machines that never go online, and a zip of the site can be hosted
+inside an institution.
 
 ## Using it
 
@@ -41,11 +49,75 @@ never leaves your machine, even on the hosted site.
    columns.
 3. Review the per-row diagnostics and download the results zip.
 
+## Use it without Internet
+
+| Situation | Use |
+|-----------|-----|
+| Online once, offline later | Open the site once; the footer shows *Available offline on this device* when the whole app is cached. Install it from the browser menu for an app icon. |
+| A computer that never goes online | The desktop app from the [latest release](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest): `NeighborhoodMatcher-darwin-aarch64.dmg` (macOS, Apple Silicon) or `NeighborhoodMatcher-windows-x64-setup.exe` (Windows, WebView2 included). Neither carries a developer certificate, so each system asks once — see [Installing the desktop app](#installing-the-desktop-app). |
+| Host it inside an institution | Download *nbhdmatch-site-v&lt;version&gt;.zip* from the site's [About page](https://nbhdmatch.netlify.app/about#offline) and serve the folder from any static server (HOSTING.txt inside lists the two settings that matter). |
+
+In every case the runtime, the engine and all assets are local: nothing is
+fetched from a CDN, and no data leaves the machine.
+
+### Installing the desktop app
+
+**macOS (Apple Silicon)** — one of:
+
+- From Terminal, with no security prompt. A download through curl is not
+  quarantined, so macOS does not vet the app on first launch:
+
+  ```bash
+  curl -fsSL https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/latest/download/install-macos.sh | sh
+  ```
+
+  It puts the app in Applications (replacing an older copy) and opens it.
+- With [Homebrew](https://brew.sh), also without a prompt; later
+  `brew upgrade --cask neighborhoodmatcher`:
+
+  ```bash
+  brew install --cask SustainableUrbanSystemsLab/tap/neighborhoodmatcher
+  ```
+
+  The cask lifts the quarantine flag Homebrew puts on downloads (Homebrew 7
+  dropped `--no-quarantine`), and the
+  [tap](https://github.com/SustainableUrbanSystemsLab/homebrew-tap) follows
+  each release by itself.
+- By hand: open the .dmg, drag the app to Applications and open it from
+  there. macOS says it "could not verify" the app: click **Done**, open
+  System Settings → Privacy & Security, click **Open Anyway** and confirm.
+  Once per copy.
+
+**Windows** — run the installer; SmartScreen: **More info → Run anyway**.
+
 No data handy? Grab the benchmark pair from this repo:
 [`simulated_data/dataset_A100.csv`](simulated_data/dataset_A100.csv) (target) ×
 [`simulated_data/dataset_B_tracts.csv`](simulated_data/dataset_B_tracts.csv)
 (supplemental), answer key in
 [`simulated_data/truth_A100.csv`](simulated_data/truth_A100.csv).
+
+<details>
+<summary><strong>Build everything with one command</strong> (website, self-host zip, desktop app)</summary>
+
+```bash
+./build.sh              # macOS, Linux
+```
+
+```bat
+build.bat               :: Windows
+```
+
+Both run the same steps (`scripts/build-all.mjs`): install dependencies,
+build the website and its self-host zip, check that the build needs no
+Internet, and build the desktop app for this computer. The outputs land in
+`release/`: `nbhdmatch-site-v<version>.zip`, plus the `.dmg` on macOS or the
+`-setup.exe` installer on Windows. `--web-only` skips the desktop app;
+`--test` also runs the Python tests, the benchmark, the Playwright tests and
+the built app's self-test; `--help` lists the prerequisites. You need Node.js
+20+, which provides pnpm automatically, plus Rust for the desktop app and uv
+for `--test`. On Linux the desktop app is skipped.
+
+</details>
 
 <details>
 <summary><strong>Run the webapp locally</strong> (Node + pnpm)</summary>
@@ -59,8 +131,17 @@ pnpm dev          # http://localhost:5173
 The dev/build step copies the Python matcher sources from
 [`matcher/`](matcher/) into `webapp/public/` (see
 `webapp/scripts/sync-assets.mjs`), so the app always runs the same code the
-tests cover. Matching runs in a pool of Pyodide Web Workers sized to the
-job — all CPU cores but one for anything non-trivial.
+tests cover, together with the Pyodide runtime and the numpy wheel
+(checksum-verified; the only build-time download). Matching runs in a pool of
+Pyodide Web Workers sized to the job — all CPU cores but one for anything
+non-trivial.
+
+```bash
+pnpm build                 # dist/ + dist/offline/nbhdmatch-site-v<version>.zip
+pnpm run check:offline     # fails if the build could need the Internet
+pnpm test:e2e              # Playwright: offline run, no foreign requests, identifier guard, desktop CSP
+pnpm desktop:build         # desktop app (needs Rust; CI builds the installers)
+```
 
 </details>
 
@@ -97,7 +178,7 @@ Input format, missing-value handling, and column-linking rules:
 
 ```bash
 cd matcher
-uv run --project . pytest                                        # 340 tests
+uv run --project . pytest                                        # 460 tests
 uv run --project . python analysis/benchmark_simulated.py --check # scored vs ground truth
 ```
 
@@ -152,7 +233,8 @@ all show it, so two runs can always be told apart.
 
 Bump with `python scripts/bump_version.py patch|minor|major`, which rewrites
 every declaration (`matcher/about.py`, `webapp/src/lib/about.ts`,
-`webapp/package.json`, both `pyproject.toml`) and keeps them in agreement;
+`webapp/package.json`, both `pyproject.toml`, `webapp/src-tauri/Cargo.toml`)
+and keeps them in agreement;
 `--check` verifies. Add a line to `CHANGELOG.md`. CI fails a pull request that
 changes `matcher/src`, `webapp/src` or `webapp/public/matcher` without a bump.
 
@@ -161,7 +243,7 @@ changes `matcher/src`, `webapp/src` or `webapp/public/matcher` without a bump.
 | Folder | What it is |
 |--------|------------|
 | [`matcher/`](matcher/) | The matcher: matching core, quality signals, missing-data-aware distances, explanatory-PDF pipeline, and the Pyodide-loadable `web_api` the frontend uses. Docs in [`matcher/docs/`](matcher/docs/). |
-| [`webapp/`](webapp/) | React + Vite webapp running the matcher in the browser via a pool of Pyodide workers. Deployed to [nbhdmatch.netlify.app](https://nbhdmatch.netlify.app/). |
+| [`webapp/`](webapp/) | React + Vite webapp running the matcher in the browser via a pool of Pyodide workers, offline-capable. Deployed to [nbhdmatch.netlify.app](https://nbhdmatch.netlify.app/). `webapp/src-tauri/` wraps the same build as the desktop app. |
 | [`simulated_data/`](simulated_data/) | Benchmark: fake participants generated from real ACS 2010–2014 tracts with known ground truth. Drives the regression floors in CI. |
 
 <details>
