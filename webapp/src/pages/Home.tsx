@@ -69,6 +69,16 @@ export default function Home() {
             client-side.
           </p>
         </div>
+        <p className="mt-3 text-xs text-gray-500">
+          Works without Internet: after this visit the app keeps running
+          offline on this device, and it can be installed from the browser
+          menu. For a machine with no web access at all, or to host a copy
+          inside your institution, see{" "}
+          <Link to="/about#offline" className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">
+            Use it without Internet
+          </Link>
+          .
+        </p>
 
         <SiteFooter />
       </div>

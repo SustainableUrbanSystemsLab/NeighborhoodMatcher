@@ -7,6 +7,7 @@ from .ablation import ablation_sample_indices, ablation_suite
 from .about import TOOL_NAME, VERSION, authors_line, provenance_rows
 from .io import MISSING_TOKENS, load_csv, clean_val, drop_label_row, dump_csv
 from .align import find_common_headers, header_warnings, no_shared_columns_error
+from .identifiers import blocked_links, blocked_summary, blocked_warning, without_blocked
 from .standardize import dual_standardize, scale_compatibility_warnings
 from .distance import match_all, validate_threshold, validate_max_distance, winner_observed_stats
 from .merge import row_merge, new_header
@@ -170,10 +171,18 @@ skip_label_row=True):
 
     # Align columns
     common = find_common_headers(h1, h2, exclude)
+
+    # ZIP codes, census tracts and other geographic identifiers are never
+    # matching variables (HIPAA / PII) — dropped here, loudly, whatever the
+    # files share. They still pass through to the output like any other
+    # non-matching column. See identifiers.py.
+    blocked = blocked_links(common, h1, h2, rs1, rs2)
+    identifier_notes = [blocked_warning(b) for b in blocked]
+    common = without_blocked(common, blocked)
     feature_names = [c["headerName"] for c in common]
 
     if not common:
-        raise no_shared_columns_error(h1, h2)
+        raise no_shared_columns_error(h1, h2, blocked=blocked)
     if not rs1:
         raise ValueError(f"{target}: target dataset has no rows.")
     if not rs2:
@@ -190,7 +199,7 @@ skip_label_row=True):
     # Dataset-level sanity checks before pooling the two files
     warnings = scale_compatibility_warnings(filtered_rs1, filtered_rs2, feature_names)
     warnings += header_warnings(h1, h2, feature_names)
-    warnings = label_notes + warnings
+    warnings = label_notes + identifier_notes + warnings
 
     # Per-variable input diagnostics (missingness, definition-shift check) —
     # computed on raw parsed values, before standardization can absorb a
@@ -407,6 +416,7 @@ skip_label_row=True):
             ("supplemental_rows", len(rs2)),
             ("label_rows_skipped",
              "; ".join(n.split(" looks like")[0] for n in label_notes) or "none"),
+            ("identifier_columns_blocked", blocked_summary(blocked)),
             ("matching_variables", "; ".join(feature_names)),
             ("nndr_threshold", threshold),
             ("max_distance_cutoff", "off" if max_distance is None else max_distance),

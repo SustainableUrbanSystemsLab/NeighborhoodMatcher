@@ -14,6 +14,7 @@
 import JSZip from "jszip";
 import Papa from "papaparse";
 import { parseCSVFile } from "@/lib/csv";
+import { columnVerdicts, guardLinks } from "@/lib/identifier-guard";
 import { findCommonHeaders } from "@/lib/matching";
 import type { ColumnLink, ParsedDataset } from "@/types";
 
@@ -34,6 +35,12 @@ export interface RestoredRun {
    * a column is missing. Non-empty means running will not reproduce the run.
    */
   unlinked: string[];
+  /**
+   * Matching variables the package DID use that are geographic identifiers
+   * (ZIP, census tract, GEOID, …) — no longer permitted, so they come back
+   * blocked and the run will not reproduce exactly.
+   */
+  blockedFeatures: string[];
   threshold: number;
   maxDistance: number | null;
   minConfidence: "medium" | "high" | null;
@@ -185,19 +192,33 @@ export async function restoreFromZip(file: File): Promise<RestoredRun> {
     .split(";")
     .map((name: string) => name.trim())
     .filter(Boolean);
-  const { links, unlinked } = rebuildLinks(
+  const rebuilt = rebuildLinks(
     target,
     supplemental,
     features,
     parseColumnLinks(info.get("column_links"))
   );
+  // Whatever an older package recorded, identifier columns cannot be
+  // matching variables any more: apply the guard and name what it removed.
+  const links = guardLinks(
+    rebuilt.links,
+    target,
+    supplemental,
+    columnVerdicts(target),
+    columnVerdicts(supplemental)
+  );
+  const stillActive = new Set(links.filter((l) => !l.excluded).map((l) => l.headerName));
+  const blockedFeatures = rebuilt.links
+    .filter((l) => !l.excluded && !stillActive.has(l.headerName))
+    .map((l) => l.headerName);
 
   return {
     target,
     supplemental,
     features,
     links,
-    unlinked,
+    unlinked: rebuilt.unlinked,
+    blockedFeatures,
     threshold: num(info.get("nndr_threshold")) ?? 0.8,
     maxDistance: rawCutoff.toLowerCase() === "off" ? null : num(rawCutoff),
     minConfidence:

@@ -28,10 +28,15 @@ v2 → v3 redesign.
 - **No external audit of the privacy posture.** The methodology has not been
   reviewed by anyone outside the project for HIPAA or re-identification
   risk. We believe the issue is solved; that belief has not been tested.
-- **The PII soft-warning is bypassable.** Nothing prevents a user from
-  including census tract ID, location, or other re-identifying columns in
-  the matching feature set. The current safeguard is a soft warning, which
-  is easy to click through.
+- ~~**The PII soft-warning is bypassable.**~~ **Resolved (September 2026,
+  0.9.0).** Geographic identifiers — ZIP, census tract, GEOID/FIPS,
+  coordinates, address, detected by column name and by value shape — are
+  hard-blocked from the matching feature set in the engine
+  (`matcher/identifiers.py`: auto links dropped with a warning, explicit
+  links refused) and in the webapp (`identifier-guard.ts`), with no override.
+  Direct-identifier names (name, SSN, DOB, …) are still only an advisory
+  warning; the value-shape rules (≥ 90 % of ≥ 20 observed cells) are
+  heuristics and belong in the external audit below.
 - **Performance vs. privacy trade-off is unsurfaced.** The performance
   ceiling discussed below (70k × 70k under 2 minutes) directly conflicts
   with the privacy-driven choice to stay brute-force. Any optimisation work
@@ -145,11 +150,10 @@ collaborators; ordering after that is judgment.
 1. **External HIPAA / ethics audit of the matching methodology.** The v1 → v2/v3
    redesign was driven by privacy concerns; we believe the issue is solved.
    That belief needs an outside reviewer to be defensible.
-2. **Harden the PII safeguard.** Move beyond a soft warning. Options: a
-   curated block-list of column-name patterns (`tract`, `lat`, `lon`,
-   `geoid`, `address`, `zip`, …) that requires an explicit override; or a
-   distribution-based check that flags columns with row-uniqueness above a
-   threshold. Pair with the ethics audit.
+2. ~~**Harden the PII safeguard.**~~ **Done for geographic identifiers
+   (0.9.0)** — name + value-shape block-list, no override, engine-enforced
+   (see Issues). Open: whether direct-identifier names should be blocked
+   too, and review of the value-shape thresholds as part of the audit.
 3. **Performance pass — target ~70k × 70k in under 2 minutes.** Vectorise
    the distance matrix; vectorise per-row signals where possible; profile
    the MNN reverse search and the histogram step. **Constraint:** stay
@@ -209,6 +213,37 @@ collaborators; ordering after that is judgment.
     deliberately while feature work was stacked on an open PR; a
     CLI-vs-web parity test (`tests/test_min_confidence.py`) pins them
     together. Fold into one helper once the August 2026 PRs land.
+
+### Offline / desktop (0.9.0 follow-ups)
+
+- **Releasing.** Bump with `python scripts/bump_version.py patch|minor|major`,
+  merge to `main`, then push the tag `v<version>` from `main`.
+  `.github/workflows/desktop.yml` builds and tests both installers and only
+  then publishes the GitHub Release, marked Latest — the address behind
+  every `…/releases/latest/download/<name>` link (README buttons, About
+  page, `scripts/install-macos.sh`). Each push to `main` also refreshes the
+  `main-build` pre-release with the same files.
+- **Homebrew tap.** A cask with a self-testing update workflow is prepared
+  for `SustainableUrbanSystemsLab/homebrew-tap`, but that repository is not
+  published yet, so the README, the About page and the release notes in
+  `desktop.yml` leave Homebrew out. Once it exists, add the `brew install`
+  line back to all three (optional: a `HOMEBREW_TAP_TOKEN` secret makes the
+  tap update right after each release instead of within six hours).
+- **Code signing.** The desktop installers carry no developer certificate.
+  The macOS app is ad-hoc signed as a whole (`signingIdentity: "-"` in
+  `tauri.conf.json`; `scripts/build-all.mjs` fails the build otherwise —
+  signed only by the linker, a downloaded copy is "damaged" and cannot be
+  opened), so Gatekeeper blocks only its first launch (Privacy & Security →
+  Open Anyway); Windows shows SmartScreen. Removing the prompts needs an
+  Apple Developer ID (plus notarization) and a Windows certificate as
+  repository secrets, passed to `tauri build` as its signing environment
+  variables in `.github/workflows/desktop.yml`
+  (https://v2.tauri.app/distribute/sign/).
+- **More platforms.** Linux (`.AppImage`/`.deb`) and Intel-mac builds are one
+  matrix entry each in `desktop.yml`.
+- **Pyodide upgrades** must keep `sync-assets.mjs`'s wheel list complete
+  (numpy only today); `pnpm run check:offline` fails if a needed file is
+  missing from the build.
 
 ### Lower / longer term
 

@@ -3,10 +3,12 @@
 // All work is client-side; the zip blob is handed to the browser for download.
 
 import JSZip from "jszip";
+import { saveFile } from "@/lib/platform";
 import Papa from "papaparse";
 import type {
   AblationReport,
   ColumnLink,
+  IdentifierBlock,
   MatchOutput,
   ParsedDataset,
 } from "@/types";
@@ -40,7 +42,9 @@ export async function buildResultsZip(
   links: ColumnLink[],
   ablation: AblationReport | null = null,
   /** when the package was generated; injected for deterministic tests */
-  generatedAt: Date = new Date()
+  generatedAt: Date = new Date(),
+  /** shared identifier columns kept out of the run (recorded in run_info) */
+  blocked: IdentifierBlock[] = []
 ): Promise<Blob> {
   const zip = new JSZip();
 
@@ -50,7 +54,7 @@ export async function buildResultsZip(
   zip.file(
     "run_info.csv",
     withBom(
-      buildRunInfoCsv(output, target, supplemental, links, generatedAt, ablation)
+      buildRunInfoCsv(output, target, supplemental, links, generatedAt, ablation, blocked)
     )
   );
 
@@ -97,12 +101,10 @@ export async function buildResultsZip(
   });
 }
 
-export function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  // Release the object URL on the next tick so the click completes first.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+/**
+ * Hands the package to the user: a browser download on the web, a file in
+ * the Downloads folder in the desktop app (returns its path, null on the web).
+ */
+export function triggerDownload(blob: Blob, filename: string): Promise<string | null> {
+  return saveFile(blob, filename);
 }

@@ -27,6 +27,12 @@ from .ablation import (
     variant_metrics,
 )
 from .align import find_common_headers, header_warnings, no_shared_columns_error
+from .identifiers import (
+    IdentifierColumnError,
+    blocked_links,
+    blocked_warning,
+    without_blocked,
+)
 from .standardize import dual_standardize, scale_compatibility_warnings
 from .distance import (
     MISSING_PENALTY,
@@ -125,7 +131,11 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
     worker running this on the same inputs gets identical arrays.
 
     NOTE: `exclude` applies only when `links is None` (auto-detection);
-    explicit links are authoritative and bypass it.
+    explicit links are authoritative and bypass it — except for geographic
+    identifiers (ZIP, tract, GEOID, ...), which nothing can turn into a
+    matching variable: auto-detected ones are dropped with a warning,
+    explicitly requested ones raise IdentifierColumnError (the webapp never
+    sends them, so reaching that means an old or tampered client).
     """
     if exclude is None:
         exclude = []
@@ -133,8 +143,12 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
     h1, rs1, lines1 = _parse_csv_string(target_csv, "target file")
     h2, rs2, lines2 = _parse_csv_string(supplemental_csv, "supplemental file")
 
+    identifier_notes = []
     if links is None:
         common = find_common_headers(h1, h2, exclude)
+        blocked = blocked_links(common, h1, h2, rs1, rs2)
+        identifier_notes = [blocked_warning(b) for b in blocked]
+        common = without_blocked(common, blocked)
     else:
         _validate_links(list(links), len(h1), len(h2))
         # Normalize dict-like entries coming from JS.
@@ -146,10 +160,13 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
             }
             for link in links
         ]
+        blocked = blocked_links(common, h1, h2, rs1, rs2)
+        if blocked:
+            raise IdentifierColumnError(blocked)
     feature_names = [c["headerName"] for c in common]
 
     if not common:
-        raise no_shared_columns_error(h1, h2)
+        raise no_shared_columns_error(h1, h2, blocked=blocked)
     if not rs1:
         raise ValueError("Target dataset has no rows.")
     if not rs2:
@@ -171,6 +188,7 @@ def _prepare(target_csv, supplemental_csv, links, exclude):
     # systematic between-file offset.
     variables = variable_report(filtered_rs1, filtered_rs2, feature_names)
     warnings += variable_warnings(variables)
+    warnings = identifier_notes + warnings
 
     std_rows_1, std_rows_2 = dual_standardize(filtered_rs1, filtered_rs2)
 
