@@ -69,7 +69,10 @@ All design choices should serve honest, transparent reporting — not optimistic
 
 ### Per Feature Match Contribution by Measuring Degraded Match Quality through Systematic Ablation Methodology
 
-**Status:** Tabled 2026-04-18. Design captured; implementation deferred to a future software revision.
+**Status:** Implemented August 2026 as the harm-detection inverse (flag
+variables whose removal *improves* run quality) — see
+[`../signals/ablation.md`](../signals/ablation.md) and `matcher/ablation.py`.
+Original design notes kept below for the record.
 
 **Motivation.** The existing per-row feature contribution signal (§5b) measures how much each feature contributed to the **distance** of a specific match. A complementary question — unaddressed by current signals — is how much each feature contributed to the **selection** of that match over alternatives.
 

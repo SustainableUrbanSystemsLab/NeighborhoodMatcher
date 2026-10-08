@@ -5,19 +5,21 @@
 /// <reference lib="webworker" />
 
 import { loadPyodide, type PyodideInterface } from "pyodide";
-import type { MatchOutput } from "@/types";
+import type { AblationReport, MatchOutput } from "@/types";
 
 const PYODIDE_VERSION = "0.29.3";
 const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 
 const MATCHER_MODULES = [
   "__init__",
+  "about",
   "io",
   "align",
   "standardize",
   "distance",
   "merge",
   "signals",
+  "ablation",
   "pipeline",
   "web_api",
 ];
@@ -34,6 +36,10 @@ export interface MatchRequest {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** optional match-rejection cutoff in per-feature z-units; null = off */
+  maxDistance: number | null;
+  /** optional minimum-confidence reporting filter; null = off */
+  minConfidence: "medium" | "high" | null;
 }
 
 // One slice of target rows, matched against the full supplemental set.
@@ -45,6 +51,10 @@ export interface MatchShardRequest {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** carried by the shared payload spread but ignored here — the cutoff and
+   *  the confidence filter are applied at assembly, so shards stay agnostic */
+  maxDistance?: number | null;
+  minConfidence?: "medium" | "high" | null;
   rowLo: number;
   rowHi: number;
 }
@@ -57,7 +67,40 @@ export interface AssembleRequest {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** optional match-rejection cutoff in per-feature z-units; null = off */
+  maxDistance: number | null;
+  /** optional minimum-confidence reporting filter; null = off */
+  minConfidence: "medium" | "high" | null;
   shards: ShardPayload[];
+}
+
+// One leave-one-variable-out matching variant (matcher.web_api.
+// ablation_variant). The pool runs d+1 of these across its workers; every
+// worker derives the same deterministic target sample from the data shape.
+export interface AblationVariantRequest {
+  type: "ablation_variant";
+  targetCsv: string;
+  supplementalCsv: string;
+  links: LinkPayload[];
+  threshold: number;
+  /** feature index to leave out; null = baseline (all features) */
+  dropIndex: number | null;
+}
+
+// Merge ablation_variant payloads into the AblationReport. Pure Python
+// function — no CSVs, no matching; runs on any ready worker.
+export interface AssembleAblationRequest {
+  type: "assemble_ablation";
+  variants: AblationVariantPayload[];
+  featureNames: string[];
+  threshold: number;
+}
+
+// Opaque to TS beyond ordering needs; produced by web_api.ablation_variant
+// (plain JSON — safe to structured-clone between workers).
+export interface AblationVariantPayload {
+  drop_index: number | null;
+  [key: string]: unknown;
 }
 
 // Opaque to TS beyond what the pool needs for ordering; produced by
@@ -76,7 +119,9 @@ export type WorkerRequest =
   | InitRequest
   | MatchRequest
   | MatchShardRequest
-  | AssembleRequest;
+  | AssembleRequest
+  | AblationVariantRequest
+  | AssembleAblationRequest;
 
 export type StatusPhase =
   | "loading-runtime"
@@ -105,6 +150,16 @@ export interface ShardResultMessage {
   payload: ShardPayload;
 }
 
+export interface AblationVariantResultMessage {
+  type: "ablation_variant_result";
+  payload: AblationVariantPayload;
+}
+
+export interface AblationResultMessage {
+  type: "ablation_result";
+  payload: AblationReport;
+}
+
 export interface ErrorMessage {
   type: "error";
   message: string;
@@ -115,6 +170,8 @@ export type WorkerResponse =
   | ProgressMessage
   | ResultMessage
   | ShardResultMessage
+  | AblationVariantResultMessage
+  | AblationResultMessage
   | ErrorMessage;
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -165,7 +222,10 @@ async function initInner(): Promise<void> {
 import sys
 if '/' not in sys.path:
     sys.path.insert(0, '/')
-from matcher.web_api import coordinate_in_memory, match_shard, assemble_results
+from matcher.web_api import (
+    coordinate_in_memory, match_shard, assemble_results,
+    ablation_variant, assemble_ablation,
+)
 `);
 
     send({ type: "status", phase: "ready" });
@@ -182,6 +242,11 @@ async function runMatch(req: MatchRequest): Promise<void> {
   pyodide.globals.set("supp_csv", req.supplementalCsv);
   pyodide.globals.set("links_json", JSON.stringify(req.links));
   pyodide.globals.set("threshold", req.threshold);
+  // Numeric sentinel: -1 = disabled. Avoids JS null → Python conversion
+  // ambiguity across Pyodide versions. String sentinel "" for the
+  // confidence filter, same reasoning.
+  pyodide.globals.set("max_distance", req.maxDistance ?? -1);
+  pyodide.globals.set("min_confidence", req.minConfidence ?? "");
   pyodide.globals.set("progress_cb", (pct: number) => {
     send({ type: "progress", pct });
   });
@@ -194,6 +259,8 @@ _result = coordinate_in_memory(
     target_csv, supp_csv,
     links=_links, threshold=threshold,
     progress_cb=progress_cb,
+    max_distance=(max_distance if max_distance > 0 else None),
+    min_confidence=(min_confidence or None),
 )
 _result
 `);
@@ -267,6 +334,8 @@ async function runAssemble(req: AssembleRequest): Promise<void> {
   pyodide.globals.set("supp_csv", req.supplementalCsv);
   pyodide.globals.set("links_json", JSON.stringify(req.links));
   pyodide.globals.set("threshold", req.threshold);
+  pyodide.globals.set("max_distance", req.maxDistance ?? -1);
+  pyodide.globals.set("min_confidence", req.minConfidence ?? "");
   pyodide.globals.set("shards_js", req.shards);
 
   try {
@@ -277,6 +346,8 @@ _shards = shards_js.to_py()
 _result = assemble_results(
     target_csv, supp_csv, _shards,
     links=_links, threshold=threshold,
+    max_distance=(max_distance if max_distance > 0 else None),
+    min_confidence=(min_confidence or None),
 )
 _result
 `);
@@ -296,6 +367,77 @@ _result
   }
 }
 
+async function runAblationVariant(req: AblationVariantRequest): Promise<void> {
+  await init();
+  if (!pyodide) throw new Error("Pyodide not initialized.");
+
+  send({ type: "status", phase: "running" });
+
+  pyodide.globals.set("target_csv", req.targetCsv);
+  pyodide.globals.set("supp_csv", req.supplementalCsv);
+  pyodide.globals.set("links_json", JSON.stringify(req.links));
+  pyodide.globals.set("threshold", req.threshold);
+  // Numeric sentinel: -1 = baseline (no column dropped), mirroring the
+  // max_distance convention.
+  pyodide.globals.set("drop_index", req.dropIndex ?? -1);
+
+  try {
+    const pyResult = pyodide.runPython(`
+import json
+_links = json.loads(links_json)
+_variant = ablation_variant(
+    target_csv, supp_csv,
+    links=_links, threshold=threshold,
+    drop_index=(drop_index if drop_index >= 0 else None),
+)
+_variant
+`);
+    const jsVariant = pyResult.toJs({
+      dict_converter: Object.fromEntries,
+      create_pyproxies: false,
+    }) as AblationVariantPayload;
+    if (pyResult && typeof pyResult.destroy === "function") pyResult.destroy();
+
+    send({ type: "ablation_variant_result", payload: jsVariant });
+  } finally {
+    pyodide.globals.set("target_csv", "");
+    pyodide.globals.set("supp_csv", "");
+    pyodide.globals.set("links_json", "");
+    pyodide.runPython("_variant = None");
+  }
+}
+
+async function runAssembleAblation(req: AssembleAblationRequest): Promise<void> {
+  await init();
+  if (!pyodide) throw new Error("Pyodide not initialized.");
+
+  pyodide.globals.set("variants_js", req.variants);
+  pyodide.globals.set("feature_names_json", JSON.stringify(req.featureNames));
+  pyodide.globals.set("threshold", req.threshold);
+
+  try {
+    const pyResult = pyodide.runPython(`
+import json
+_variants = variants_js.to_py()
+_report = assemble_ablation(
+    _variants, json.loads(feature_names_json), threshold=threshold,
+)
+_report
+`);
+    const jsReport = pyResult.toJs({
+      dict_converter: Object.fromEntries,
+      create_pyproxies: false,
+    }) as AblationReport;
+    if (pyResult && typeof pyResult.destroy === "function") pyResult.destroy();
+
+    send({ type: "ablation_result", payload: jsReport });
+  } finally {
+    pyodide.globals.set("variants_js", null);
+    pyodide.globals.set("feature_names_json", "");
+    pyodide.runPython("_report = None; _variants = None");
+  }
+}
+
 ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const msg = event.data;
   try {
@@ -307,11 +449,26 @@ ctx.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       await runShard(msg);
     } else if (msg.type === "assemble") {
       await runAssemble(msg);
+    } else if (msg.type === "ablation_variant") {
+      await runAblationVariant(msg);
+    } else if (msg.type === "assemble_ablation") {
+      await runAssembleAblation(msg);
     }
   } catch (err) {
-    send({
-      type: "error",
-      message: err instanceof Error ? err.message : String(err),
-    });
+    send({ type: "error", message: userFacingMessage(err) });
   }
 };
+
+/**
+ * Pyodide's PythonError.message is the whole Python traceback; the sentence
+ * the user needs ("target file: line 2, column 'pctPoor': cannot parse …")
+ * is its last line. Show that, keep the traceback in the console.
+ */
+function userFacingMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (!raw.includes("Traceback (most recent call last)")) return raw;
+  console.error(raw);
+  const lines = raw.trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const last = lines[lines.length - 1] ?? raw;
+  return last.replace(/^\w+(?:Error|Exception):\s*/, "");
+}

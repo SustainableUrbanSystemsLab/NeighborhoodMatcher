@@ -3,7 +3,63 @@
 import Papa from "papaparse";
 import type { ParsedDataset } from "@/types";
 
-export function parseCSVFile(file: File): Promise<ParsedDataset> {
+// A second header / label row — NDA and ABCD exports put variable
+// descriptions on line 2 — is text where the rest of the column is numbers.
+// Mirrors matcher/io.py (looks_like_label_row); keep the rule and the
+// constants in sync (pinned by matcher/tests/test_label_row.py).
+const LABEL_ROW_NUMERIC_SHARE = 0.8;
+const LABEL_ROW_SAMPLE = 200;
+const MISSING_TOKENS = new Set(["", "na", "n/a", "null", "none", "-", ".", "nan", "#n/a"]);
+
+function isObserved(cell: string): boolean {
+  return !MISSING_TOKENS.has(cell.trim().toLowerCase());
+}
+
+function isNumber(cell: string): boolean {
+  const s = cell.replace(/[,$]/g, "").trim();
+  if (!s || MISSING_TOKENS.has(s.toLowerCase())) return false;
+  return Number.isFinite(Number(s));
+}
+
+/**
+ * True when `row` reads as a second header or label row rather than data:
+ * it repeats a column name, or it holds text (not a number, not a missing
+ * token) in a column that is numeric in the rows that follow, and holds no
+ * number anywhere. A row with any numeric cell is data.
+ */
+export function looksLikeLabelRow(
+  headers: string[],
+  row: string[],
+  otherRows: string[][]
+): boolean {
+  const names = headers.map((h) => h.trim().toLowerCase());
+  const cells = row.map((c) => c.trim());
+  if (cells.some((c, j) => c !== "" && !!names[j] && c.toLowerCase() === names[j])) {
+    return true;
+  }
+  const observed = cells
+    .map((c, j) => [j, c] as const)
+    .filter(([, c]) => isObserved(c));
+  if (observed.length === 0 || observed.some(([, c]) => isNumber(c))) return false;
+  const sample = otherRows.slice(0, LABEL_ROW_SAMPLE);
+  for (const [j] of observed) {
+    const col = sample.map((r) => r[j] ?? "").filter(isObserved);
+    if (col.length > 0 && col.filter(isNumber).length / col.length >= LABEL_ROW_NUMERIC_SHARE) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export interface ParseOptions {
+  /** keep a detected label row in `rows` (the user overrode the skip) */
+  keepLabelRow?: boolean;
+}
+
+export function parseCSVFile(
+  file: File,
+  options: ParseOptions = {}
+): Promise<ParsedDataset> {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       complete(results) {
@@ -63,7 +119,34 @@ export function parseCSVFile(file: File): Promise<ParsedDataset> {
           }
         }
 
-        resolve({ headers, rows, fileName: file.name, file });
+        // Line 2 that is labels, not data: skip it (visibly — the upload
+        // card shows the row and offers to keep it) so an NDA/ABCD export
+        // runs instead of failing on "cannot parse 'pctPoor ' as a number".
+        let labelRow: string[] | undefined;
+        let labelRowSkipped = false;
+        if (rows.length >= 1 && looksLikeLabelRow(headers, rows[0]!, rows.slice(1))) {
+          labelRow = rows[0]!;
+          if (!options.keepLabelRow) {
+            rows.splice(0, 1);
+            labelRowSkipped = true;
+          }
+        }
+        if (rows.length < 1) {
+          reject(
+            new Error(
+              `${file.name}: line 2 looks like a label row and there is no data below it.`
+            )
+          );
+          return;
+        }
+
+        resolve({
+          headers,
+          rows,
+          fileName: file.name,
+          file,
+          ...(labelRow ? { labelRow, labelRowSkipped } : {}),
+        });
       },
       error(err) {
         reject(err);

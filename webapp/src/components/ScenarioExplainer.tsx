@@ -113,11 +113,11 @@ function DistanceStrip({
       aria-label="Distances from the target to every supplemental row"
     >
       {/* axis */}
-      <line x1={padL} x2={W - padR} y1={axisY} y2={axisY} stroke="#e2e8f0" strokeWidth={2} />
-      <text x={padL} y={axisY + 16} fontSize={9} fill="#64748b">
+      <line x1={padL} x2={W - padR} y1={axisY} y2={axisY} stroke="var(--chart-rule)" strokeWidth={2} />
+      <text x={padL} y={axisY + 16} fontSize={9} fill="var(--chart-label)">
         0 = identical
       </text>
-      <text x={W - padR} y={axisY + 16} fontSize={9} fill="#64748b" textAnchor="end">
+      <text x={W - padR} y={axisY + 16} fontSize={9} fill="var(--chart-label)" textAnchor="end">
         distance →
       </text>
 
@@ -129,7 +129,7 @@ function DistanceStrip({
             y={axisY - 13}
             width={Math.max(x(cutoff) - x(d1), 0)}
             height={26}
-            fill="#fef3c7"
+            fill="var(--chart-warn-bg)"
             opacity={0.8}
           />
           <line
@@ -137,7 +137,7 @@ function DistanceStrip({
             x2={x(cutoff)}
             y1={axisY - 20}
             y2={axisY + 13}
-            stroke="#f43f5e"
+            stroke="var(--chart-cutoff)"
             strokeWidth={1.5}
             strokeDasharray="4,3"
           />
@@ -145,7 +145,7 @@ function DistanceStrip({
             x={cutoffVisible ? x(cutoff) + 4 : x(cutoff) - 4}
             y={axisY - 22}
             fontSize={9}
-            fill="#be123c"
+            fill="var(--chart-cutoff-text)"
             fontWeight={600}
             textAnchor={cutoffVisible ? "start" : "end"}
           >
@@ -164,7 +164,7 @@ function DistanceStrip({
             cx={x(r.dist)}
             cy={axisY}
             r={isBest ? 7 : isNear ? 5 : 3.5}
-            fill={isBest ? "#2563eb" : isNear ? "#f59e0b" : "#94a3b8"}
+            fill={isBest ? "var(--chart-best)" : isNear ? "var(--chart-near)" : "var(--chart-muted)"}
             opacity={isBest ? 1 : 0.85}
           >
             <title>{`Rank ${r.rank}: distance ${r.dist.toFixed(4)}`}</title>
@@ -178,7 +178,7 @@ function DistanceStrip({
         x={Math.min(x(d1), W - 150)}
         y={12}
         fontSize={10}
-        fill="#1d4ed8"
+        fill="var(--chart-best-text)"
         fontWeight={600}
       >
         best match ({d1.toFixed(4)})
@@ -215,7 +215,7 @@ const SIGNAL_ORDER: Array<{ key: string; label: string }> = [
   { key: "nndr", label: "NNDR" },
   { key: "near_miss_count", label: "Near misses" },
   { key: "mnn_confirmed", label: "MNN" },
-  { key: "repeats", label: "Ties" },
+  { key: "repeats", label: "Tied at min" },
   { key: "per_feature_contribution", label: "Feature contributions" },
   { key: "smd", label: "SMD" },
   { key: "flags", label: "Flags" },
@@ -235,16 +235,13 @@ export function ScenarioExplainer({
   const ex = scenario.example;
 
   return (
-    <details
-      open={index === 0}
-      className="group rounded-lg border border-gray-200 bg-white"
-    >
+    <details className="group rounded-lg border border-gray-200 bg-surface">
       <summary className="flex cursor-pointer items-center gap-3 p-5 [&::-webkit-details-marker]:hidden">
         <span className="text-gray-400 transition-transform group-open:rotate-90">
           ▸
         </span>
         <span>
-          <span className="block text-xs uppercase tracking-wider text-blue-600">
+          <span className="block text-xs uppercase tracking-wider text-blue-600 dark:text-blue-400">
             Scenario {index + 1}
           </span>
           <span className="block text-base font-semibold text-gray-900">
@@ -287,7 +284,12 @@ export function ScenarioExplainer({
           value={s.mnn_confirmed ? "confirmed" : "not confirmed"}
           good={s.mnn_confirmed}
         />
-        <SignalChip label="Ties" value={String(s.repeats)} good={s.repeats <= 1} />
+        {/* repeats counts the winner itself; ≤1 means a unique minimum */}
+        <SignalChip
+          label="Tied at min"
+          value={s.repeats > 1 ? `${s.repeats} rows` : "none"}
+          good={s.repeats <= 1}
+        />
         <SignalChip
           label="Flags"
           value={s.flags ? `${s.flags.split(" | ").length}` : "none"}
@@ -305,8 +307,21 @@ export function ScenarioExplainer({
       {/* Distance strip */}
       <div className="mt-4 rounded border border-gray-200 p-2">
         <p className="mb-1 px-1 text-[11px] text-gray-500">
-          Every supplemental row, placed by its distance to the target. Blue =
-          chosen match; amber = near-miss competitors inside the cutoff.
+          Every supplemental row, placed by its distance to the target.{" "}
+          <span
+            className="font-semibold"
+            style={{ color: "var(--chart-best-text)" }}
+          >
+            Blue
+          </span>{" "}
+          = chosen match;{" "}
+          <span
+            className="font-semibold"
+            style={{ color: "var(--chart-warn-text)" }}
+          >
+            amber
+          </span>{" "}
+          = near-miss competitors inside the cutoff.
         </p>
         <DistanceStrip rows={scenario.supp_table} threshold={scenario.nndr_threshold} />
       </div>
@@ -466,14 +481,14 @@ export function ScenarioExplainer({
       <p className="mt-3 text-[11px] text-gray-400">
         Printable version:{" "}
         <a
-          className="text-blue-500 hover:text-blue-700"
+          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           href={`${import.meta.env.BASE_URL}explanatory/${scenario.scenario_label}.pdf`}
         >
           scatter PDF
         </a>{" "}
         ·{" "}
         <a
-          className="text-blue-500 hover:text-blue-700"
+          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
           href={`${import.meta.env.BASE_URL}explanatory/${scenario.scenario_label}_hist.pdf`}
         >
           histogram PDF

@@ -203,19 +203,27 @@ collaborators; ordering after that is judgment.
 16. **Repo hygiene pass.** Add `apps/dataset-merge/.gitignore`,
     `git rm --cached` the tracked `dist/` / `node_modules/` / `egg-info/` /
     `.DS_Store` files. Strip the AI marker from `version-2/README.md`.
+17. **Shared emit-loop helper.** `pipeline.coordinator` pass 2 and
+    `web_api._assemble_prepared` mirror ~200 lines of row-emission logic
+    (no-match / rejected / withheld / matched branches). Kept mirrored
+    deliberately while feature work was stacked on an open PR; a
+    CLI-vs-web parity test (`tests/test_min_confidence.py`) pins them
+    together. Fold into one helper once the August 2026 PRs land.
 
 ### Lower / longer term
 
-17. **Per-feature ablation signal** described in
-    `version-3/docs/old-planning/match_quality_brainstorm.md` under "Per
-    Feature Match Contribution by Measuring Degraded Match Quality through
-    Systematic Ablation Methodology". Adds selection-based importance to
-    complement distance-based contribution.
-18. **Mahalanobis distance** (or document the choice to keep standardized
+18. ~~**Per-feature ablation signal**~~ **Implemented (August 2026)** as the
+    harm-detection inverse of the design in
+    `matcher/docs/old-planning/match_quality_brainstorm.md`: leave-one-
+    variable-out re-runs flag variables whose removal IMPROVES linkage
+    quality (`matcher/ablation.py`, `docs/signals/ablation.md`; webapp
+    variable panel + `coordinator(..., ablation=True)`). Margins (10 pts /
+    50 rows) are heuristics — calibrate alongside the NNDR work above.
+19. **Mahalanobis distance** (or document the choice to keep standardized
     Euclidean). Account for feature correlations.
-10. **Tier 2 preprocessing layer** (column-linkage suggestion beyond name
+20. **Tier 2 preprocessing layer** (column-linkage suggestion beyond name
     match, coverage sufficiency warning).
-20. **Tier 3 backdriving with pre-registered correlations.** Architectural
+21. **Tier 3 backdriving with pre-registered correlations.** Architectural
     and ethical constraints already documented; long-term.
 
 ---

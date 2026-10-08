@@ -37,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={this.reset}
-            className="rounded border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
+            className="rounded border border-red-300 bg-surface px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
           >
             Dismiss
           </button>

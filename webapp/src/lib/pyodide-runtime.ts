@@ -11,13 +11,19 @@
 
 import MatcherWorker from "./matcher.worker.ts?worker";
 import type {
+  AblationVariantPayload,
   LinkPayload,
   ShardPayload,
   WorkerRequest,
   WorkerResponse,
   StatusPhase,
 } from "./matcher.worker";
-import type { ColumnLink, MatchOutput, ParsedDataset } from "@/types";
+import type {
+  AblationReport,
+  ColumnLink,
+  MatchOutput,
+  ParsedDataset,
+} from "@/types";
 import Papa from "papaparse";
 
 export type PyodideStatus =
@@ -140,10 +146,41 @@ export function prefetchPyodide(onStatus?: StatusCallback): void {
  * the next run's listeners — silently wrong output. The cost is a cold
  * (re-)init on the next run; correctness wins.
  */
+// Bumped on every terminate. Background work (the variable check) captures
+// it at start so a failure in an ABANDONED suite can never terminate the
+// pool a newer run is using.
+let poolGeneration = 0;
+// Abandon callbacks for in-flight background work: a terminated worker never
+// posts again, so without these the work's promise would hang forever.
+const abandonHandlers = new Set<() => void>();
+
+/** Thrown to background work when the pool it was running on was reset. */
+export class WorkAbandoned extends Error {
+  constructor() {
+    super("cancelled: the worker pool was reset");
+    this.name = "WorkAbandoned";
+  }
+}
+
 export function terminatePool(): void {
   for (const w of pool) w.terminate();
   pool.length = 0;
   prefetchStarted = false;
+  poolGeneration++;
+  for (const abandon of abandonHandlers) abandon();
+  abandonHandlers.clear();
+}
+
+/**
+ * Stops the background variable check, if one is running, by resetting the
+ * pool — in-flight Pyodide work cannot be interrupted any other way. A new
+ * matching run must not queue behind stale variants on the same workers
+ * (its wall time would roughly double), and a stale variant's error would
+ * even reject the new run's shard. No-op when nothing is in flight, so the
+ * warm pool is kept.
+ */
+export function cancelBackgroundWork(): void {
+  if (abandonHandlers.size > 0) terminatePool();
 }
 
 function statusFromPhase(phase: StatusPhase): PyodideStatus {
@@ -151,7 +188,15 @@ function statusFromPhase(phase: StatusPhase): PyodideStatus {
 }
 
 function datasetToCsv(dataset: ParsedDataset): string {
-  return Papa.unparse({ fields: dataset.headers, data: dataset.rows });
+  const csv = Papa.unparse({ fields: dataset.headers, data: dataset.rows });
+  if (!dataset.labelRowSkipped) return csv;
+  // The skipped label row becomes an EMPTY line: the engine skips blank
+  // lines but keeps original line numbers, so a later parse error still
+  // cites the line the user sees in their own file.
+  const nl = csv.includes("\r\n") ? "\r\n" : "\n";
+  const cut = csv.indexOf(nl);
+  if (cut < 0) return csv;
+  return csv.slice(0, cut + nl.length) + nl + csv.slice(cut + nl.length);
 }
 
 interface RunPayloads {
@@ -159,13 +204,21 @@ interface RunPayloads {
   supplementalCsv: string;
   links: LinkPayload[];
   threshold: number;
+  /** optional match-rejection cutoff in per-feature z-units; null = off.
+   *  Applied at assembly only, so shard requests ignore it. */
+  maxDistance: number | null;
+  /** optional minimum-confidence reporting filter; null = off.
+   *  Also assembly-only. */
+  minConfidence: "medium" | "high" | null;
 }
 
 function buildPayloads(
   target: ParsedDataset,
   supplemental: ParsedDataset,
   links: ColumnLink[],
-  threshold: number
+  threshold: number,
+  maxDistance: number | null,
+  minConfidence: "medium" | "high" | null
 ): RunPayloads {
   const activeLinks = links.filter((l) => !l.excluded);
   if (activeLinks.length === 0) {
@@ -180,6 +233,8 @@ function buildPayloads(
       header2Index: l.supplementalIndex,
     })),
     threshold,
+    maxDistance,
+    minConfidence,
   };
 }
 
@@ -276,12 +331,20 @@ export async function runMatching(
   supplemental: ParsedDataset,
   links: ColumnLink[],
   threshold: number,
+  maxDistance: number | null = null,
+  minConfidence: "medium" | "high" | null = null,
   onStatus?: StatusCallback,
   onProgress?: ProgressCallback
 ): Promise<RunResult> {
-  const payloads = buildPayloads(target, supplemental, links, threshold);
+  const payloads = buildPayloads(
+    target, supplemental, links, threshold, maxDistance, minConfidence
+  );
   const nRows = target.rows.length;
   const nWorkers = poolSizeFor(nRows, supplemental.rows.length);
+
+  // "Exclude and adjust" → Run arrives while the previous results' variable
+  // check may still be computing. Never share workers with it.
+  cancelBackgroundWork();
 
   if (nWorkers <= 1) {
     try {
@@ -344,5 +407,172 @@ export async function runMatching(
     // their eventual results would poison the next run. Kill everything.
     terminatePool();
     throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Leave-one-variable-out ablation (variable quality check)
+// ---------------------------------------------------------------------------
+
+// Mirrors matcher/ablation.py — ABLATION_BUDGET_OPS and
+// ABLATION_SAMPLE_FLOOR. Keep in sync by hand; the gate only decides
+// auto-run vs on-demand, Python owns the actual sampling.
+const ABLATION_BUDGET_OPS = 6_000_000_000;
+const ABLATION_SAMPLE_FLOOR = 200;
+
+/**
+ * Whether the variable check should run automatically after results.
+ * Auto only when even the minimum target sample fits the compute budget;
+ * otherwise the panel offers it as an explicit button.
+ */
+export function ablationAutoRunAllowed(mRows: number, d: number): boolean {
+  return mRows * d * (d + 1) * ABLATION_SAMPLE_FLOOR <= ABLATION_BUDGET_OPS;
+}
+
+function runAblationVariantOn(
+  w: Worker,
+  payloads: RunPayloads,
+  dropIndex: number | null
+): Promise<AblationVariantPayload> {
+  return new Promise<AblationVariantPayload>((resolve, reject) => {
+    const handler = (e: MessageEvent<WorkerResponse>) => {
+      const msg = e.data;
+      if (msg.type === "ablation_variant_result") {
+        w.removeEventListener("message", handler);
+        resolve(msg.payload);
+      } else if (msg.type === "error") {
+        w.removeEventListener("message", handler);
+        reject(new Error(msg.message));
+      }
+      // status/progress messages from the worker are ignored here — the
+      // ablation runs in the background after results are already shown.
+    };
+    w.addEventListener("message", handler);
+    w.postMessage({
+      type: "ablation_variant",
+      targetCsv: payloads.targetCsv,
+      supplementalCsv: payloads.supplementalCsv,
+      links: payloads.links,
+      threshold: payloads.threshold,
+      dropIndex,
+    } satisfies WorkerRequest);
+  });
+}
+
+function runAssembleAblationOn(
+  w: Worker,
+  variants: AblationVariantPayload[],
+  featureNames: string[],
+  threshold: number
+): Promise<AblationReport> {
+  return new Promise<AblationReport>((resolve, reject) => {
+    const handler = (e: MessageEvent<WorkerResponse>) => {
+      const msg = e.data;
+      if (msg.type === "ablation_result") {
+        w.removeEventListener("message", handler);
+        resolve(msg.payload);
+      } else if (msg.type === "error") {
+        w.removeEventListener("message", handler);
+        reject(new Error(msg.message));
+      }
+    };
+    w.addEventListener("message", handler);
+    w.postMessage({
+      type: "assemble_ablation",
+      variants,
+      featureNames,
+      threshold,
+    } satisfies WorkerRequest);
+  });
+}
+
+/**
+ * Runs the leave-one-variable-out suite: a baseline plus one variant per
+ * active link, striped across the EXISTING worker pool (no extra workers
+ * are spawned — each Pyodide instance costs ~150 MB), then assembled into
+ * the AblationReport on worker 0.
+ *
+ * Diagnostic of the raw matching geometry: the cutoff and confidence
+ * filter deliberately do not apply inside it.
+ */
+export async function runAblation(
+  target: ParsedDataset,
+  supplemental: ParsedDataset,
+  links: ColumnLink[],
+  threshold: number,
+  onProgress?: ProgressCallback
+): Promise<AblationReport> {
+  const payloads = buildPayloads(
+    target, supplemental, links, threshold, null, null
+  );
+  const d = payloads.links.length;
+  if (d < 2) {
+    throw new Error(
+      "The variable check needs at least two linked variables."
+    );
+  }
+
+  // null = baseline, then one drop per active link (link order == the
+  // engine's feature order).
+  const dropIndices: (number | null)[] = [null];
+  for (let i = 0; i < d; i++) dropIndices.push(i);
+
+  const nWorkers = Math.max(1, Math.min(pool.length || 1, dropIndices.length));
+  let completed = 0;
+  const report = () => {
+    completed += 1;
+    onProgress?.(completed / dropIndices.length);
+  };
+
+  // Abandonment: terminatePool() rejects `abandoned`, which every await
+  // below races against — otherwise a suite whose workers were killed
+  // would simply never settle.
+  const generation = poolGeneration;
+  let abandon: () => void = () => {};
+  const abandoned = new Promise<never>((_, reject) => {
+    abandon = () => reject(new WorkAbandoned());
+  });
+  abandonHandlers.add(abandon);
+
+  try {
+    // Stripe the variants round-robin; each worker runs its share
+    // sequentially while the workers themselves run concurrently.
+    const results = new Array<AblationVariantPayload>(dropIndices.length);
+    await Promise.race([
+      abandoned,
+      Promise.all(
+        Array.from({ length: nWorkers }, async (_, w) => {
+          for (let k = w; k < dropIndices.length; k += nWorkers) {
+            // A result that landed just before a reset must not post the
+            // next variant into the NEW pool getWorker() would spawn.
+            if (poolGeneration !== generation) throw new WorkAbandoned();
+            results[k] = await runAblationVariantOn(
+              getWorker(w), payloads, dropIndices[k] as number | null
+            );
+            report();
+          }
+        })
+      ),
+    ]);
+
+    if (poolGeneration !== generation) throw new WorkAbandoned();
+    const featureNames = payloads.links.map((l) => l.headerName);
+    return await Promise.race([
+      abandoned,
+      runAssembleAblationOn(
+        getWorker(0), results, featureNames, payloads.threshold
+      ),
+    ]);
+  } catch (err) {
+    // Same stale-results hygiene as runMatching: a failed variant leaves
+    // workers mid-compute; kill the pool rather than risk poisoned output.
+    // Only OUR pool, though — after a reset it is gone or belongs to a
+    // newer run, and killing that would hang the run.
+    if (!(err instanceof WorkAbandoned) && poolGeneration === generation) {
+      terminatePool();
+    }
+    throw err;
+  } finally {
+    abandonHandlers.delete(abandon);
   }
 }

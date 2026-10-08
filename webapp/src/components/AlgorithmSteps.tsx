@@ -2,12 +2,12 @@
 // About page. Purely decorative-explanatory; the authoritative description
 // is the adjacent text.
 
-const SLATE = "#94a3b8";
-const SLATE_DARK = "#475569";
-const BLUE = "#2563eb";
-const BLUE_LIGHT = "#bfdbfe";
-const GREEN = "#10b981";
-const AMBER = "#f59e0b";
+const SLATE = "var(--chart-muted)";
+const SLATE_DARK = "var(--chart-muted-strong)";
+const BLUE = "var(--chart-best)";
+const BLUE_LIGHT = "var(--chart-best-soft)";
+const GREEN = "var(--chart-ok)";
+const AMBER = "var(--chart-near)";
 
 function StepAlign() {
   // Two header stacks; identical names linked.
@@ -16,11 +16,11 @@ function StepAlign() {
     <svg viewBox="0 0 120 90" className="h-full w-full" aria-hidden="true">
       {rows.map((r) => (
         <rect key={`l${r}`} x={8} y={16 + r * 22} width={34} height={12} rx={3}
-              fill={r === 2 ? "#e2e8f0" : BLUE_LIGHT} />
+              fill={r === 2 ? "var(--chart-rule)" : BLUE_LIGHT} />
       ))}
       {rows.map((r) => (
         <rect key={`r${r}`} x={78} y={16 + r * 22} width={34} height={12} rx={3}
-              fill={r === 1 ? "#e2e8f0" : BLUE_LIGHT} />
+              fill={r === 1 ? "var(--chart-rule)" : BLUE_LIGHT} />
       ))}
       {/* links: row0<->row0, row1<->row2 (name match across positions) */}
       <path d="M42 22 C 58 22, 62 22, 78 22" fill="none" stroke={BLUE} strokeWidth={2} />
@@ -100,14 +100,14 @@ function StepSignals() {
       <circle cx={52} cy={30} r={4.5} fill={GREEN} />
       <line x1={27} y1={30} x2={47} y2={30} stroke={BLUE} strokeWidth={2} />
       {/* signal chips */}
-      <rect x={70} y={12} width={42} height={13} rx={3.5} fill="#dcfce7" />
-      <text x={91} y={21.5} fontSize={7.5} fill="#166534" textAnchor="middle">NNDR 0.21</text>
-      <rect x={70} y={31} width={42} height={13} rx={3.5} fill="#dcfce7" />
-      <text x={91} y={40.5} fontSize={7.5} fill="#166534" textAnchor="middle">MNN ✓</text>
-      <rect x={70} y={50} width={42} height={13} rx={3.5} fill="#fef3c7" />
-      <text x={91} y={59.5} fontSize={7.5} fill="#92400e" textAnchor="middle">1 near miss</text>
+      <rect x={70} y={12} width={42} height={13} rx={3.5} fill="var(--chart-good-bg)" />
+      <text x={91} y={21.5} fontSize={7.5} fill="var(--chart-good-text)" textAnchor="middle">NNDR 0.21</text>
+      <rect x={70} y={31} width={42} height={13} rx={3.5} fill="var(--chart-good-bg)" />
+      <text x={91} y={40.5} fontSize={7.5} fill="var(--chart-good-text)" textAnchor="middle">MNN ✓</text>
+      <rect x={70} y={50} width={42} height={13} rx={3.5} fill="var(--chart-warn-bg)" />
+      <text x={91} y={59.5} fontSize={7.5} fill="var(--chart-warn-text)" textAnchor="middle">1 near miss</text>
       {/* flag string */}
-      <rect x={12} y={68} width={100} height={13} rx={3.5} fill="#f1f5f9" />
+      <rect x={12} y={68} width={100} height={13} rx={3.5} fill="var(--chart-grid)" />
       <circle cx={20} cy={74.5} r={2.5} fill={AMBER} />
       <rect x={27} y={72} width={60} height={5} rx={2.5} fill={SLATE} opacity={0.5} />
     </svg>

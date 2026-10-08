@@ -125,3 +125,18 @@ full sorted distances).
 The web API additionally returns per-target diagnostics (distance histograms,
 top-k near-miss distances, feature contributions) for the Results UI. The CLI
 writes the equivalent information to the detail CSV.
+
+Two run options are applied at the **assembly/emit stage**, never inside the
+matching itself, so worker-pool shards stay option-agnostic and the shard
+payload is unchanged: the `max_distance` cutoff (rejects a too-far nearest
+row) and the `min_confidence` reporting filter (withholds links below a
+tier). Both default to off, byte-identical to previous output.
+
+The **ablation suite** (`matcher/ablation.py`, see
+[signals/ablation.md](signals/ablation.md)) is an optional third pass:
+d+1 leave-one-variable-out re-runs over the already-standardized arrays
+(column re-slicing ≡ a fresh run with that link excluded), deterministically
+subsampling targets above a compute budget. The CLI runs it serially
+(`coordinator(..., ablation=True)`); the webapp fans the variants out across
+its existing worker pool (`web_api.ablation_variant`) and merges them with
+`web_api.assemble_ablation`. Still brute force — only more of it.

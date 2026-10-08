@@ -27,6 +27,29 @@ jobs:
           git add -N webapp/public/matcher webapp/public/explanatory
           git diff --exit-code webapp/public/matcher webapp/public/explanatory
 
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Version declarations agree
+        run: python3 scripts/bump_version.py --check
+      - name: Shipped code changes carry a version bump
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE" HEAD -- matcher/src webapp/src webapp/public/matcher webapp/index.html)
+          if [ -z "$changed" ]; then echo "no shipped code changed"; exit 0; fi
+          old=$(git show "$BASE:matcher/src/matcher/about.py" 2>/dev/null | sed -n 's/^VERSION = "\(.*\)"$/\1/p' || true)
+          new=$(python3 scripts/bump_version.py --check)
+          echo "base $old -> head $new"
+          if [ "$old" = "$new" ]; then
+            echo "::error::shipped code changed but the version did not — run: python scripts/bump_version.py patch|minor|major"
+            exit 1
+          fi
+
   webapp:
     runs-on: ubuntu-latest
     defaults:

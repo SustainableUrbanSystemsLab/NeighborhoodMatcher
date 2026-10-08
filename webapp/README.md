@@ -26,6 +26,54 @@ copy drifts.
    contributions, plain-English flags) and download the results zip
    (linked CSV, match detail, data + match statistics, SMD, agreement)
 
+## Theming
+
+Light and dark, following the OS/browser (`prefers-color-scheme`) by default
+and overridable per device with the single theme icon in the header, which
+cycles Auto → Light → Dark and shows the state it is in. The choice lives in
+`localStorage` (`nbhdmatch:theme`); "Auto" keeps following the system,
+including when it flips while the page is open. The dark palette is GitHub's
+(Primer): canvas `#0d1117`, cards `#161b22`, borders `#30363d`, text
+`#e6edf3`, with Primer's accent / success / attention / danger families.
+
+The palette is a variable layer, not a per-component `dark:` sweep: the app is
+written in literal Tailwind utilities, Tailwind v4 compiles those to
+`var(--color-*)`, and `src/main.css` re-points the palette (and the `--chart-*`
+tokens the inline SVGs paint with) under `[data-theme="dark"]`. Two rules keep
+that honest:
+
+- Card and panel backgrounds use the `surface` token, not `bg-white`, so
+  `white` still means white where it must (`text-white` on colored buttons).
+- New color choices that cannot be expressed as a palette re-point use the
+  `dark:` variant, which is wired to the same attribute.
+
+`index.html` applies the stored/system theme before the bundle loads, so
+dark-mode visitors never see a white flash.
+
+## Local storage and reopening runs
+
+The app keeps three small things per device, all in `localStorage`, none of
+them dataset contents: the data-use agreement acceptance, the theme choice,
+the worker-count override — and a **run history** (`nbhdmatch:runs`, last 20)
+holding settings, run-level quality numbers, and per-variable diagnostics.
+Row-level data is deliberately excluded: results here can constitute PHI,
+browser storage is unencrypted and outlives the tab, so participant data has
+no business in it. The panel that shows the history says so and can clear it.
+
+To **reopen a full run** — every number and chart — load its results zip back
+in from the upload step. The package already carries the original inputs and
+the settings used, and matching is deterministic, so replaying it reproduces
+the run exactly. That keeps the "should this persist?" decision in the
+researcher's file system, under their institution's rules, instead of in
+browser storage (`src/lib/restore.ts`).
+
+A service worker (`public/sw.js`) caches the Pyodide runtime — the ~15 MB of
+public, version-pinned CDN assets — so it downloads once per device and keeps
+working on networks that block jsDelivr. It touches nothing else: not the
+app's own bundle (a deploy is never served stale), not `/matcher/*.py` (which
+changes per deploy — a stale engine beside a fresh UI would compute with the
+wrong code), and nothing of the user's, which never travels over HTTP here.
+
 ## Key properties
 
 - **Client-side only** — all computation runs in the browser; data never

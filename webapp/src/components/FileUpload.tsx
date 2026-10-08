@@ -10,6 +10,12 @@ interface FileUploadProps {
   dataset: ParsedDataset | null;
 }
 
+function labelPreview(row: string[]): string {
+  const cells = row.map((c) => c.trim()).filter(Boolean).slice(0, 3);
+  const text = cells.join(", ");
+  return text.length > 60 ? `${text.slice(0, 57)}…` : text;
+}
+
 export function FileUpload({
   label,
   description,
@@ -39,6 +45,20 @@ export function FileUpload({
     [onFileLoaded]
   );
 
+  // "Keep it as data" / "Skip it" for a detected label row: re-parse the
+  // same File with the user's choice; nothing is inferred twice.
+  const reparse = useCallback(
+    async (keepLabelRow: boolean) => {
+      if (!dataset) return;
+      try {
+        onFileLoaded(await parseCSVFile(dataset.file, { keepLabelRow }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to parse CSV.");
+      }
+    },
+    [dataset, onFileLoaded]
+  );
+
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -66,6 +86,21 @@ export function FileUpload({
           <span>{dataset.rows.length} rows</span>
           <span>{dataset.headers.length} columns</span>
         </div>
+        {dataset.labelRow && (
+          <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+            Line 2 looks like a label row, not data (
+            <span className="font-mono">{labelPreview(dataset.labelRow)}</span>
+            ){dataset.labelRowSkipped
+              ? " and was skipped."
+              : " and is being kept — matching will fail on it."}{" "}
+            <button
+              onClick={() => reparse(dataset.labelRowSkipped === true)}
+              className="font-medium underline hover:text-amber-900"
+            >
+              {dataset.labelRowSkipped ? "Keep it as data" : "Skip it"}
+            </button>
+          </div>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-1">
           {(columnsExpanded ? dataset.headers : dataset.headers.slice(0, 5)).map(
             (h, i) => (
@@ -80,7 +115,7 @@ export function FileUpload({
           {dataset.headers.length > 5 && (
             <button
               onClick={() => setColumnsExpanded((v) => !v)}
-              className="rounded px-1.5 py-0.5 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+              className="rounded px-1.5 py-0.5 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 hover:text-blue-800"
             >
               {columnsExpanded
                 ? "show fewer"

@@ -1,11 +1,18 @@
 import { Link, useNavigate } from "react-router";
+import { SiteFooter } from "@/components/SiteFooter";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/lib/use-theme";
 
 export default function Home() {
   const navigate = useNavigate();
+  const theme = useTheme();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-xl text-center">
+        <div className="mb-2 flex justify-end">
+          <ThemeToggle theme={theme} />
+        </div>
         <img
           src="/logo.svg"
           alt=""
@@ -19,19 +26,21 @@ export default function Home() {
         </p>
 
         <div className="mb-8 space-y-3 text-left">
-          <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-surface p-4">
             <h3 className="font-medium text-gray-900">1. Upload two datasets</h3>
             <p className="text-sm text-gray-500">
-              A target dataset and a supplemental dataset in CSV format
+              A target dataset (the one you want to add information to) and a
+              supplemental dataset (the source of that information, e.g. a
+              census extract), both CSV
             </p>
           </div>
-          <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-surface p-4">
             <h3 className="font-medium text-gray-900">2. Link matching columns</h3>
             <p className="text-sm text-gray-500">
               Auto-detect shared columns or manually link them
             </p>
           </div>
-          <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-surface p-4">
             <h3 className="font-medium text-gray-900">3. Download merged results</h3>
             <p className="text-sm text-gray-500">
               Each target row matched to its closest supplemental row
@@ -48,7 +57,7 @@ export default function Home() {
           </button>
           <Link
             to="/about"
-            className="rounded-xl border border-gray-300 bg-white px-8 py-3 text-lg font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            className="rounded-xl border border-gray-300 bg-surface px-8 py-3 text-lg font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
           >
             How it works
           </Link>
@@ -60,6 +69,8 @@ export default function Home() {
             client-side.
           </p>
         </div>
+
+        <SiteFooter />
       </div>
     </div>
   );

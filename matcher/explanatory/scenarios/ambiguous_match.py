@@ -167,12 +167,14 @@ def build_scenario():
              "the match should be reviewed before use.")
         ),
         "repeats": (
-            f"\\textbf{{{repeats}}} row(s) tied at the minimum distance. "
-            + ("No exact tie. The two similar candidates are close but not "
-               "equidistant from the target."
-               if repeats == 1 else
-               "An exact tie --- two rows are equidistant from the target. "
-               "The system selects one arbitrarily.")
+            ("No exact tie --- a single row sits alone at the minimum distance "
+             "(the count includes the chosen match itself, so 1 means a unique "
+             "winner). The two similar candidates are close but not equidistant."
+             if repeats == 1 else
+             f"\\textbf{{{repeats}}} rows tied at the minimum distance (count "
+             f"includes the chosen match) --- equidistant from the target. The "
+             f"system deterministically selects the first in file order and "
+             f"flags the tie.")
         ),
         "smd": (
             "With one target row, SMD is not computable and is reported as 0. "

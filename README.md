@@ -13,13 +13,14 @@
 <p align="center">
   <a href="https://nbhdmatch.netlify.app/"><strong>▶ Use it in your browser — nbhdmatch.netlify.app</strong></a>
   <br /><br />
+  <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher"><img src="https://img.shields.io/badge/GitHub-NeighborhoodMatcher-181717?logo=github" alt="Source on GitHub" /></a>
   <a href="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml"><img src="https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/actions/workflows/python-tests.yml/badge.svg" alt="Python tests" /></a>
   <a href="https://app.netlify.com/projects/nbhdmatch/deploys"><img src="https://api.netlify.com/api/v1/badges/f2fe942a-24a9-41d3-9ed6-29dac67da9b3/deploy-status" alt="Netlify Status" /></a>
 </p>
 
-Developed by the Sustainable Urban Systems Lab. Given a **target** CSV (e.g.
-study participants) and a **supplemental** CSV (e.g. census tracts), the
-matcher links every target row to its closest supplemental row by
+Developed by **[Dr. Benson Ku](https://med.emory.edu/directory/profile/?u=BSKU)**
+and **[Dr. Patrick Kastner](https://sustainableurbansystems.com/)**. Given a **target** CSV (e.g. study participants) and a
+**supplemental** CSV (e.g. census tracts), the matcher links every target row to its closest supplemental row by
 standardized Euclidean distance and reports how trustworthy each link is:
 nearest-neighbor distance ratio (NNDR), mutual-nearest-neighbor confirmation,
 exact-distance ties, per-feature contributions, dataset-level balance (SMD),
@@ -33,9 +34,11 @@ never leaves your machine, even on the hosted site.
 
 1. Open **[nbhdmatch.netlify.app](https://nbhdmatch.netlify.app/)** (or run locally, below).
 2. Upload a target CSV and a supplemental CSV. Columns with identical names
-   are auto-linked; every linked column must be numeric and in the same units
-   in both files. Missing cells (`NA`, blank, `-`, …) are fine — never fed
-   raw or z-scored data.
+   are auto-linked; every linked column must be numeric and measure the same
+   thing the same way in both files (see
+   [Preparing your data](#preparing-your-data)). Missing cells (`NA`, blank,
+   `-`, …) are fine. Upload raw values — never pre-standardized (z-scored)
+   columns.
 3. Review the per-row diagnostics and download the results zip.
 
 No data handy? Grab the benchmark pair from this repo:
@@ -79,9 +82,11 @@ coordinator(
 )"
 ```
 
-Writes `linked.csv` (matched rows + distance, NNDR, MNN, flags) and
+Writes `linked.csv` (matched rows + distance, NNDR, MNN, flags),
 `linked_detail.csv` (per-row audit: missing counts, per-feature
-contributions). Dataset-level warnings (e.g. scale mismatch) print to stderr.
+contributions), `linked_variables.csv` (per-variable input diagnostics), and
+`linked_run_info.csv` (tool version, authors, run timestamp, and the settings
+used). Dataset-level warnings (e.g. scale mismatch) print to stderr.
 Input format, missing-value handling, and column-linking rules:
 [`matcher/docs/output_format.md`](matcher/docs/output_format.md).
 
@@ -92,7 +97,7 @@ Input format, missing-value handling, and column-linking rules:
 
 ```bash
 cd matcher
-uv run --project . pytest                                        # 167 tests
+uv run --project . pytest                                        # 340 tests
 uv run --project . python analysis/benchmark_simulated.py --check # scored vs ground truth
 ```
 
@@ -100,6 +105,56 @@ The benchmark runs the matcher against the simulated ACS datasets and fails
 if any accuracy/flagging floor regresses; CI runs it on every push.
 
 </details>
+
+## Preparing your data
+
+The matcher standardizes both files together (joint z-scoring), which
+corrects for *scale* — dollars vs thousands of dollars — but never for
+*meaning*. Before uploading:
+
+- **One header row.** NDA/ABCD-style exports carry a second row of variable
+  labels or descriptions. Both the web app and the CLI detect such a row
+  (text where the column is otherwise numeric, or a repeat of the column
+  names), skip it, and say so — in the upload card, where you can keep it
+  instead, and in the run's warnings and `run_info.csv`.
+- **Same definition and coding in both files.** A column must measure the
+  same quantity computed the same way. Example failure: "poverty rate" as
+  % below 100% of the federal poverty line in one file but below 180% in
+  the other — every value shifts systematically, distances inflate, and
+  matches degrade. The results page reports a per-variable check
+  (`offset SMD`) that flags this pattern.
+- **Raw values only.** Don't mix a pre-z-scored column with raw data — the
+  pooled statistics collapse the narrow side onto a point. The scale check
+  warns when spreads differ wildly, but same-scale definition differences
+  are on you to verify.
+- **Mark missing data as missing.** Recognized missing tokens: blank, `NA`,
+  `N/A`, `null`, `none`, `-`, `.`, `NaN`, `#N/A` (case-insensitive). Convert
+  sentinel codes like `9999` or `-99` to blanks first — left in place they
+  are treated as real extreme values (the upload step tries to spot repeated
+  extremes, but only as a heuristic).
+- **Missing values are never imputed.** Each missing dimension of a pair
+  contributes a fixed distance penalty instead. A variable that is mostly
+  missing therefore adds mostly penalty — noise that can drown the signal
+  from complete variables and *worsen* every match. Quality beats quantity:
+  fewer well-measured shared variables usually out-match many spotty ones.
+  The results page runs a leave-one-variable-out check and recommends
+  excluding variables that hurt the linkage.
+
+## Versioning
+
+[Semantic Versioning](https://semver.org/), and **every change that ships bumps
+the version** — the footer, the results page, `run_info.csv` and the CLI banner
+all show it, so two runs can always be told apart.
+
+- **patch** — fixes, copy, visual polish, docs that ship in the app
+- **minor** — new behaviour: a signal, a control, an output column or file
+- **major** — an incompatible change to an output format or the CLI/Python API
+
+Bump with `python scripts/bump_version.py patch|minor|major`, which rewrites
+every declaration (`matcher/about.py`, `webapp/src/lib/about.ts`,
+`webapp/package.json`, both `pyproject.toml`) and keeps them in agreement;
+`--check` verifies. Add a line to `CHANGELOG.md`. CI fails a pull request that
+changes `matcher/src`, `webapp/src` or `webapp/public/matcher` without a bump.
 
 ## Repository layout
 

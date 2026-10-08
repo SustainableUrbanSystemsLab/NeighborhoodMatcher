@@ -160,5 +160,7 @@ def header_warnings(headers1, headers2, feature_names):
 # input column with one of these names almost always means a linked output
 # was re-fed as an input (see header_warnings).
 RESERVED_OUTPUT_COLUMNS = {
-    "euc_distance", "repeats", "nndr", "near_miss_count", "mnn_confirmed", "flags",
+    "euc_distance", "repeats", "nndr", "near_miss_count", "mnn_confirmed",
+    "features_used", "exact_on_observed", "filled_from_match", "confidence",
+    "flags",
 }

@@ -29,9 +29,13 @@ feature; larger values mean a worse match.
 - **Constant column** — `dual_standardize` guards against a feature whose SD
   is zero across both datasets (replaces the SD with 1 before dividing). Such
   a column contributes 0 to every distance.
-- **Empty / NA values** — replaced with `"0"` upstream by `clean_val` before
-  standardization. This is a conservative default; future revisions may
-  prefer mean imputation or an explicit missing-value flag.
+- **Empty / NA values** — never imputed. `clean_val` parses them to `None`
+  (NaN after standardization), the column statistics ignore them, and the
+  distance charges each dimension missing on either side a fixed penalty
+  (`matcher.distance.MISSING_PENALTY = 2.0` squared units — the expected
+  squared difference between two unrelated z-scored rows). A pair with no
+  jointly observed dimension has distance `inf` and becomes a no-match row.
+  See the missing-data section in [`../output_format.md`](../output_format.md).
 
 ## Important caveat
 

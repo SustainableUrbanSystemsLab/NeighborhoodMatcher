@@ -1,1 +1,204 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Dark mode
+   ---------------------------------------------------------------------------
+   The app is written in literal palette utilities (bg-gray-50, text-gray-900,
+   …), and Tailwind v4 compiles those to `var(--color-<name>-<shade>)`. So a
+   theme is a variable layer: re-point the palette under [data-theme="dark"]
+   and every existing utility follows, with no per-component `dark:` churn.
+
+   The remap is by ROLE, not a mechanical inversion — in this codebase the
+   light shades (50–300) are only ever surfaces and borders, and the dark
+   shades (600–900) are only ever text (verified before writing this). Each
+   line below therefore says which shade's job it takes over.
+
+   Deliberately NOT remapped, because they carry both roles:
+     white          — `bg-white` surfaces AND `text-white` on colored buttons.
+                      Surfaces use the `surface` token below instead, so
+                      `white` keeps meaning white.
+     blue/red/green/amber 400–600 — chart fills, indicator dots, and the
+                      primary button background; they read correctly on either
+                      canvas. Link text at blue-600 is too dim on the dark
+                      canvas, so links carry an explicit `dark:` variant.
+
+   `dark:` is available for those exceptions and for new code.
+--------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+   Chart colors
+   ---------------------------------------------------------------------------
+   The inline SVGs (rank plot, algorithm diagrams, scenario strips) paint with
+   explicit fills rather than utilities, so they get their own tokens. Grid
+   lines and axis labels have to flip with the theme — a slate-100 gridline is
+   invisible on a dark canvas — while the semantic marks (best / near-miss /
+   target) keep their meaning and only shift lightness where contrast needs it.
+--------------------------------------------------------------------------- */
+:root {
+  --chart-grid: #f6f8fa;        /* histogram gridlines — bgColor-muted */
+  --chart-rule: #d1d9e0;        /* axis rules, inert cells — borderColor-default */
+  --chart-label: #64748b;       /* tick and axis labels */
+  --chart-muted: #94a3b8;       /* ordinary, unremarkable points */
+  --chart-muted-strong: #475569;
+  --chart-best: #2563eb;        /* the chosen match */
+  --chart-best-text: #1d4ed8;
+  --chart-best-soft: #bfdbfe;
+  --chart-near: #f59e0b;        /* near-miss / runner-up */
+  --chart-ok: #10b981;
+  --chart-cutoff: #f43f5e;      /* threshold marker */
+  --chart-cutoff-text: #be123c;
+  --chart-good-bg: #dcfce7;     /* small "pass" pills inside diagrams */
+  --chart-good-text: #166534;
+  --chart-warn-bg: #fef3c7;
+  --chart-warn-text: #92400e;
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  /* GitHub's light theme, by ROLE (Primer primitives v11 — the tokens
+     github.com serves). The structure matters as much as the values: on
+     GitHub a box is the CANVAS colour delimited by a border, and the muted
+     shade is reserved for headers, insets, hover fills and default buttons.
+     So `surface` (cards) equals `canvas` (page), and gray-50 is the muted
+     recessed fill — never the page background. */
+  --color-canvas: #ffffff; /* bgColor-default — the page */
+  --color-surface: #ffffff; /* bgColor-default — boxes, same as the canvas */
+  --color-surface-muted: #f6f8fa; /* bgColor-muted */
+
+  /* Neutrals: 50–300 are fills and borders, 400–900 are text. GitHub has
+     two text colours (default and muted); the shades map onto those. */
+  --color-gray-50: #f6f8fa; /* bgColor-muted — recessed fills, row hover */
+  --color-gray-100: #eff2f5; /* control-bgColor-hover — chips, hover */
+  --color-gray-200: #d1d9e0; /* borderColor-default */
+  --color-gray-300: #d1d9e0; /* control-borderColor-rest — inputs */
+  --color-gray-400: #59636e; /* fgColor-muted — placeholders */
+  --color-gray-500: #59636e; /* fgColor-muted */
+  --color-gray-600: #59636e;
+  --color-gray-700: #1f2328; /* fgColor-default — body */
+  --color-gray-800: #1f2328;
+  --color-gray-900: #1f2328; /* headings */
+
+  /* Tinted callouts: Primer's *-muted backgrounds, borders composited over
+     white the way the browser does it (accent/success/attention/danger). */
+  --color-blue-50: #ddf4ff;
+  --color-blue-200: #bbdfff;
+  --color-green-50: #dafbe1;
+  --color-green-200: #b7e7c4;
+  --color-amber-50: #fff8c5;
+  --color-amber-200: #eedcab;
+  --color-red-50: #ffebe9;
+  --color-red-200: #ffcdcd;
+
+  /* Semantic text on white and on the tints above: Primer's fgColor-* and
+     the next darker steps, all ≥ 4.5:1 where the app uses them (the
+     Tailwind defaults fall to ~3–4.4:1 on GitHub's whiter surfaces). */
+  --color-blue-500: #0969da; /* fgColor-accent — secondary links */
+  --color-green-600: #1a7f37; /* fgColor-success — "Active" labels */
+  --color-green-700: #116329; /* on success-muted callouts */
+  --color-green-800: #116329;
+  --color-amber-600: #9a6700; /* fgColor-attention */
+  --color-amber-700: #7d4e00;
+  --color-amber-800: #633c01;
+  --color-red-500: #cf222e; /* bgColor-danger-emphasis — "Unlink" */
+  --color-red-600: #a40e26; /* on success/attention tints ("Remove") */
+  --color-red-700: #82071e;
+  --color-red-800: #82071e;
+}
+
+[data-theme="dark"] {
+  /* GitHub's DARK DIMMED theme (Primer primitives v11 — the tokens
+     github.com serves for Settings › Appearance › Dark dimmed), same
+     structure as light: boxes are the CANVAS colour with a border;
+     bgColor-muted is for insets, headers and hover; text is
+     fgColor-default / fgColor-muted. Tinted callouts are Primer's
+     translucent *-muted tokens composited over the canvas. Where a
+     Primer text token lands a hair under WCAG AA on this canvas (links
+     #478be6 = 4.3:1, danger #e5534b = 4.0:1) the next lighter step of the
+     same Primer scale is used for TEXT; fills keep the token. */
+  --color-canvas: #212830; /* bgColor-default — the page */
+  --color-surface: #212830; /* bgColor-default — boxes, same as the canvas */
+  --color-surface-muted: #262c36; /* bgColor-muted */
+
+  --color-gray-50: #262c36; /* bgColor-muted — recessed fills, row hover */
+  --color-gray-100: #262c36; /* chips and hover on the canvas */
+  --color-gray-200: #3d444d; /* borderColor-default */
+  --color-gray-300: #3d444d; /* control-borderColor-rest — inputs */
+  /* fgColor-muted is #9198a1, which lands at 4.2:1 on the tinted callouts
+     of this lighter canvas; one step up keeps every muted string ≥ 4.5:1. */
+  --color-gray-400: #a5adb6; /* muted — placeholders, row markers */
+  --color-gray-500: #a5adb6; /* muted text */
+  --color-gray-600: #a5adb6;
+  --color-gray-700: #d1d7e0; /* fgColor-default — body */
+  --color-gray-800: #d1d7e0;
+  --color-gray-900: #d1d7e0; /* headings */
+
+  /* Accent (Primer dimmed blue scale). 500–700 stay backgrounds (primary
+     button + hover); the blue TEXT shades live at 300/400 and carry
+     `dark:` variants where a component needs them. */
+  --color-blue-50: #243142; /* bgColor-accent-muted over the canvas */
+  --color-blue-100: #273a54;
+  --color-blue-200: #2e4d78; /* borderColor-accent-muted over the canvas */
+  --color-blue-300: #96d0ff; /* bright accent text */
+  --color-blue-400: #6cb6ff; /* links (fgColor-accent #478be6 is 4.3:1 here) */
+  --color-blue-500: #478be6; /* fgColor-accent — fills, indicator dots */
+  --color-blue-600: #316dca; /* bgColor-accent-emphasis — primary button */
+  --color-blue-700: #478be6; /* its hover */
+  --color-blue-800: #96d0ff; /* text on tinted callouts */
+  --color-blue-900: #c6e6ff;
+
+  --color-red-50: #352c33; /* bgColor-danger-muted over the canvas */
+  --color-red-100: #483135;
+  --color-red-200: #6f393b; /* borderColor-danger-muted over the canvas */
+  --color-red-300: #c93c37; /* bgColor-danger-emphasis */
+  --color-red-500: #f47067; /* danger text/dots (fgColor-danger #e5534b is 4.0:1 here) */
+  --color-red-600: #ff938a;
+  --color-red-700: #ffb8b0;
+  --color-red-800: #ffd8d3;
+  --color-red-900: #ffd8d3;
+
+  --color-green-50: #273834; /* bgColor-success-muted over the canvas */
+  --color-green-100: #2a4337;
+  --color-green-200: #30543a; /* borderColor-success-muted over the canvas */
+  --color-green-500: #57ab5a; /* fgColor-success */
+  --color-green-600: #57ab5a;
+  --color-green-700: #6bc46d;
+  --color-green-800: #8ddb8c;
+  --color-green-900: #b4f1b4;
+
+  --color-amber-50: #36352c; /* bgColor-attention-muted over the canvas */
+  --color-amber-100: #443d29;
+  --color-amber-200: #594a25; /* borderColor-attention-muted over the canvas */
+  --color-amber-300: #966600; /* bgColor-attention-emphasis */
+  --color-amber-500: #c69026; /* fgColor-attention — dots and bars */
+  --color-amber-600: #daaa3f; /* attention text (the token is 4.4:1 on its own tint here) */
+  --color-amber-700: #eac55f;
+  --color-amber-800: #eac55f;
+  --color-amber-900: #fbe090;
+
+  /* Charts: scaffolding recedes to the border tokens, marks keep meaning. */
+  --chart-grid: #3d444db3; /* borderColor-muted */
+  --chart-rule: #3d444d;
+  --chart-label: #9198a1;
+  --chart-muted: #9198a1;
+  --chart-muted-strong: #b1bac4;
+  --chart-best: #478be6;
+  --chart-best-text: #6cb6ff;
+  --chart-best-soft: #316dca;
+  --chart-near: #c69026;
+  --chart-ok: #57ab5a;
+  --chart-cutoff: #e5534b;
+  --chart-cutoff-text: #f47067;
+  --chart-good-bg: #273834;
+  --chart-good-text: #6bc46d;
+  --chart-warn-bg: #36352c;
+  --chart-warn-text: #daaa3f;
+
+  color-scheme: dark; /* native form controls, scrollbars, and caret */
+}
+
+/* The canvas itself, so overscroll and the area behind short pages match the
+   theme instead of flashing the browser default. */
+html {
+  background-color: var(--color-canvas);
+}

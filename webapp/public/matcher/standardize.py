@@ -46,7 +46,31 @@ def dual_standardize(raw_rows_1, raw_rows_2):
     return table[:split], table[split:]
 
 
-def scale_compatibility_warnings(raw_rows_1, raw_rows_2, feature_names, ratio_limit=50.0):
+# Spread ratio beyond which two files are judged to be on different scales.
+# Shared with signals.variable_report so the per-variable note and the
+# dataset-level warning can never disagree on the same column.
+SCALE_RATIO_LIMIT = 50.0
+
+
+def observed_column_std(table):
+    """
+    Per-column population standard deviation and observed count over a float
+    array (NaN = missing). The scale-check convention: a column whose spread
+    is float rounding dust relative to its mean is reported as exactly 0
+    (constant), so dust never produces an arbitrary spread ratio.
+    """
+    counts = (~np.isnan(table)).sum(axis=0)
+    safe = np.maximum(counts, 1)
+    mean = np.where(counts > 0, np.nansum(table, axis=0) / safe, 0.0)
+    with np.errstate(over="ignore"):
+        var = np.nansum((table - mean) ** 2, axis=0) / safe
+    std = np.sqrt(var)
+    dust = std <= 1e-12 * np.abs(mean)
+    return np.where(dust, 0.0, std), counts
+
+
+def scale_compatibility_warnings(raw_rows_1, raw_rows_2, feature_names,
+                                 ratio_limit=SCALE_RATIO_LIMIT):
     """
     Detects columns whose spread differs wildly between the two datasets —
     the signature of a unit mismatch or an already-standardized input file.
@@ -68,19 +92,8 @@ def scale_compatibility_warnings(raw_rows_1, raw_rows_2, feature_names, ratio_li
     a = np.asarray(raw_rows_1, dtype=float)
     b = np.asarray(raw_rows_2, dtype=float)
 
-    def _observed_std(table):
-        counts = (~np.isnan(table)).sum(axis=0)
-        safe = np.maximum(counts, 1)
-        mean = np.where(counts > 0, np.nansum(table, axis=0) / safe, 0.0)
-        with np.errstate(over="ignore"):
-            var = np.nansum((table - mean) ** 2, axis=0) / safe
-        std = np.sqrt(var)
-        dust = std <= 1e-12 * np.abs(mean)
-        std = np.where(dust, 0.0, std)
-        return std, counts
-
-    std_a, count_a = _observed_std(a)
-    std_b, count_b = _observed_std(b)
+    std_a, count_a = observed_column_std(a)
+    std_b, count_b = observed_column_std(b)
 
     warnings = []
     for i, name in enumerate(feature_names):
