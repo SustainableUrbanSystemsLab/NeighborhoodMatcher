@@ -53,8 +53,8 @@ export default defineConfig({
     react(),
     tailwindcss(),
     // Offline after one visit: src/sw.ts precaches the whole build (app
-    // shell, matcher sources, Pyodide runtime, numpy wheel, PDFs) as one
-    // versioned unit. Registration and the "reload for the new build" flow
+    // shell, matcher sources, Pyodide runtime, numpy wheel, PDFs, the demo's
+    // sample CSVs) as one versioned unit. Registration and the "reload for the new build" flow
     // live in src/lib/runtime-cache.ts.
     VitePWA({
       strategies: "injectManifest",
@@ -79,7 +79,7 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: [
-          "**/*.{html,js,css,svg,png,ico,webmanifest,py,json,wasm,zip,whl,pdf}",
+          "**/*.{html,js,css,svg,png,ico,webmanifest,py,json,wasm,zip,whl,pdf,csv}",
         ],
         // The self-host bundle offered on the About page is a download, not
         // something the app needs to run.

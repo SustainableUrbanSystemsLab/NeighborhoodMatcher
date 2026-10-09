@@ -6,6 +6,19 @@ All notable changes to NeighborhoodMatcher. The format follows
 version (`python scripts/bump_version.py patch|minor|major`), and CI refuses a
 pull request that changes shipped code without one.
 
+## [0.10.0] - 2026-10-09
+
+### Added
+
+- **Demo mode** (`/match?demo`, or *Try it with sample data* — one line under the upload boxes, the only new control). Loads the benchmark pair from `simulated_data/` (100 synthetic participants × 73,056 census tracts) and lands on Link Columns with the columns auto-linked; the user presses Run. One line above the steps says it is sample data, offers both files for download (through the app in the desktop build) and an Exit. The data-use agreement is skipped (the data is synthetic), and demo runs stay out of *Recent runs*. Replacing either file, reopening a results package, Start over, Exit or the browser's Back button leaves the demo — the agreement applies again to the user's own data.
+- **Answer key on the demo's results**: each sample participant was generated from a known tract (`truth_A100.csv`), so the results page scores the run — how many written links are the true tract, how many held-back matches would have been wrong, and the nearest-tract accuracy. Never shown for real data, which has no answer key.
+- The sample files are copied into the build by `sync-assets.mjs` (gitignored, like the Pyodide runtime) and precached, so the demo works offline and in the desktop app; `check:offline` verifies both. Playwright covers the demo flow, leaving it, and its downloads under the desktop CSP.
+
+### Changed
+
+- The self-host zip grows to ~12 MB (the sample data); the About page says so.
+- `scripts/bump_version.py` also updates (and `--check` verifies) the app's own entry in `webapp/src-tauri/Cargo.lock`, which it did not track before.
+
 ## [0.9.0] - 2026-10-08
 
 ### Added

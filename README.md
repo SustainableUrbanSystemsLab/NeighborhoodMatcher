@@ -91,11 +91,16 @@ To try changes before they are released, the
 [main-build](https://github.com/SustainableUrbanSystemsLab/NeighborhoodMatcher/releases/tag/main-build)
 pre-release has the same files, rebuilt on every push to `main`.
 
-No data handy? Grab the benchmark pair from this repo:
+No data handy? Open the demo,
+**[nbhdmatch.netlify.app/match?demo](https://nbhdmatch.netlify.app/match?demo)**
+(or *Try it with sample data* on the upload step, also in the desktop app).
+It loads the benchmark pair from this repo,
 [`simulated_data/dataset_A100.csv`](simulated_data/dataset_A100.csv) (target) ×
 [`simulated_data/dataset_B_tracts.csv`](simulated_data/dataset_B_tracts.csv)
-(supplemental), answer key in
-[`simulated_data/truth_A100.csv`](simulated_data/truth_A100.csv).
+(supplemental), skips the data-use agreement (the data is synthetic), and
+after the run scores it against the answer key,
+[`simulated_data/truth_A100.csv`](simulated_data/truth_A100.csv). Demo runs
+are not added to *Recent runs*.
 
 <details>
 <summary><strong>Build everything with one command</strong> (website, self-host zip, desktop app)</summary>

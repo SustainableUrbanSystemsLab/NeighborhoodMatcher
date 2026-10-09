@@ -11,6 +11,7 @@
 // catch a broken policy or desktop code path in seconds, locally.
 
 import { expect, test } from "@playwright/test";
+import { statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyDesktopCsp, cspViolations, emulateTauri } from "./desktop-env";
@@ -81,6 +82,24 @@ test("@desktop the self-test passes in the page (emulated Tauri IPC)", async ({ 
   const violations = await cspViolations(page);
   expect(violations.length).toBe(1);
   expect(violations[0]).toMatch(/^connect-src https:\/\/example\.com/);
+});
+
+test("@desktop demo mode loads its sample data and saves it through the app", async ({ page }) => {
+  await applyDesktopCsp(page);
+  await emulateTauri(page, { selftest: false });
+  await page.goto("/match?demo");
+  await expect(page.getByText("Column Linking", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /sample supplemental file/ }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as { __ipc: { cmd: string; headers?: Record<string, string>; bytes?: number }[] }).__ipc
+          .filter((c) => c.cmd === "save_download")
+          .map((c) => [c.headers?.["x-filename"], c.bytes])
+      )
+    )
+    .toEqual([["dataset_B_tracts.csv", statSync(resolve(REPO, "simulated_data/dataset_B_tracts.csv")).size]]);
+  expect(await cspViolations(page)).toEqual([]);
 });
 
 test("@desktop outside self-test mode the app never reports", async ({ page }) => {

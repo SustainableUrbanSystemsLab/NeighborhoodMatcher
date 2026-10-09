@@ -338,7 +338,7 @@ export default function About() {
                   href={`${isDesktopApp() ? SITE_URL : "/"}offline/nbhdmatch-site-v${MATCHER_VERSION}.zip`}
                   className={LINK}
                 >
-                  Download the site (v{MATCHER_VERSION}, ~11 MB)
+                  Download the site (v{MATCHER_VERSION}, ~12 MB)
                 </a>
               </p>
             </div>

@@ -1,6 +1,6 @@
 [package]
 name = "neighborhood-matcher"
-version = "0.9.0"
+version = "0.10.0"
 description = "Match participant-level data to neighborhood-scale records, entirely on this computer"
 authors = ["Dr. Benson Ku", "Dr. Patrick Kastner"]
 license = ""
