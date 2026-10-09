@@ -4,6 +4,10 @@
 //   - the matcher Python sources (matcher/src/matcher/*.py) — the engine the
 //     tests cover, loaded into Pyodide's virtual FS at runtime;
 //   - the explanatory PDFs;
+//   - the demo's sample data (/match?demo): the benchmark pair from
+//     simulated_data/ (100 synthetic participants, 73,056 census tracts)
+//     and its answer key — gitignored like the Pyodide runtime, since
+//     simulated_data/ stays the one checked-in copy;
 //   - the Pyodide runtime (pyodide.asm.js/.wasm, python_stdlib.zip,
 //     pyodide-lock.json) from the installed `pyodide` npm package, plus the
 //     numpy wheel that package does not ship. The wheel is downloaded ONCE
@@ -39,6 +43,10 @@ const matcherDest = resolve(appRoot, "public/matcher");
 const pdfSrc = resolve(repoRoot, "matcher/explanatory/output");
 const pdfDest = resolve(appRoot, "public/explanatory");
 const pyodideDest = resolve(appRoot, "public/pyodide");
+const demoSrc = resolve(repoRoot, "simulated_data");
+const demoDest = resolve(appRoot, "public/demo");
+// The demo's files (src/lib/demo.ts names them too).
+const DEMO_FILES = ["dataset_A100.csv", "dataset_B_tracts.csv", "truth_A100.csv"];
 const cacheRoot = resolve(appRoot, ".cache/pyodide");
 
 // The runtime files loadPyodide fetches from indexURL. pyodide.mjs itself
@@ -153,6 +161,12 @@ async function syncPyodide() {
 
 syncDir(matcherSrc, matcherDest, (n) => n.endsWith(".py"));
 syncDir(pdfSrc, pdfDest, (n) => n.endsWith(".pdf"));
+syncDir(demoSrc, demoDest, (n) => DEMO_FILES.includes(n));
+for (const name of DEMO_FILES) {
+  if (!existsSync(join(demoDest, name))) {
+    throw new Error(`[sync-assets] demo file missing: simulated_data/${name}`);
+  }
+}
 await syncPyodide();
 
-console.log("[sync-assets] matcher + explanatory assets synced into public/");
+console.log("[sync-assets] matcher, explanatory and demo assets synced into public/");

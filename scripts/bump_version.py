@@ -29,6 +29,9 @@ DECLARATIONS = [
     ("webapp/package.json", r'^  "version": "(' + SEMVER + r')",$'),
     ("matcher/pyproject.toml", r'^version = "(' + SEMVER + r')"$'),
     ("webapp/src-tauri/Cargo.toml", r'^version = "(' + SEMVER + r')"$'),
+    # The app's own entry in the committed lockfile; cargo would rewrite it at
+    # the next build and leave a stray diff.
+    ("webapp/src-tauri/Cargo.lock", r'^name = "neighborhood-matcher"\nversion = "(' + SEMVER + r')"$'),
     ("pyproject.toml", r'^version = "(' + SEMVER + r')"$'),
 ]
 

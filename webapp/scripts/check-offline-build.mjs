@@ -7,6 +7,7 @@
 //   - index.html loads no script, style or font from another origin;
 //   - the self-hosted runtime is complete (core files + numpy wheel);
 //   - the service worker precaches the runtime and every matcher module;
+//   - the demo's sample data is built and precached (/match?demo offline);
 //   - the self-host zip exists (skip with --no-zip for a build:web).
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -83,6 +84,10 @@ if (!existsSync(swPath)) {
     if (!sw.includes(`matcher/${py}`)) problems.push(`sw.js does not precache matcher/${py}`);
   }
   if (!sw.includes("index.html")) problems.push("sw.js does not precache index.html");
+  for (const name of ["dataset_A100.csv", "dataset_B_tracts.csv", "truth_A100.csv"]) {
+    if (!existsSync(join(dist, "demo", name))) problems.push(`missing demo file demo/${name}`);
+    else if (!sw.includes(`demo/${name}`)) problems.push(`sw.js does not precache demo/${name}`);
+  }
 }
 if (!existsSync(join(dist, "manifest.webmanifest"))) problems.push("manifest.webmanifest missing (not installable)");
 

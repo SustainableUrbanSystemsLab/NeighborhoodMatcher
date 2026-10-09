@@ -3,7 +3,8 @@
 // WHAT IS CACHED — the whole build as ONE versioned unit: the app shell
 // (index.html, JS, CSS), the matcher's Python sources (/matcher/*.py), the
 // self-hosted Pyodide runtime and numpy wheel (/pyodide/v<version>/*), the
-// logo, icons and explanatory PDFs. vite-plugin-pwa injects the list
+// logo, icons, explanatory PDFs and the demo's sample data (/demo/*.csv —
+// synthetic, ours, not the user's). vite-plugin-pwa injects the list
 // (self.__WB_MANIFEST) with a content hash per file at build time, so a
 // deploy produces a new precache and Workbox drops the old one.
 //

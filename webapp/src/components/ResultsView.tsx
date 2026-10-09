@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { buildResultsZip, triggerDownload } from "@/lib/zip-builder";
 import { tierChipClasses, tierRank, tierSentence } from "@/lib/confidence-text";
 import { VariableDiagnosticsPanel } from "@/components/VariableDiagnosticsPanel";
+import type { AnswerKeyScore } from "@/lib/demo";
 import {
   REPO_URL,
   TOOL_NAME,
@@ -31,6 +32,8 @@ interface ResultsViewProps {
   links: ColumnLink[];
   /** shared identifier columns (ZIP, tract, GEOID, …) kept out of the run */
   blocked?: IdentifierBlock[];
+  /** demo mode only: the run scored against the sample's answer key */
+  answerKey?: AnswerKeyScore | null;
   /** wall-clock duration of the matching run (null if unknown) */
   runDurationMs: number | null;
   /** Pyodide workers (≈ CPU cores) the run used (null if unknown) */
@@ -70,6 +73,7 @@ export function ResultsView({
   supplemental,
   links,
   blocked = [],
+  answerKey = null,
   runDurationMs,
   workersUsed,
   completedAt,
@@ -215,6 +219,8 @@ export function ResultsView({
           tone="gray"
         />
       </div>
+
+      {answerKey && <AnswerKeyPanel score={answerKey} />}
 
       {/* Dataset-level warnings (e.g. scale mismatch, no-match rows) */}
       {(output.warnings?.length > 0 ||
@@ -565,6 +571,47 @@ export function ResultsView({
           run_info.csv.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Demo mode only: real data has no answer key, the sample does. */
+function AnswerKeyPanel({ score }: { score: AnswerKeyScore }) {
+  const heldBackWrong = score.heldBack - score.heldBackCorrect;
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">
+      <p className="mb-1 font-semibold">Answer key (sample data only)</p>
+      <p className="mb-1">
+        Each sample participant was generated from a known census tract, so
+        this run can be checked, which is never possible with real data.
+      </p>
+      <ul className="list-disc space-y-0.5 pl-4">
+        <li>
+          <strong>
+            {score.linkedCorrect} of {score.linked}
+          </strong>{" "}
+          {plural(score.linked, "link", "links")} written to the results{" "}
+          {plural(score.linked, "is", "are")} the participant&apos;s true tract.
+        </li>
+        {score.heldBack > 0 && (
+          <li>
+            {score.heldBack} {plural(score.heldBack, "match was", "matches were")}{" "}
+            held back by the minimum confidence or the distance cutoff;{" "}
+            {heldBackWrong} of them would have been wrong.
+          </li>
+        )}
+        {score.noMatch > 0 && (
+          <li>
+            {score.noMatch} {plural(score.noMatch, "participant has", "participants have")}{" "}
+            no usable values, so no match was made.
+          </li>
+        )}
+        <li>
+          The nearest tract is the true one for {score.nearestCorrect} of{" "}
+          {score.total} participants.
+        </li>
+      </ul>
     </div>
   );
 }
