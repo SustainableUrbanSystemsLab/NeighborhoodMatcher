@@ -19,6 +19,10 @@ pull request that changes shipped code without one.
 - The self-host zip grows to ~12 MB (the sample data); the About page says so.
 - `scripts/bump_version.py` also updates (and `--check` verifies) the app's own entry in `webapp/src-tauri/Cargo.lock`, which it did not track before.
 
+### Fixed
+
+- **Phones:** the Match page no longer scrolls sideways. The step indicator needed ~680px; below 768px it now shows only the numbered circles with the current step's name underneath (every label stays available to screen readers, and the current step is marked `aria-current`). The Link step's column table, whose names and buttons overlapped on a phone, scrolls inside its box instead, like the results table. A Playwright test checks every step at 375px.
+
 ## [0.9.0] - 2026-10-08
 
 ### Added
